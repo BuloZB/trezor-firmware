@@ -3,3 +3,4 @@ web3>=5
 Pillow>=10
 stellar-sdk>=6
 cryptography>=41
+aiohttp>=3.10.11 # not directly required, pinned by Snyk to avoid a vulnerability
