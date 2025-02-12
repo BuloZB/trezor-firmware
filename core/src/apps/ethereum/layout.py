@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from trezor import TR, ui
+from trezor import TR
 from trezor.enums import ButtonRequestType
 from trezor.ui.layouts import (
     confirm_blob,
@@ -180,7 +180,7 @@ def require_confirm_other_data(data: bytes, data_total: int) -> Awaitable[None]:
         "confirm_data",
         TR.ethereum__title_input_data,
         data,
-        TR.ethereum__data_size_template.format(data_total),
+        description=TR.ethereum__data_size_template.format(data_total),
         verb=TR.buttons__confirm,
         verb_cancel=TR.send__cancel_sign,
         br_code=ButtonRequestType.SignTx,
@@ -214,9 +214,9 @@ async def should_show_domain(name: bytes, version: bytes) -> bool:
     domain_version = decode_typed_data(version, "string")
 
     para = (
-        (ui.NORMAL, TR.ethereum__name_and_version),
-        (ui.DEMIBOLD, domain_name),
-        (ui.DEMIBOLD, domain_version),
+        (TR.ethereum__name_and_version, False),
+        (domain_name, False),
+        (domain_version, False),
     )
     return await should_show_more(
         TR.ethereum__title_confirm_domain,
@@ -243,12 +243,9 @@ async def should_show_struct(
     contains_plural = f"{TR.words__contains} {plural}"
 
     para = (
-        (ui.DEMIBOLD, description),
-        (
-            ui.NORMAL,
-            contains_plural,
-        ),
-        (ui.NORMAL, ", ".join(field.name for field in data_members)),
+        (description, False),
+        (contains_plural, False),
+        (", ".join(field.name for field in data_members), False),
     )
     return await should_show_more(
         title,
@@ -268,7 +265,7 @@ async def should_show_array(
     # Leaving english plural form because of dynamic noun - data_type
     plural = format_plural_english("{count} {plural}", size, data_type)
     array_of_plural = f"{TR.words__array_of} {plural}"
-    para = ((ui.NORMAL, array_of_plural),)
+    para = ((array_of_plural, False),)
     return await should_show_more(
         limit_str(".".join(parent_objects)),
         para,

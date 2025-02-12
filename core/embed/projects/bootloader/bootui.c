@@ -19,7 +19,6 @@
 
 #include <trezor_rtl.h>
 
-#include <gfx/fonts.h>
 #include <io/display.h>
 #include <io/display_utils.h>
 #include <rtl/mini_printf.h>
@@ -44,7 +43,7 @@
 #define COLOR_BL_GRAY COLOR_BL_FG
 #endif
 
-#if !defined TREZOR_MODEL_R && !defined TREZOR_MODEL_T3B1
+#if !defined TREZOR_MODEL_T2B1 && !defined TREZOR_MODEL_T3B1
 #define BOOT_WAIT_HEIGHT 25
 #define BOOT_WAIT_Y_TOP (DISPLAY_RESY - BOOT_WAIT_HEIGHT)
 #else

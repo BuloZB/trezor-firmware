@@ -25,12 +25,21 @@
 #include <sys/irq.h>
 #include <sys/wakeup_flags.h>
 
+#ifdef USE_OPTIGA
+#include <sec/optiga_config.h>
+#include <sec/optiga_transport.h>
+#endif
+
 #ifdef USE_TOUCH
 #include <io/touch.h>
 #endif
 
 #ifdef USE_HAPTIC
 #include <io/haptic.h>
+#endif
+
+#ifdef USE_RGB_LED
+#include <io/rgb_led.h>
 #endif
 
 #ifdef KERNEL_MODE
@@ -54,9 +63,17 @@ void powerctl_suspend(void) {
 
   // Deinitialize all drivers that are not required in low-power mode
   // (e.g., USB, display, touch, haptic, etc.).
+#ifdef USE_OPTIGA
+  optiga_deinit();
+#endif
+#ifdef USE_USB
   usb_stop();
+#endif
 #ifdef USE_HAPTIC
   haptic_deinit();
+#endif
+#ifdef USE_RGB_LED
+  rgb_led_deinit();
 #endif
 #ifdef USE_TOUCH
   touch_deinit();
@@ -93,8 +110,15 @@ void powerctl_suspend(void) {
       // immediately after exiting STOP2 mode.
       irq_key_t irq_key = irq_lock();
 
-      // Enter STOP2 mode
+      // The PWR clock is disabled after system initialization.
+      // Re-enable it before writing to PWR registers.
+      __HAL_RCC_PWR_CLK_ENABLE();
+
+      // Enter STOP2 low-power mode
       HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+
+      // Disable PWR clock after use
+      __HAL_RCC_PWR_CLK_DISABLE();
 
       // Recover system clock
       SystemInit();
@@ -118,7 +142,15 @@ void powerctl_suspend(void) {
 #ifdef USE_HAPTIC
   haptic_init();
 #endif
+#ifdef USE_RGB_LED
+  rgb_led_init();
+#endif
+#ifdef USE_USB
   usb_start();
+#endif
+#ifdef USE_OPTIGA
+  optiga_init_and_configure();
+#endif
 }
 
 #endif  // KERNEL_MODE

@@ -31,14 +31,16 @@ jobs:
         model: [T2T1, T2B1]
         coins: [universal, btconly]
     env:
-      TREZOR_MODEL: ${{ matrix.model == 'T2T1' && 'T' || 'R' }}
+      TREZOR_MODEL: ${{ matrix.model }}
+      BITCOIN_ONLY: ${{ matrix.coins == 'btconly' && '1' || '0' }}
       TREZOR_PYTEST_SKIP_ALTCOINS: ${{ matrix.coins == 'btconly' && '1' || '0' }}
-      PYTEST_TIMEOUT: 1200
+      PYTEST_TIMEOUT: 1200  # 20m single test timeout
       PYOPT: 0
       DISABLE_OPTIGA: 1
       BOOTLOADER_DEVEL: ${{ matrix.model == 'T2B1' && '1' || '0' }}
-      TESTOPTS: "-k 'not authenticate and not recovery and not lots'"
+      TESTOPTS: "-k 'not authenticate and not recovery and not lots' --session-timeout 19800"  # 5.5h pytest global timeout
       TT_UHUB_PORT: 1
+    timeout-minutes: 360  # 6h CI job timeout
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,8 +53,8 @@ jobs:
       - run: nix-shell --run "poetry run trezorctl get-features"
       - run: |
           # log serial console to file; sleep is used because tio needs stdin that is not /dev/null
-          nix-shell --arg hardwareTest true --run "sleep 8h | tio --no-autoconnect /dev/ttyTREZOR &> trezor.log" &
-          nix-shell --run "poetry run pytest -v tests/device_tests"
+          nix-shell --arg hardwareTest true --run "sleep 8h | tio --timestamp --no-autoconnect /dev/ttyTREZOR &> trezor.log" &
+          nix-shell --run "poetry run pytest -v tests/device_tests $TESTOPTS"
       - run: tail -n50 trezor.log || true
         if: failure()
       - uses: actions/upload-artifact@v4
@@ -74,7 +76,7 @@ jobs:
       matrix:
         model: [T2T1, T2B1]
     env:
-      TREZOR_MODEL: ${{ matrix.model == 'T2T1' && 'T' || 'R' }}
+      TREZOR_MODEL: ${{ matrix.model }}
       PYTEST_TIMEOUT: 1200
       PYOPT: 0
       DISABLE_OPTIGA: 1
@@ -92,8 +94,8 @@ jobs:
       - run: nix-shell --run "poetry run trezorctl get-features"
       - run: |
           # log serial console to file; sleep is used because tio needs stdin that is not /dev/null
-          nix-shell --arg hardwareTest true --run "sleep 8h | tio --no-autoconnect /dev/ttyTREZOR &> trezor.log" &
-          nix-shell --arg fullDeps true --run "./core/tests/run_tests_device_emu_monero.sh $TESTOPTS"
+          nix-shell --arg hardwareTest true --run "sleep 8h | tio --timestamp --no-autoconnect /dev/ttyTREZOR &> trezor.log" &
+          nix-shell --arg fullDeps true --run "./core/tests/run_tests_device_emu_monero.sh --trezor-path webusb:"
       - run: tail -n50 trezor.log || true
         if: failure()
       - uses: actions/upload-artifact@v4

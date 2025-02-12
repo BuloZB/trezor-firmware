@@ -18,6 +18,7 @@ def stm32f4_common_files(env, defines, sources, paths):
         "embed/sec/time_estimate/inc",
         "embed/sys/bsp/stm32f4",
         "embed/sys/irq/inc",
+        "embed/sys/linker/inc",
         "embed/sys/mpu/inc",
         "embed/sys/pvd/inc",
         "embed/sec/secret/inc",
@@ -29,6 +30,7 @@ def stm32f4_common_files(env, defines, sources, paths):
         "embed/util/flash/inc",
         "embed/util/fwutils/inc",
         "embed/util/option_bytes/inc",
+        "embed/util/tsqueue/inc",
         "embed/util/unit_properties/inc",
         "vendor/micropython/lib/cmsis/inc",
         "vendor/micropython/lib/stm32lib/STM32F4xx_HAL_Driver/Inc",
@@ -65,9 +67,11 @@ def stm32f4_common_files(env, defines, sources, paths):
         "embed/sec/rng/stm32/rng.c",
         "embed/sec/secret/stm32f4/secret.c",
         "embed/sec/time_estimate/stm32/time_estimate.c",
+        "embed/sys/linker/linker_utils.c",
         "embed/sys/mpu/stm32f4/mpu.c",
         "embed/sys/pvd/stm32/pvd.c",
         "embed/sys/startup/stm32/bootutils.c",
+        "embed/sys/startup/stm32/sysutils.c",
         "embed/sys/startup/stm32f4/reset_flags.c",
         "embed/sys/startup/stm32f4/startup_init.c",
         "embed/sys/startup/stm32f4/vectortable.S",
@@ -87,20 +91,9 @@ def stm32f4_common_files(env, defines, sources, paths):
         "embed/util/flash/stm32f4/flash_otp.c",
         "embed/util/fwutils/fwutils.c",
         "embed/util/option_bytes/stm32f4/option_bytes.c",
+        "embed/util/tsqueue/tsqueue.c",
         "embed/util/unit_properties/stm32/unit_properties.c",
     ]
-
-    # boardloader needs separate assembler for some function unencumbered by various FW+bootloader hacks
-    # this helps to prevent making a bug in boardloader which may be hard to fix since it's locked with write-protect
-    env_constraints = env.get("CONSTRAINTS")
-    if env_constraints and "limited_util_s" in env_constraints:
-        sources += [
-            "embed/sys/startup/stm32f4/limited_util.S",
-        ]
-    else:
-        sources += [
-            "embed/sys/startup/stm32f4/util.S",
-        ]
 
     env.get("ENV")["SUFFIX"] = "stm32f4"
     env.get("ENV")["LINKER_SCRIPT"] = """embed/sys/linker/stm32f4/{target}.ld"""

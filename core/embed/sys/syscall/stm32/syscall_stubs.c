@@ -76,12 +76,6 @@ uint64_t systick_us_to_cycles(uint64_t us) {
 
 #include <sys/bootutils.h>
 
-void secure_shutdown(void) {
-  syscall_invoke0(SYSCALL_SECURE_SHUTDOWN);
-  while (1)
-    ;
-}
-
 void reboot_to_bootloader(void) {
   syscall_invoke0(SYSCALL_REBOOT_TO_BOOTLOADER);
   while (1)
@@ -162,8 +156,12 @@ secbool usb_start(void) { return (secbool)syscall_invoke0(SYSCALL_USB_START); }
 
 void usb_stop(void) { syscall_invoke0(SYSCALL_USB_STOP); }
 
-secbool usb_configured(void) {
-  return (secbool)syscall_invoke0(SYSCALL_USB_CONFIGURED);
+usb_event_t usb_get_event(void) {
+  return (usb_event_t)syscall_invoke0(SYSCALL_USB_GET_EVENT);
+}
+
+void usb_get_state(usb_state_t *state) {
+  syscall_invoke1((uint32_t)state, SYSCALL_USB_GET_STATE);
 }
 
 // =============================================================================
@@ -640,5 +638,89 @@ secbool firmware_calc_hash(const uint8_t *challenge, size_t challenge_len,
                          (uint32_t)callback_context,
                          SYSCALL_FIRMWARE_CALC_HASH);
 }
+
+#ifdef USE_BLE
+
+// =============================================================================
+// ble.h
+// =============================================================================
+
+#include <io/ble.h>
+
+void ble_start(void) { syscall_invoke0(SYSCALL_BLE_START); }
+
+bool ble_issue_command(ble_command_t *command) {
+  return (bool)syscall_invoke1((uint32_t)command, SYSCALL_BLE_ISSUE_COMMAND);
+}
+
+bool ble_get_event(ble_event_t *event) {
+  return (bool)syscall_invoke1((uint32_t)event, SYSCALL_BLE_GET_EVENT);
+}
+
+void ble_get_state(ble_state_t *state) {
+  syscall_invoke1((uint32_t)state, SYSCALL_BLE_GET_STATE);
+}
+
+bool ble_can_write(void) { return syscall_invoke0(SYSCALL_BLE_CAN_WRITE); }
+
+bool ble_write(const uint8_t *data, uint16_t len) {
+  return syscall_invoke2((uint32_t)data, len, SYSCALL_BLE_WRITE);
+}
+
+bool ble_can_read(void) { return syscall_invoke0(SYSCALL_BLE_CAN_READ); }
+
+uint32_t ble_read(uint8_t *data, uint16_t len) {
+  return (uint32_t)syscall_invoke2((uint32_t)data, len, SYSCALL_BLE_READ);
+}
+
+#endif
+
+// =============================================================================
+// powerctl.h
+// =============================================================================
+
+#ifdef USE_POWERCTL
+
+#include <sys/powerctl.h>
+
+void powerctl_suspend(void) { syscall_invoke0(SYSCALL_POWERCTL_SUSPEND); }
+
+#endif  // USE_POWERCTL
+
+// =============================================================================
+// jpegdec.h
+// =============================================================================
+
+#ifdef USE_HW_JPEG_DECODER
+
+#include <gfx/jpegdec.h>
+
+bool jpegdec_open(void) { return (bool)syscall_invoke0(SYSCALL_JPEGDEC_OPEN); }
+
+void jpegdec_close(void) {
+  {
+    // Temporary hack to fix the problem with dual DMA2D driver in
+    // user/kernel space - will be removed in the future with DMA2D syscalls
+    extern void dma2d_invalidate_clut();
+    dma2d_invalidate_clut();
+  }
+  syscall_invoke0(SYSCALL_JPEGDEC_CLOSE);
+}
+
+jpegdec_state_t jpegdec_process(jpegdec_input_t *input) {
+  return (jpegdec_state_t)syscall_invoke1((uint32_t)input,
+                                          SYSCALL_JPEGDEC_PROCESS);
+}
+
+bool jpegdec_get_info(jpegdec_image_t *info) {
+  return (bool)syscall_invoke1((uint32_t)info, SYSCALL_JPEGDEC_GET_INFO);
+}
+
+bool jpegdec_get_slice_rgba8888(uint32_t *rgba8888, jpegdec_slice_t *slice) {
+  return (bool)syscall_invoke2((uint32_t)rgba8888, (uint32_t)slice,
+                               SYSCALL_JPEGDEC_GET_SLICE_RGBA8888);
+}
+
+#endif  // USE_HW_JPEG_DECODER
 
 #endif  // KERNEL_MODE

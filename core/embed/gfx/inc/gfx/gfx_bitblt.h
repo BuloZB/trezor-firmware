@@ -72,11 +72,17 @@ typedef struct {
   gfx_color_t src_bg;
   // Alpha value for fill operation (255 => normal fill, 0 => noop)
   uint8_t src_alpha;
+  // Downscaling for the source bitmap
+  // (0 => no downscaling, 1 => 1/2, 2 => 1/4, 3 => 1/8)
+  uint8_t src_downscale;
 
 } gfx_bitblt_t;
 
 // Initializes bitblt operations
 void gfx_bitblt_init(void);
+
+// Deinitializes bitblt operations
+void gfx_bitblt_deinit(void);
 
 // If the bitblt operation is asynchronous, waits until it's finished
 void gfx_bitblt_wait(void);

@@ -96,9 +96,9 @@ async def _continue_recovery_process() -> Success:
         if is_first_step:
             # If we are starting recovery, ask for word count first...
             # _request_word_count
-            # For others than model_tr, just continue straight to word count keyboard
+            # For others than Caesar (TS3), just continue straight to word count keyboard
             # pylint: disable-next=consider-using-in
-            if utils.INTERNAL_MODEL == "T2B1" or utils.INTERNAL_MODEL == "T3B1":
+            if utils.UI_LAYOUT == "CAESAR":
                 await layout.homescreen_dialog(
                     TR.buttons__continue, TR.recovery__num_of_words
                 )
@@ -212,9 +212,8 @@ async def _finish_recovery(secret: bytes, backup_type: BackupType) -> Success:
     if backup_type is None:
         raise RuntimeError
 
-    storage_device.store_mnemonic_secret(
-        secret, backup_type, needs_backup=False, no_backup=False
-    )
+    storage_device.store_mnemonic_secret(secret, needs_backup=False, no_backup=False)
+    storage_device.set_backup_type(backup_type)
     if backup_types.is_slip39_backup_type(backup_type):
         if not backup_types.is_extendable_backup_type(backup_type):
             identifier = storage_recovery.get_slip39_identifier()

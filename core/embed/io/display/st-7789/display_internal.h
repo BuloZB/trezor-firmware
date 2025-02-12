@@ -25,6 +25,7 @@ typedef struct {
 
   // Current display orientation (0, 90, 180, 270)
   int orientation_angle;
+  int update_pending;
 
 } display_driver_t;
 
@@ -36,5 +37,7 @@ static inline uint32_t is_mode_exception(void) {
   // Check if the ISR number is not 0 (thread mode) or 11 (SVCall)
   return (isr_number != 0) && (isr_number != 11);
 }
+
+void display_ensure_refreshed(void);
 
 #endif  // TREZORHAL_DISPLAY_INTERNAL_H

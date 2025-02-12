@@ -44,10 +44,9 @@ from mnemonic import Mnemonic
 
 from . import mapping, messages, models, protobuf
 from .client import TrezorClient
-from .exceptions import TrezorFailure
+from .exceptions import TrezorFailure, UnexpectedMessageError
 from .log import DUMP_BYTES
 from .messages import DebugWaitType
-from .tools import expect
 
 if TYPE_CHECKING:
     from typing_extensions import Protocol
@@ -65,8 +64,9 @@ if TYPE_CHECKING:
         def __call__(
             self,
             hold_ms: int | None = None,
-            wait: bool | None = None,
-        ) -> "LayoutContent": ...
+        ) -> "None": ...
+
+    InputFlowType = Generator[None, messages.ButtonRequest, None]
 
 
 EXPECTED_RESPONSES_CONTEXT_LINES = 3
@@ -76,18 +76,21 @@ LOG = logging.getLogger(__name__)
 
 class LayoutType(Enum):
     T1 = auto()
-    TT = auto()
-    TR = auto()
-    Mercury = auto()
+    Bolt = auto()
+    Caesar = auto()
+    Delizia = auto()
+    Eckhart = auto()
 
     @classmethod
     def from_model(cls, model: models.TrezorModel) -> "LayoutType":
         if model in (models.T2T1,):
-            return cls.TT
+            return cls.Bolt
         if model in (models.T2B1, models.T3B1):
-            return cls.TR
+            return cls.Caesar
         if model in (models.T3T1,):
-            return cls.Mercury
+            return cls.Delizia
+        if model in (models.T3W1,):
+            return cls.Eckhart
         if model in (models.T1B1,):
             return cls.T1
         raise ValueError(f"Unknown model: {model}")
@@ -412,11 +415,10 @@ def _make_input_func(
     def input_func(
         self: "DebugLink",
         hold_ms: int | None = None,
-        wait: bool | None = None,
-    ) -> LayoutContent:
+    ) -> None:
         __tracebackhide__ = True  # for pytest # pylint: disable=W0612
         decision.hold_ms = hold_ms
-        return self._decision(decision, wait=wait)
+        self._decision(decision)
 
     return input_func  # type: ignore [Parameter name mismatch]
 
@@ -438,12 +440,7 @@ class DebugLink:
         self.t1_screenshot_directory: Path | None = None
         self.t1_screenshot_counter = 0
 
-        # Optional file for saving text representation of the screen
-        self.screen_text_file: Path | None = None
-        self.last_screen_content = ""
-
         self.waiting_for_layout_change = False
-        self.layout_dirty = True
 
         self.input_wait_type = DebugWaitType.IMMEDIATE
 
@@ -472,11 +469,6 @@ class DebugLink:
     def layout_type(self) -> LayoutType:
         assert self.model is not None
         return LayoutType.from_model(self.model)
-
-    def set_screen_text_file(self, file_path: Path | None) -> None:
-        if file_path is not None:
-            file_path.write_bytes(b"")
-        self.screen_text_file = file_path
 
     def open(self) -> None:
         self.transport.begin_session()
@@ -539,8 +531,19 @@ class DebugLink:
             raise TrezorFailure(result)
         return result
 
-    def read_layout(self) -> LayoutContent:
-        return LayoutContent(self.state().tokens)
+    def read_layout(self, wait: bool | None = None) -> LayoutContent:
+        """
+        Force waiting for the layout by setting `wait=True`. Force not waiting by
+        setting `wait=False` -- useful when, e.g., you are causing the next layout to be
+        deliberately delayed.
+        """
+        if wait is True:
+            wait_type = DebugWaitType.CURRENT_LAYOUT
+        elif wait is False:
+            wait_type = DebugWaitType.IMMEDIATE
+        else:
+            wait_type = None
+        return LayoutContent(self.state(wait_type=wait_type).tokens)
 
     def wait_layout(self, wait_for_external_change: bool = False) -> LayoutContent:
         # Next layout change will be caused by external event
@@ -554,18 +557,12 @@ class DebugLink:
         obj = self._call(
             messages.DebugLinkGetState(wait_layout=DebugWaitType.NEXT_LAYOUT)
         )
-        self.layout_dirty = True
         if isinstance(obj, messages.Failure):
             raise TrezorFailure(obj)
         return LayoutContent(obj.tokens)
 
     @contextmanager
-    def wait_for_layout_change(self) -> Iterator[LayoutContent]:
-        # set up a dummy layout content object to be yielded
-        layout_content = LayoutContent(
-            ["DUMMY CONTENT, WAIT UNTIL THE END OF THE BLOCK :("]
-        )
-
+    def wait_for_layout_change(self) -> Iterator[None]:
         # make sure some current layout is up by issuing a dummy GetState
         self.state()
 
@@ -575,17 +572,13 @@ class DebugLink:
         # allow the block to proceed
         self.waiting_for_layout_change = True
         try:
-            yield layout_content
+            yield
         finally:
             self.waiting_for_layout_change = False
-            self.layout_dirty = True
 
         # wait for the reply
         resp = self._read()
         assert isinstance(resp, messages.DebugLinkState)
-
-        # replace contents of the yielded object with the new thing
-        layout_content.__init__(resp.tokens)
 
     def reset_debug_events(self) -> None:
         # Only supported on TT and above certain version
@@ -630,44 +623,24 @@ class DebugLink:
         state = self._call(messages.DebugLinkGetState(wait_word_list=True))
         return state.reset_word
 
-    def _decision(
-        self, decision: messages.DebugLinkDecision, wait: bool | None = None
-    ) -> LayoutContent:
-        """Send a debuglink decision and returns the resulting layout.
+    def _decision(self, decision: messages.DebugLinkDecision) -> None:
+        """Send a debuglink decision.
 
         If hold_ms is set, an additional 200ms is added to account for processing
         delays. (This is needed for hold-to-confirm to trigger reliably.)
-
-        If `wait` is unset, the following wait mode is used:
-
-        - `IMMEDIATE`, when in normal tests, which never deadlocks the device, but may
-          return an empty layout in case the next one didn't come up immediately. (E.g.,
-          in SignTx flow, the device is waiting for more TxRequest/TxAck exchanges
-          before showing the next UI layout.)
-        - `CURRENT_LAYOUT`, when in tests running through a `DeviceHandler`. This mode
-          returns the current layout or waits for some layout to come up if there is
-          none at the moment. The assumption is that wirelink is communicating on
-          another thread and won't be blocked by waiting on debuglink.
-
-        Force waiting for the layout by setting `wait=True`. Force not waiting by
-        setting `wait=False` -- useful when, e.g., you are causing the next layout to be
-        deliberately delayed.
         """
         if not self.allow_interactions:
-            return self.wait_layout()
+            self.wait_layout()
+            return
 
         if decision.hold_ms is not None:
             decision.hold_ms += 200
 
         self._write(decision)
-        self.layout_dirty = True
-        if wait is True:
-            wait_type = DebugWaitType.CURRENT_LAYOUT
-        elif wait is False:
-            wait_type = DebugWaitType.IMMEDIATE
-        else:
-            wait_type = self.input_wait_type
-        return self._snapshot_core(wait_type)
+        if self.model is models.T1B1:
+            return
+        # When the call below returns, we know that `decision` has been processed in Core.
+        self._call(messages.DebugLinkGetState(return_empty_state=True))
 
     press_yes = _make_input_func(button=messages.DebugButton.YES)
     """Confirm current layout. See `_decision` for more details."""
@@ -694,58 +667,14 @@ class DebugLink:
     )
     """Press right button. See `_decision` for more details."""
 
-    def input(self, word: str, wait: bool | None = None) -> LayoutContent:
+    def input(self, word: str) -> None:
         """Send text input to the device. See `_decision` for more details."""
-        return self._decision(messages.DebugLinkDecision(input=word), wait)
+        self._decision(messages.DebugLinkDecision(input=word))
 
-    def click(
-        self,
-        click: Tuple[int, int],
-        hold_ms: int | None = None,
-        wait: bool | None = None,
-    ) -> LayoutContent:
+    def click(self, click: Tuple[int, int], hold_ms: int | None = None) -> None:
         """Send a click to the device. See `_decision` for more details."""
         x, y = click
-        return self._decision(
-            messages.DebugLinkDecision(x=x, y=y, hold_ms=hold_ms), wait
-        )
-
-    def _snapshot_core(
-        self, wait_type: DebugWaitType = DebugWaitType.IMMEDIATE
-    ) -> LayoutContent:
-        """Save text and image content of the screen to relevant directories."""
-        # skip the snapshot if we are on T1
-        if self.model is models.T1B1:
-            return LayoutContent([])
-
-        # take the snapshot
-        state = self.state(wait_type)
-        layout = LayoutContent(state.tokens)
-
-        if state.tokens and self.layout_dirty:
-            # save it, unless we already did or unless it's empty
-            self.save_debug_screen(layout.visible_screen())
-            self.layout_dirty = False
-
-        # return the layout
-        return layout
-
-    def save_debug_screen(self, screen_content: str) -> None:
-        if self.screen_text_file is None:
-            return
-
-        if not self.screen_text_file.exists():
-            self.screen_text_file.write_bytes(b"")
-
-        # Not writing the same screen twice
-        if screen_content == self.last_screen_content:
-            return
-
-        self.last_screen_content = screen_content
-
-        with open(self.screen_text_file, "a") as f:
-            f.write(screen_content)
-            f.write("\n" + 80 * "/" + "\n")
+        self._decision(messages.DebugLinkDecision(x=x, y=y, hold_ms=hold_ms))
 
     def stop(self) -> None:
         self._write(messages.DebugLinkStop())
@@ -775,9 +704,10 @@ class DebugLink:
         else:
             self.t1_take_screenshots = False
 
-    @expect(messages.DebugLinkMemory, field="memory", ret_type=bytes)
-    def memory_read(self, address: int, length: int) -> protobuf.MessageType:
-        return self._call(messages.DebugLinkMemoryRead(address=address, length=length))
+    def memory_read(self, address: int, length: int) -> bytes:
+        return self._call(
+            messages.DebugLinkMemoryRead(address=address, length=length)
+        ).memory
 
     def memory_write(self, address: int, memory: bytes, flash: bool = False) -> None:
         self._write(
@@ -787,9 +717,11 @@ class DebugLink:
     def flash_erase(self, sector: int) -> None:
         self._write(messages.DebugLinkFlashErase(sector=sector))
 
-    @expect(messages.Success)
     def erase_sd_card(self, format: bool = True) -> messages.Success:
-        return self._call(messages.DebugLinkEraseSdCard(format=format))
+        res = self._call(messages.DebugLinkEraseSdCard(format=format))
+        if not isinstance(res, messages.Success):
+            raise UnexpectedMessageError(messages.Success, res)
+        return res
 
     def snapshot_legacy(self) -> None:
         """Snapshot the current state of the device."""
@@ -875,7 +807,8 @@ class DebugUI:
             # Paginating (going as further as possible) and pressing Yes
             if br.pages is not None:
                 for _ in range(br.pages - 1):
-                    self.debuglink.swipe_up(wait=True)
+                    self.debuglink.swipe_up()
+
             if self.debuglink.model is models.T3T1:
                 layout = self.debuglink.read_layout()
                 if "PromptScreen" in layout.all_components():
@@ -1106,7 +1039,7 @@ class TrezorClientDebugLink(TrezorClient):
             return msg
 
     def set_input_flow(
-        self, input_flow: Generator[None, messages.ButtonRequest | None, None]
+        self, input_flow: InputFlowType | Callable[[], InputFlowType]
     ) -> None:
         """Configure a sequence of input events for the current with-block.
 
@@ -1140,7 +1073,7 @@ class TrezorClientDebugLink(TrezorClient):
         if not hasattr(input_flow, "send"):
             raise RuntimeError("input_flow should be a generator function")
         self.ui.input_flow = input_flow
-        input_flow.send(None)  # start the generator
+        next(input_flow)  # start the generator
 
     def watch_layout(self, watch: bool = True) -> None:
         """Enable or disable watching layout changes.
@@ -1188,7 +1121,8 @@ class TrezorClientDebugLink(TrezorClient):
             input_flow.throw(exc_type, value, traceback)
 
     def set_expected_responses(
-        self, expected: list[Union["ExpectedMessage", Tuple[bool, "ExpectedMessage"]]]
+        self,
+        expected: Sequence[Union["ExpectedMessage", Tuple[bool, "ExpectedMessage"]]],
     ) -> None:
         """Set a sequence of expected responses to client calls.
 
@@ -1350,7 +1284,6 @@ class TrezorClientDebugLink(TrezorClient):
         raise RuntimeError("Unexpected call")
 
 
-@expect(messages.Success, field="message", ret_type=str)
 def load_device(
     client: "TrezorClient",
     mnemonic: Union[str, Iterable[str]],
@@ -1360,7 +1293,7 @@ def load_device(
     skip_checksum: bool = False,
     needs_backup: bool = False,
     no_backup: bool = False,
-) -> protobuf.MessageType:
+) -> None:
     if isinstance(mnemonic, str):
         mnemonic = [mnemonic]
 
@@ -1371,7 +1304,7 @@ def load_device(
             "Device is initialized already. Call device.wipe() and try again."
         )
 
-    resp = client.call(
+    client.call(
         messages.LoadDevice(
             mnemonics=mnemonics,
             pin=pin,
@@ -1380,25 +1313,25 @@ def load_device(
             skip_checksum=skip_checksum,
             needs_backup=needs_backup,
             no_backup=no_backup,
-        )
+        ),
+        expect=messages.Success,
     )
     client.init_device()
-    return resp
 
 
 # keep the old name for compatibility
 load_device_by_mnemonic = load_device
 
 
-@expect(messages.Success, field="message", ret_type=str)
-def prodtest_t1(client: "TrezorClient") -> protobuf.MessageType:
+def prodtest_t1(client: "TrezorClient") -> None:
     if client.features.bootloader_mode is not True:
         raise RuntimeError("Device must be in bootloader mode")
 
-    return client.call(
+    client.call(
         messages.ProdTestT1(
             payload=b"\x00\xFF\x55\xAA\x66\x99\x33\xCCABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\x00\xFF\x55\xAA\x66\x99\x33\xCC"
-        )
+        ),
+        expect=messages.Success,
     )
 
 
@@ -1450,6 +1383,5 @@ def _is_emulator(debug_client: "TrezorClientDebugLink") -> bool:
     return debug_client.features.fw_vendor == "EMULATOR"
 
 
-@expect(messages.Success, field="message", ret_type=str)
-def optiga_set_sec_max(client: "TrezorClient") -> protobuf.MessageType:
-    return client.call(messages.DebugLinkOptigaSetSecMax())
+def optiga_set_sec_max(client: "TrezorClient") -> None:
+    client.call(messages.DebugLinkOptigaSetSecMax(), expect=messages.Success)

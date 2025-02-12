@@ -22,6 +22,7 @@
 
 #include <sys/bootutils.h>
 #include <sys/irq.h>
+#include <sys/linker_utils.h>
 #include <sys/mpu.h>
 #include <sys/syscall.h>
 #include <sys/systask.h>
@@ -54,10 +55,6 @@ typedef struct {
   systask_t* waiting_task;
 } systask_scheduler_t;
 
-// Kernel stack base pointer defined in linker script
-extern uint8_t _sstack;
-extern uint8_t _estack;
-
 // Global task manager state
 static systask_scheduler_t g_systask_scheduler = {
     // This static initialization is required for exception handling
@@ -65,7 +62,7 @@ static systask_scheduler_t g_systask_scheduler = {
     .active_task = &g_systask_scheduler.kernel_task,
     .waiting_task = &g_systask_scheduler.kernel_task,
     .kernel_task = {
-        .sp_lim = (uint32_t)&_sstack,
+        .sp_lim = (uint32_t)&_stack_section_start,
     }};
 
 void systask_scheduler_init(systask_error_handler_t error_handler) {
@@ -77,7 +74,7 @@ void systask_scheduler_init(systask_error_handler_t error_handler) {
   scheduler->active_task = &scheduler->kernel_task;
   scheduler->waiting_task = scheduler->active_task;
 
-  scheduler->kernel_task.sp_lim = (uint32_t)&_sstack;
+  scheduler->kernel_task.sp_lim = (uint32_t)&_stack_section_start;
 
   // SVCall priority should be the lowest since it is
   // generally a blocking operation
@@ -209,7 +206,10 @@ static void systask_kill(systask_t* task) {
     if (scheduler->error_handler != NULL) {
       scheduler->error_handler(&task->pminfo);
     }
-    secure_shutdown();
+
+    // We reach this point only if error_handler is NULL or
+    // if it returns. Neither is expected to happen.
+    reboot_device();
   } else if (task == scheduler->active_task) {
     // Switch to the kernel task
     systask_yield_to(&scheduler->kernel_task);
@@ -541,7 +541,7 @@ __attribute__((naked, no_stack_protector)) void HardFault_Handler(void) {
       "MOV      R0, #1                \n"  // R0 = 1 (Privileged)
       "B        systask_exit_fault    \n"  // Exit task with fault
       :
-      : [estack] "i"(&_estack)
+      : [estack] "i"(&_stack_section_end)
       : "memory");
 }
 
@@ -565,7 +565,9 @@ __attribute__((naked, no_stack_protector)) void MemManage_Handler(void) {
 #endif
       "B        systask_exit_fault    \n"  // Exit task with fault
       :
-      : [estack] "i"(&_estack), [sstack] "i"((uint32_t)&_sstack + 256)
+      : [estack] "i"(&_stack_section_end), [sstack] "i"(
+                                               (uint32_t)&_stack_section_start +
+                                               256)
       : "memory");
 }
 
@@ -600,7 +602,7 @@ __attribute__((naked, no_stack_protector)) void UsageFault_Handler(void) {
       "MOV      R0, #1                \n"  // R0 = 1 (Privileged)
       "B        systask_exit_fault    \n"  // Exit task with fault
       :
-      : [estack] "i"(&_estack)
+      : [estack] "i"(&_stack_section_end)
       : "memory");
 }
 
@@ -634,5 +636,7 @@ void NMI_Handler(void) {
   }
   mpu_restore(mpu_mode);
 }
+
+void Default_IRQHandler(void) { error_shutdown("Unhandled IRQ"); }
 
 #endif  // KERNEL_MODE

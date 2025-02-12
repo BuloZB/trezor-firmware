@@ -39,6 +39,10 @@
 #include <util/translations.h>
 #include <util/unit_properties.h>
 
+#ifdef USE_BLE
+#include <io/ble.h>
+#endif
+
 #ifdef USE_BUTTON
 #include <io/button.h>
 #endif
@@ -47,8 +51,16 @@
 #include <io/haptic.h>
 #endif
 
+#ifdef USE_HW_JPEG_DECODER
+#include <gfx/jpegdec.h>
+#endif
+
 #ifdef USE_OPTIGA
 #include <sec/optiga.h>
+#endif
+
+#ifdef USE_POWERCTL
+#include <sys/powerctl.h>
 #endif
 
 #ifdef USE_RGB_LED
@@ -133,10 +145,6 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       args[1] = cycles >> 32;
     } break;
 
-    case SYSCALL_SECURE_SHUTDOWN: {
-      secure_shutdown();
-    } break;
-
     case SYSCALL_REBOOT_DEVICE: {
       reboot_device();
     } break;
@@ -212,8 +220,13 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       usb_stop();
     } break;
 
-    case SYSCALL_USB_CONFIGURED: {
-      args[0] = usb_configured();
+    case SYSCALL_USB_GET_EVENT: {
+      args[0] = usb_get_event();
+    } break;
+
+    case SYSCALL_USB_GET_STATE: {
+      usb_state_t *state = (usb_state_t *)args[0];
+      usb_get_state__verified(state);
     } break;
 
     case SYSCALL_USB_HID_ADD: {
@@ -668,8 +681,80 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
           firmware_hash_callback_wrapper, callback_context);
     } break;
 
+#ifdef USE_BLE
+    case SYSCALL_BLE_START: {
+      ble_start();
+    } break;
+
+    case SYSCALL_BLE_ISSUE_COMMAND: {
+      ble_command_t *command = (ble_command_t *)args[0];
+      args[0] = ble_issue_command__verified(command);
+    } break;
+
+    case SYSCALL_BLE_GET_STATE: {
+      ble_state_t *state = (ble_state_t *)args[0];
+      ble_get_state__verified(state);
+    } break;
+
+    case SYSCALL_BLE_GET_EVENT: {
+      ble_event_t *event = (ble_event_t *)args[0];
+      args[0] = ble_get_event__verified(event);
+    } break;
+
+    case SYSCALL_BLE_CAN_WRITE: {
+      args[0] = ble_can_write();
+    } break;
+
+    case SYSCALL_BLE_WRITE: {
+      uint8_t *data = (uint8_t *)args[0];
+      size_t len = args[1];
+      args[0] = ble_write__verified(data, len);
+    } break;
+
+    case SYSCALL_BLE_CAN_READ: {
+      args[0] = ble_can_read();
+    } break;
+
+    case SYSCALL_BLE_READ: {
+      uint8_t *data = (uint8_t *)args[0];
+      size_t len = args[1];
+      args[0] = ble_read__verified(data, len);
+    } break;
+#endif
+
+#ifdef USE_POWERCTL
+    case SYSCALL_POWERCTL_SUSPEND: {
+      powerctl_suspend();
+    } break;
+#endif
+
+#ifdef USE_HW_JPEG_DECODER
+    case SYSCALL_JPEGDEC_OPEN: {
+      args[0] = jpegdec_open();
+    } break;
+
+    case SYSCALL_JPEGDEC_CLOSE: {
+      jpegdec_close();
+    } break;
+
+    case SYSCALL_JPEGDEC_PROCESS: {
+      args[0] = jpegdec_process__verified((jpegdec_input_t *)args[0]);
+    } break;
+
+    case SYSCALL_JPEGDEC_GET_INFO: {
+      args[0] = jpegdec_get_info__verified((jpegdec_image_t *)args[0]);
+      break;
+    }
+
+    case SYSCALL_JPEGDEC_GET_SLICE_RGBA8888: {
+      args[0] = jpegdec_get_slice_rgba8888__verified(
+          (void *)args[0], (jpegdec_slice_t *)args[1]);
+      break;
+    }
+#endif  // USE_HW_JPEG_DECODER
+
     default:
-      args[0] = 0xffffffff;
+      system_exit_fatal("Invalid syscall", __FILE__, __LINE__);
       break;
   }
 }

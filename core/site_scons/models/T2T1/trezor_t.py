@@ -16,9 +16,13 @@ def configure(
     hw_model = get_hw_model_as_number("T2T1")
     hw_revision = 0
 
-    defines += ["DISPLAY_RGB565"]
     features_available.append("display_rgb565")
-    defines += [("USE_RGB_COLORS", "1")]
+    defines += [
+        "DISPLAY_RGB565",
+        ("USE_RGB_COLORS", "1"),
+        ("DISPLAY_RESX", "240"),
+        ("DISPLAY_RESY", "240"),
+    ]
 
     mcu = "STM32F427xx"
 
@@ -51,10 +55,10 @@ def configure(
     sources += ["embed/io/display/st-7789/panels/lx154a2422.c"]
     paths += ["embed/io/display/inc"]
 
-    sources += ["embed/io/display/backlight/stm32/backlight_pwm.c"]
-
     features_available.append("backlight")
     defines += [("USE_BACKLIGHT", "1")]
+    sources += ["embed/io/backlight/stm32/tps61043.c"]
+    paths += ["embed/io/backlight/inc"]
 
     if "input" in features_wanted:
         sources += ["embed/io/i2c_bus/stm32f4/i2c_bus.c"]
@@ -96,6 +100,7 @@ def configure(
         ]
         features_available.append("usb")
         paths += ["embed/io/usb/inc"]
+        defines += [("USE_USB", "1")]
 
     if "dma2d" in features_wanted:
         defines += ["USE_DMA2D"]

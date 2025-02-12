@@ -193,6 +193,18 @@ access_violation:
 
 // ---------------------------------------------------------------------
 
+void usb_get_state__verified(usb_state_t *state) {
+  if (!probe_write_access(state, sizeof(*state))) {
+    goto access_violation;
+  }
+
+  usb_get_state(state);
+  return;
+
+access_violation:
+  apptask_access_violation();
+}
+
 int usb_hid_read__verified(uint8_t iface_num, uint8_t *buf, uint32_t len) {
   if (!probe_write_access(buf, len)) {
     goto access_violation;
@@ -702,5 +714,115 @@ access_violation:
   apptask_access_violation();
   return secfalse;
 }
+
+// ---------------------------------------------------------------------
+
+#ifdef USE_BLE
+bool ble_issue_command__verified(ble_command_t *command) {
+  if (!probe_read_access(command, sizeof(*command))) {
+    goto access_violation;
+  }
+
+  return ble_issue_command(command);
+
+access_violation:
+  apptask_access_violation();
+  return false;
+}
+
+void ble_get_state__verified(ble_state_t *state) {
+  if (!probe_write_access(state, sizeof(*state))) {
+    goto access_violation;
+  }
+
+  ble_state_t state_copy = {0};
+  ble_get_state(&state_copy);
+  *state = state_copy;
+  return;
+
+access_violation:
+  apptask_access_violation();
+}
+
+bool ble_get_event__verified(ble_event_t *event) {
+  if (!probe_write_access(event, sizeof(*event))) {
+    goto access_violation;
+  }
+
+  return ble_get_event(event);
+
+access_violation:
+  apptask_access_violation();
+  return false;
+}
+
+bool ble_write__verified(const uint8_t *data, size_t len) {
+  if (!probe_read_access(data, len)) {
+    goto access_violation;
+  }
+
+  return ble_write(data, len);
+
+access_violation:
+  apptask_access_violation();
+  return false;
+}
+
+uint32_t ble_read__verified(uint8_t *data, size_t len) {
+  if (!probe_write_access(data, len)) {
+    goto access_violation;
+  }
+
+  return ble_read(data, len);
+
+access_violation:
+  apptask_access_violation();
+  return 0;
+}
+#endif
+
+// ---------------------------------------------------------------------
+
+#ifdef USE_HW_JPEG_DECODER
+
+jpegdec_state_t jpegdec_process__verified(jpegdec_input_t *input) {
+  if (!probe_write_access(input, sizeof(*input))) {
+    goto access_violation;
+  }
+
+  return jpegdec_process(input);
+
+access_violation:
+  return JPEGDEC_STATE_ERROR;
+}
+
+bool jpegdec_get_info__verified(jpegdec_image_t *image) {
+  if (!probe_write_access(image, sizeof(*image))) {
+    goto access_violation;
+  }
+
+  return jpegdec_get_info(image);
+
+access_violation:
+  return false;
+}
+
+bool jpegdec_get_slice_rgba8888__verified(void *rgba8888,
+                                          jpegdec_slice_t *slice) {
+  if (!probe_write_access(rgba8888, JPEGDEC_RGBA8888_BUFFER_SIZE)) {
+    goto access_violation;
+  }
+
+  if (!probe_write_access(slice, sizeof(*slice))) {
+    goto access_violation;
+  }
+
+  return jpegdec_get_slice_rgba8888(rgba8888, slice);
+
+access_violation:
+  return false;
+}
+
+#endif  // USE_HW_JPEG_DECODER
 
 #endif  // SYSCALL_DISPATCH

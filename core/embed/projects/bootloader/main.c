@@ -98,8 +98,7 @@ static void drivers_init(secbool *touch_initialized) {
 #ifdef USE_HASH_PROCESSOR
   hash_processor_init();
 #endif
-  gfx_bitblt_init();
-  display_init(DISPLAY_JUMP_BEHAVIOR);
+  display_init(DISPLAY_RESET_CONTENT);
   unit_properties_init();
 
 #ifdef USE_TOUCH
@@ -134,10 +133,14 @@ static void drivers_init(secbool *touch_initialized) {
 
 static void drivers_deinit(void) {
 #ifdef FIXED_HW_DEINIT
-  // TODO
+#ifdef USE_BUTTON
+  button_deinit();
+#endif
+#ifdef USE_RGB_LED
+  rgb_led_deinit();
+#endif
 #endif
   display_deinit(DISPLAY_JUMP_BEHAVIOR);
-  ensure_compatible_settings();
 }
 
 static void usb_init_all(secbool usb21_landing) {
@@ -374,11 +377,16 @@ void real_jump_to_firmware(void) {
     ui_screen_boot_stage_1(false);
   }
 
+  if (DISPLAY_JUMP_BEHAVIOR == DISPLAY_RESET_CONTENT) {
+    display_fade(display_get_backlight(), 0, 200);
+  }
+
   drivers_deinit();
 
   system_deinit();
 
-  jump_to(IMAGE_CODE_ALIGN(FIRMWARE_START + vhdr.hdrlen + IMAGE_HEADER_SIZE));
+  jump_to_next_stage(
+      IMAGE_CODE_ALIGN(FIRMWARE_START + vhdr.hdrlen + IMAGE_HEADER_SIZE));
 }
 
 #ifdef USE_RESET_TO_BOOT

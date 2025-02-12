@@ -4,12 +4,11 @@ import os
 import shlex
 import tools, models, ui
 
-TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T')
+TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T2T1')
 CMAKELISTS = int(ARGUMENTS.get('CMAKELISTS', 0))
 BOOTLOADER_QA = ARGUMENTS.get('BOOTLOADER_QA', '0') == '1'
 PRODUCTION = 0 if BOOTLOADER_QA else ARGUMENTS.get('PRODUCTION', '0') == '1'
 HW_REVISION = ARGUMENTS.get('HW_REVISION', None)
-MODEL_IDENTIFIER = models.get_model_identifier(TREZOR_MODEL)
 
 FEATURES_WANTED = ["input", "rgb_led", "consumption_mask", "usb", "optiga", "dma2d"]
 
@@ -68,7 +67,6 @@ SOURCE_MOD += [
     'embed/gfx/bitblt/gfx_bitblt_rgb565.c',
     'embed/gfx/bitblt/gfx_bitblt_rgba8888.c',
     'embed/gfx/fonts/font_bitmap.c',
-    'embed/gfx/fonts/fonts.c',
     'embed/gfx/gfx_color.c',
     'embed/gfx/gfx_draw.c',
     'embed/gfx/terminal.c',
@@ -76,6 +74,7 @@ SOURCE_MOD += [
     'embed/util/flash/flash_utils.c',
     'embed/util/image/image.c',
     'embed/util/rsod/rsod.c',
+    'embed/util/scm_revision/scm_revision.c',
     'embed/rtl/error_handling.c',
     'embed/rtl/mini_printf.c',
     'vendor/micropython/lib/uzlib/adler32.c',
@@ -89,7 +88,7 @@ SOURCE_NANOPB = [
     'vendor/nanopb/pb_encode.c',
 ]
 
-ui.init_ui(TREZOR_MODEL, "bootloader", CPPDEFINES_MOD, SOURCE_MOD, RUST_UI_FEATURES)
+ui.init_ui(TREZOR_MODEL, "bootloader", RUST_UI_FEATURES)
 
 env = Environment(
     ENV=os.environ,
@@ -101,10 +100,7 @@ env = Environment(
 
 FEATURES_AVAILABLE = models.configure_board(TREZOR_MODEL, HW_REVISION, FEATURES_WANTED, env, CPPDEFINES_HAL, SOURCE_HAL, PATH_HAL)
 
-FILE_SUFFIX= env.get('ENV')['SUFFIX']
-
 SOURCE_BOOTLOADER = [
-    f'embed/sys/startup/{FILE_SUFFIX}/startup_stage_1.s',
     'embed/projects/bootloader/header.S',
     'embed/projects/bootloader/bootui.c',
     'embed/projects/bootloader/main.c',
@@ -142,6 +138,7 @@ ALLPATHS = [
         'embed/util/translations/inc',
         'embed/util/image/inc',
         'embed/util/rsod/inc',
+        'embed/util/scm_revision/inc',
         'embed/upymod/modtrezorui',
         'vendor/nanopb',
     ] + CPPPATH_MOD + PATH_HAL
@@ -157,7 +154,7 @@ env.Replace(
     '-fstack-protector-strong '
     +  env.get('ENV')["CPU_CCFLAGS"] + CCFLAGS_MOD,
     CCFLAGS_QSTR='-DNO_QSTR -DN_X64 -DN_X86 -DN_THUMB',
-    LINKFLAGS='-T build/bootloader/memory.ld -Wl,--gc-sections -Wl,-Map=build/bootloader/bootloader.map -Wl,--warn-common -Wl,--print-memory-usage',
+    LINKFLAGS=['-Tbuild/bootloader/memory.ld', '-Wl,--gc-sections', '-Wl,-Map=build/bootloader/bootloader.map', '-Wl,--warn-common', '-Wl,--print-memory-usage'],
     CPPPATH=ALLPATHS,
     CPPDEFINES=[
         'BOOTLOADER',
@@ -185,50 +182,19 @@ cmake_gen = env.Command(
     action='$MAKECMAKELISTS --sources $ALLSOURCES --dirs $CPPPATH --defs $ALLDEFS',
 )
 
-
 #
 # Rust library
 #
+features = ['bootloader',] + FEATURES_AVAILABLE + RUST_UI_FEATURES
 
-RUST_PROFILE = 'release'
-RUST_LIB = 'trezor_lib'
-RUST_LIBDIR = f'build/bootloader/rust/{env.get("ENV")["RUST_TARGET"]}/{RUST_PROFILE}'
-RUST_LIBPATH = f'{RUST_LIBDIR}/lib{RUST_LIB}.a'
+rust = tools.add_rust_lib(
+    env,
+    'bootloader',
+    'release',
+    features,
+    ALLPATHS,
+    str(Dir('.').abspath))
 
-def cargo_build():
-    # Determine the profile build flags.
-    if RUST_PROFILE == 'release':
-        profile = '--release'
-    else:
-        profile = ''
-
-    features = []
-    features.extend(RUST_UI_FEATURES)
-    features.append("ui")
-    features.append("bootloader")
-    features.extend(FEATURES_AVAILABLE)
-
-    cargo_opts = [
-        f'--target={env.get("ENV")["RUST_TARGET"]}',
-        f'--target-dir=../../build/bootloader/rust',
-        '--no-default-features',
-        '--features ' + ','.join(features),
-        '-Z build-std=core',
-        '-Z build-std-features=panic_immediate_abort',
-    ]
-
-    bindgen_macros = tools.get_bindgen_defines(env.get("CPPDEFINES"), ALLPATHS)
-    build_dir = str(Dir('.').abspath)
-
-    return f'export BINDGEN_MACROS={shlex.quote(bindgen_macros)}; export BUILD_DIR=\'{build_dir}\'; cd embed/rust; cargo build {profile} ' + ' '.join(cargo_opts)
-
-rust = env.Command(
-    target=RUST_LIBPATH,
-    source='',
-    action=cargo_build(), )
-
-env.Append(LINKFLAGS=f' -L{RUST_LIBDIR}')
-env.Append(LINKFLAGS=f' -l{RUST_LIB}')
 
 #
 # Program objects
@@ -244,7 +210,7 @@ obj_program += env.Object(source=SOURCE_HAL)
 
 linkerscript_gen = env.Command(
     target='memory.ld',
-    source=[f'embed/models/{MODEL_IDENTIFIER}/memory.ld', env.get('ENV')['LINKER_SCRIPT'].format(target='bootloader')],
+    source=[f'embed/models/{TREZOR_MODEL}/memory.ld', env.get('ENV')['LINKER_SCRIPT'].format(target='bootloader')],
     action='$CAT $SOURCES > $TARGET',
 )
 
@@ -260,7 +226,7 @@ env.Depends(program_elf, rust)
 
 SUFFIX = '_qa' if BOOTLOADER_QA else ''
 
-BINARY_NAME = f"build/bootloader/bootloader-{models.get_model_identifier(TREZOR_MODEL)}{SUFFIX}"
+BINARY_NAME = f"build/bootloader/bootloader-{TREZOR_MODEL}{SUFFIX}"
 BINARY_NAME += "-" + tools.get_version('embed/projects/bootloader/version.h')
 BINARY_NAME += "-" + tools.get_git_revision_short_hash()
 BINARY_NAME += "-dirty" if tools.get_git_modified() else ""

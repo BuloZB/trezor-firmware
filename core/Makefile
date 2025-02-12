@@ -32,7 +32,7 @@ BITCOIN_ONLY ?= 0
 BOOTLOADER_QA ?= 0
 BOOTLOADER_DEVEL ?= 0
 DISABLE_OPTIGA ?= 0
-TREZOR_MODEL ?= T
+TREZOR_MODEL ?= T2T1
 TREZOR_MEMPERF ?= 0
 ADDRESS_SANITIZER ?= 0
 CMAKELISTS ?= 0
@@ -44,41 +44,19 @@ TREZOR_EMULATOR_DEBUGGABLE ?= 0
 QUIET_MODE ?= 0
 TREZOR_DISABLE_ANIMATION ?= $(if $(filter 0,$(PYOPT)),1,0)
 STORAGE_INSECURE_TESTING_MODE ?= 0
+RUST_PRINT_TYPES_SIZES ?= 0
 
 # OpenOCD interface default. Alternative: ftdi/olimex-arm-usb-tiny-h
 OPENOCD_INTERFACE ?= stlink
 # OpenOCD transport default. Alternative: jtag
 OPENOCD_TRANSPORT ?= hla_swd
 
-ifeq ($(TREZOR_MODEL),$(filter $(TREZOR_MODEL),T))
-MCU = STM32F4
-OPENOCD_TARGET = target/stm32f4x.cfg
-MODEL_FEATURE = model_tt
-else ifeq ($(TREZOR_MODEL),$(filter $(TREZOR_MODEL),R))
-MCU = STM32F4
-OPENOCD_TARGET = target/stm32f4x.cfg
-MODEL_FEATURE = model_tr
-else ifeq ($(TREZOR_MODEL),$(filter $(TREZOR_MODEL),T3T1))
-MCU = STM32U5
-OPENOCD_TARGET = target/stm32u5x.cfg
-MODEL_FEATURE = model_mercury
-else ifeq ($(TREZOR_MODEL),$(filter $(TREZOR_MODEL),T3B1))
-MCU = STM32U5
-OPENOCD_TARGET = target/stm32u5x.cfg
-MODEL_FEATURE = model_tr
-else ifeq ($(TREZOR_MODEL),$(filter $(TREZOR_MODEL),T3W1))
-MCU = STM32U5
-OPENOCD_TARGET = target/stm32u5x.cfg
-MODEL_FEATURE = model_tt
-else ifeq ($(TREZOR_MODEL),$(filter $(TREZOR_MODEL),DISC1))
-MCU = STM32F4
-OPENOCD_TARGET = target/stm32f4x.cfg
-else ifeq ($(TREZOR_MODEL),$(filter $(TREZOR_MODEL),DISC2))
-MCU = STM32U5
-OPENOCD_TARGET = target/stm32u5x.cfg
-else
-$(error Unknown TREZOR_MODEL: $(TREZOR_MODEL))
-endif
+# Include the device-specific definitions.
+include embed/models/$(TREZOR_MODEL)/config.mk
+
+# Get bindgen macros for rust tests
+TEST_BINDGEN_MACROS := $(shell tr -d '\n' < embed/models/$(TREZOR_MODEL)/test_bindgen_macros.txt)
+export TEST_BINDGEN_MACROS
 
 
 FLASH_START		         = $(shell layout_parser ${TREZOR_MODEL} FLASH_START)
@@ -116,7 +94,8 @@ STORAGE_2_OFFSET := $(shell expr $(STORAGE_2_START) - $(FLASH_START))
 
 OPENOCD = openocd -f interface/$(OPENOCD_INTERFACE).cfg -c "transport select $(OPENOCD_TRANSPORT)" -f $(OPENOCD_TARGET)
 
-CFLAGS += -DSCM_REVISION='\"$(shell git rev-parse HEAD | sed 's:\(..\):\\x\1:g')\"'
+SCM_REVISION = '$(shell git rev-parse HEAD)'
+CFLAGS += -DSCM_REVISION_INIT='{$(shell echo ${SCM_REVISION} | sed 's:\(..\):0x\1,:g')}'
 
 TESTPATH = $(CURDIR)/../tests
 
@@ -141,10 +120,11 @@ SCONS_VARS = \
 	CFLAGS="$(CFLAGS)" \
 	CMAKELISTS="$(CMAKELISTS)" \
 	DISABLE_OPTIGA="$(DISABLE_OPTIGA)" \
-	NEW_RENDERING="$(NEW_RENDERING)" \
 	PRODUCTION="$(PRODUCTION)" \
 	PYOPT="$(PYOPT)" \
 	QUIET_MODE="$(QUIET_MODE)" \
+	RUST_PRINT_TYPES_SIZES="$(RUST_PRINT_TYPES_SIZES)" \
+	SCM_REVISION="$(SCM_REVISION)" \
 	STORAGE_INSECURE_TESTING_MODE="$(STORAGE_INSECURE_TESTING_MODE)" \
 	THP="$(THP)" \
 	TREZOR_DISABLE_ANIMATION="$(TREZOR_DISABLE_ANIMATION)" \
@@ -186,7 +166,7 @@ test: ## run unit tests
 test_rust: ## run rs unit tests
 	export BUILD_DIR=$(abspath $(UNIX_BUILD_DIR)) ; \
 	cd embed/rust ; cargo test $(TESTOPTS) --target=$(RUST_TARGET) \
-		--no-default-features --features $(MODEL_FEATURE),test \
+		--no-default-features --features $(LAYOUT_FEATURE),test \
 		-- --test-threads=1 --nocapture
 
 test_emu: ## run selected device tests from python-trezor
@@ -224,12 +204,12 @@ test_emu_persistence_ui: ## run persistence tests with UI testing
 
 test_emu_ui: ## run ui integration tests
 	$(EMU_TEST) $(PYTEST) $(TESTPATH)/device_tests $(TESTOPTS) \
-		--ui=test --ui-check-missing --record-text-layout --do-master-diff \
+		--ui=test --ui-check-missing --do-master-diff \
 		--lang=$(TEST_LANG)
 
 test_emu_ui_multicore: ## run ui integration tests using multiple cores
 	$(PYTEST) -n $(MULTICORE) $(TESTPATH)/device_tests $(TESTOPTS) --timeout $(PYTEST_TIMEOUT) \
-		--ui=test --ui-check-missing --record-text-layout --do-master-diff \
+		--ui=test --ui-check-missing --do-master-diff \
 		--control-emulators --model=core --random-order-seed=$(RANDOM) \
 		--lang=$(TEST_LANG)
 
@@ -305,7 +285,7 @@ build_reflash: ## build reflash firmware + reflash image
 	dd if=build/bootloader/bootloader.bin of=$(REFLASH_BUILD_DIR)/sdimage.bin bs=1 seek=49152
 
 build_kernel: ## build kernel image
-	$(SCONS) PYOPT=1 $(KERNEL_BUILD_DIR)/kernel.bin
+	$(SCONS) $(KERNEL_BUILD_DIR)/kernel.bin
 
 build_firmware: templates build_cross build_kernel ## build firmware with frozen modules
 	$(SCONS) $(FIRMWARE_BUILD_DIR)/firmware.bin

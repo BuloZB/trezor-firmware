@@ -1,4 +1,6 @@
 pub mod bip39;
+#[cfg(feature = "ble")]
+pub mod ble;
 #[macro_use]
 #[allow(unused_macros)]
 pub mod fatal_error;
@@ -11,6 +13,9 @@ mod ffi;
 pub mod haptic;
 
 pub mod io;
+
+#[cfg(feature = "hw_jpeg_decoder")]
+pub mod jpegdec;
 pub mod model;
 pub mod random;
 #[cfg(feature = "rgb_led")]

@@ -1,4 +1,5 @@
 use crate::{
+    error::Error,
     trezorhal::bitblt::{BitBltCopy, BitBltFill},
     ui::{
         display::Color,
@@ -32,10 +33,10 @@ impl<'a> Rgba8888Canvas<'a> {
         stride: Option<usize>,
         min_height: Option<i16>,
         buff: &'a mut [u8],
-    ) -> Option<Self> {
+    ) -> Result<Self, Error> {
         let bitmap = Bitmap::new_mut(BitmapFormat::RGBA8888, stride, size, min_height, buff)?;
         let viewport = Viewport::from_size(bitmap.size());
-        Some(Self { bitmap, viewport })
+        Ok(Self { bitmap, viewport })
     }
 
     /// Returns the specified row as a mutable slice.
@@ -134,7 +135,31 @@ impl<'a> Canvas for Rgba8888Canvas<'a> {
     }
 
     #[cfg(feature = "ui_blurring")]
-    fn blur_rect(&mut self, _r: Rect, _radius: usize, _cache: &DrawingCache) {
-        // TODO
+    fn blur_rect(&mut self, r: Rect, radius: usize, cache: &DrawingCache) {
+        let clip = r.translate(self.viewport.origin).clamp(self.viewport.clip);
+
+        let ofs = radius as i16;
+
+        if clip.width() > 2 * ofs - 1 && clip.height() > 2 * ofs - 1 {
+            let mut blur_cache = cache.blur();
+            let (blur, _) = unwrap!(
+                blur_cache.get(clip.size(), radius, None),
+                "Too small blur buffer"
+            );
+
+            loop {
+                if let Some(y) = blur.push_ready() {
+                    let row = unwrap!(self.row_mut(y + clip.y0)); // can't panic
+                    blur.push(&row[clip.x0 as usize..clip.x1 as usize]);
+                }
+                if let Some(y) = blur.pop_ready() {
+                    let row = unwrap!(self.row_mut(y + clip.y0)); // can't panic
+                    blur.pop(&mut row[clip.x0 as usize..clip.x1 as usize], None);
+                    if y + 1 >= clip.height() {
+                        break;
+                    }
+                }
+            }
+        }
     }
 }

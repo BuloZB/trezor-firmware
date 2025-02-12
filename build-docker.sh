@@ -54,7 +54,7 @@ function help_and_die() {
   echo "  --skip-legacy - do not build legacy"
   echo "  --repository path/to/repo - checkout the repository from the given path/url"
   echo "  --no-init - do not recreate docker environments"
-  echo "  --models - comma-separated list of models. default: --models R,T"
+  echo "  --models - comma-separated list of models. default: --models T2B1,T2T1,T3T1"
   echo "  --targets - comma-separated list of targets for core build. default: --targets boardloader,bootloader,firmware"
   echo "  --help"
   echo
@@ -69,7 +69,7 @@ OPT_BUILD_LEGACY=1
 OPT_BUILD_NORMAL=1
 OPT_BUILD_BITCOINONLY=1
 INIT=1
-MODELS=(R T T3T1)
+MODELS=(T2B1 T2T1 T3T1)
 CORE_TARGETS=(boardloader bootloader firmware)
 
 REPOSITORY="file:///local"
@@ -156,10 +156,10 @@ else
 fi
 
 # check alpine checksum
-if command -v sha256sum &> /dev/null ; then
-    echo "${ALPINE_CHECKSUM}  ci/${ALPINE_TARBALL}" | sha256sum -c
-else
+if command -v shasum &> /dev/null ; then
     echo "${ALPINE_CHECKSUM}  ci/${ALPINE_TARBALL}" | shasum -a 256 -c
+else
+    echo "${ALPINE_CHECKSUM}  ci/${ALPINE_TARBALL}" | sha256sum -c
 fi
 
 tag_clean="${TAG//[^a-zA-Z0-9]/_}"
@@ -225,7 +225,7 @@ fi  # init
 cat <<EOF >> "$SCRIPT_NAME"
   $GIT_CLEAN_REPO
   git submodule update --init --recursive
-  poetry install
+  poetry install -v --no-ansi --no-interaction
   cd core/embed/rust
   cargo fetch
 
@@ -305,7 +305,6 @@ EOF
 
     $DOCKER run \
       --network=host \
-      -it \
       --rm \
       -v "$DIR:/local" \
       -v "$DIR/build/core$DIRSUFFIX":/build:z \
@@ -325,6 +324,7 @@ for BITCOIN_ONLY in ${VARIANTS_legacy[@]}; do
 
   DIRSUFFIX=${BITCOIN_ONLY/1/-bitcoinonly}
   DIRSUFFIX=${DIRSUFFIX/0/}
+  DIRSUFFIX="-T1B1${DIRSUFFIX}"
 
   SCRIPT_NAME=".build_legacy_$BITCOIN_ONLY.sh"
   cat <<EOF > "build/$SCRIPT_NAME"
@@ -354,7 +354,6 @@ EOF
 
   $DOCKER run \
     --network=host \
-    -it \
     --rm \
     -v "$DIR:/local" \
     -v "$DIR/build/legacy$DIRSUFFIX":/build:z \

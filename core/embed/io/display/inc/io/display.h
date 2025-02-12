@@ -44,8 +44,6 @@
 // MIPI            -
 //                 - STM32U5A9J-DK Discovery Board
 
-#ifdef KERNEL_MODE
-
 // Specifies how display content should be handled during
 // initialization or deinitialization.
 typedef enum {
@@ -55,11 +53,15 @@ typedef enum {
   DISPLAY_RETAIN_CONTENT
 } display_content_mode_t;
 
+#ifdef KERNEL_MODE
+
 // Initializes the display controller.
 //
 // If `mode` is `DISPLAY_RETAIN_CONTENT`, ensure the driver was previously
 // initialized and `display_deinit(DISPLAY_RETAIN_CONTENT)` was called.
-void display_init(display_content_mode_t mode);
+//
+// Returns `true` if the initialization was successful.
+bool display_init(display_content_mode_t mode);
 
 // Deinitializes the display controller.
 //

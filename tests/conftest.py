@@ -111,21 +111,13 @@ def emulator(request: pytest.FixtureRequest) -> t.Generator["Emulator", None, No
             "Legacy emulator is not supported until it can be run on arbitrary ports."
         )
 
-    def _get_port() -> int:
-        """Get a unique port for this worker process on which it can run.
-
-        Guarantees to be unique because each worker has a different name.
-        gw0=>20000, gw1=>20003, gw2=>20006, etc.
-        """
-        worker_id = xdist.get_xdist_worker_id(request)
-        assert worker_id.startswith("gw")
-        # One emulator instance occupies 3 consecutive ports:
-        # 1. normal link, 2. debug link and 3. webauthn fake interface
-        return 20000 + int(worker_id[2:]) * 3
+    worker_id = xdist.get_xdist_worker_id(request)
+    assert worker_id.startswith("gw")
+    worker_id = int(worker_id[2:])
 
     with EmulatorWrapper(
         model,
-        port=_get_port(),
+        worker_id=worker_id,
         headless=True,
         auto_interact=not interact,
         main_args=_emulator_wrapper_main_args(),
@@ -184,7 +176,7 @@ class ModelsFilter:
         "safe": {models.T2B1, models.T3T1, models.T3B1},
         "safe3": {models.T2B1, models.T3B1},
         "safe5": {models.T3T1},
-        "mercury": {models.T3T1},
+        "delizia": {models.T3T1},
     }
 
     def __init__(self, node: Node) -> None:
@@ -375,7 +367,6 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: pytest.ExitCode) -
             exitstatus,
             test_ui,  # type: ignore
             bool(session.config.getoption("ui_check_missing")),
-            bool(session.config.getoption("record_text_layout")),
             bool(session.config.getoption("do_master_diff")),
         )
 
@@ -467,9 +458,10 @@ def pytest_configure(config: "Config") -> None:
         for line in f:
             config.addinivalue_line("markers", line.strip())
 
-    # enable debug
-    if config.getoption("verbose"):
-        log.enable_debug_output()
+    # enable debug if `-v` flag is passed (use multiple times for higher verbosity)
+    verbosity = config.getoption("verbose")
+    if verbosity:
+        log.enable_debug_output(verbosity)
 
     idval_orig = IdMaker._idval_from_value
 

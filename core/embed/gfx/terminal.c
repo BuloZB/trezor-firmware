@@ -20,11 +20,12 @@
 #include <trezor_model.h>
 #include <trezor_rtl.h>
 
-#include <gfx/fonts.h>
 #include <gfx/gfx_draw.h>
 #include <gfx/terminal.h>
 #include <io/display.h>
 #include <rtl/mini_printf.h>
+
+#include "fonts/font_bitmap.h"
 
 #define TERMINAL_COLS (DISPLAY_RESX / 6)
 #define TERMINAL_ROWS (DISPLAY_RESY / 8)
@@ -80,6 +81,7 @@ static void term_redraw_rows(int start_row, int row_count) {
       .src_stride = 8,
       .src_fg = terminal_fgcolor,
       .src_bg = terminal_bgcolor,
+      .src_alpha = 255,
   };
 
   for (int y = start_row; y < start_row + row_count; y++) {
@@ -131,6 +133,13 @@ void term_print(const char *text, int textlen) {
   }
 
   term_redraw_rows(0, TERMINAL_ROWS);
+
+  // redraw residual area of the display
+  gfx_draw_bar(gfx_rect(0, TERMINAL_ROWS * 8, DISPLAY_RESX, DISPLAY_RESY),
+               terminal_bgcolor);
+  gfx_draw_bar(gfx_rect(TERMINAL_COLS * 6, 0, DISPLAY_RESX, DISPLAY_RESY),
+               terminal_bgcolor);
+
   display_refresh();
 }
 

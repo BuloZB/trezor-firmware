@@ -43,10 +43,15 @@ def configure(
         "embed/io/display/ltdc_dsi/panels/stm32u5a9j-dk/stm32u5a9j-dk.c",
         "embed/io/display/ltdc_dsi/display_fb.c",
         "embed/io/display/ltdc_dsi/display_fb_rgb888.c",
-        "embed/io/display/ltdc_dsi/display_gfxmmu.c",
+        # "embed/io/display/ltdc_dsi/display_gfxmmu.c",
         "embed/io/display/fb_queue/fb_queue.c",
     ]
     paths += ["embed/io/display/inc"]
+
+    features_available.append("backlight")
+    defines += [("USE_BACKLIGHT", "1")]
+    sources += ["embed/io/backlight/stm32/backlight_pin.c"]
+    paths += ["embed/io/backlight/inc"]
 
     if "input" in features_wanted:
         sources += ["embed/io/i2c_bus/stm32u5/i2c_bus.c"]
@@ -73,22 +78,23 @@ def configure(
         ]
         features_available.append("usb")
         paths += ["embed/io/usb/inc"]
+        defines += [("USE_USB", "1")]
 
     defines += [
-        "USE_DMA2D",
+        "FRAMEBUFFER",
+        "DISPLAY_RGBA8888",
         ("UI_COLOR_32BIT", "1"),
         ("USE_RGB_COLORS", "1"),
+        ("DISPLAY_RESX", "240"),
+        ("DISPLAY_RESY", "240"),
     ]
-
-    sources += ["embed/gfx/bitblt/stm32/dma2d_bitblt.c"]
-
-    features_available.append("dma2d")
-    features_available.append("ui_color_32bit")
-
-    defines += ["FRAMEBUFFER"]
-    defines += ["DISPLAY_RGBA8888"]
     features_available.append("framebuffer")
     features_available.append("display_rgba8888")
+    features_available.append("ui_color_32bit")
+
+    defines += ["USE_DMA2D"]
+    features_available.append("dma2d")
+    sources += ["embed/gfx/bitblt/stm32/dma2d_bitblt.c"]
 
     defines += [
         "USE_HASH_PROCESSOR=1",

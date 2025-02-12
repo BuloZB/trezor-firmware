@@ -50,7 +50,6 @@ if TYPE_CHECKING:
     StorageSafetyCheckLevel = Literal[0, 1]
 # fmt: on
 
-HOMESCREEN_MAXSIZE = const(16384)
 LABEL_MAXLENGTH = const(32)
 
 if __debug__:
@@ -171,20 +170,18 @@ def set_passphrase_enabled(enable: bool) -> None:
 
 
 def set_homescreen(homescreen: bytes) -> None:
-    if len(homescreen) > HOMESCREEN_MAXSIZE:
+    if len(homescreen) > utils.HOMESCREEN_MAXSIZE:
         raise ValueError  # homescreen too large
     common.set(_NAMESPACE, _HOMESCREEN, homescreen, public=True)
 
 
 def store_mnemonic_secret(
     secret: bytes,
-    backup_type: BackupType,
     needs_backup: bool = False,
     no_backup: bool = False,
 ) -> None:
     set_version(common.STORAGE_VERSION_CURRENT)
     common.set(_NAMESPACE, _MNEMONIC_SECRET, secret)
-    common.set_uint8(_NAMESPACE, _BACKUP_TYPE, backup_type)
     common.set_true_or_delete(_NAMESPACE, _NO_BACKUP, no_backup)
     common.set_bool(_NAMESPACE, INITIALIZED, True, public=True)
     if not no_backup:

@@ -4,7 +4,7 @@ import os
 import shlex
 import tools, models, ui
 
-TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T')
+TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T2T1')
 CMAKELISTS = int(ARGUMENTS.get('CMAKELISTS', 0))
 HW_REVISION = 'emulator'
 
@@ -74,7 +74,6 @@ SOURCE_MOD += [
     'embed/gfx/bitblt/gfx_bitblt_rgb565.c',
     'embed/gfx/bitblt/gfx_bitblt_rgba8888.c',
     'embed/gfx/fonts/font_bitmap.c',
-    'embed/gfx/fonts/fonts.c',
     'embed/gfx/gfx_color.c',
     'embed/gfx/gfx_draw.c',
     'embed/gfx/terminal.c',
@@ -82,6 +81,7 @@ SOURCE_MOD += [
     'embed/util/flash/flash_utils.c',
     'embed/util/image/image.c',
     'embed/util/rsod/rsod.c',
+    'embed/util/scm_revision/scm_revision.c',
     'embed/rtl/error_handling.c',
     'embed/rtl/mini_printf.c',
     'vendor/micropython/lib/uzlib/adler32.c',
@@ -126,7 +126,7 @@ SOURCE_UNIX = [
     'embed/projects/unix/profile.c',
 ]
 
-ui.init_ui(TREZOR_MODEL, "bootloader", CPPDEFINES_MOD, SOURCE_MOD, RUST_UI_FEATURES)
+ui.init_ui(TREZOR_MODEL, "bootloader", RUST_UI_FEATURES)
 
 env = Environment(
     ENV=os.environ,
@@ -150,8 +150,7 @@ env.Replace(
     PYTHON='python',
     MAKECMAKELISTS='$PYTHON tools/make_cmakelists.py', )
 
-MODEL_IDENTIFIER = models.get_model_identifier(TREZOR_MODEL)
-MODEL_AS_NUMBER = str(models.get_hw_model_as_number(MODEL_IDENTIFIER))
+MODEL_AS_NUMBER = str(models.get_hw_model_as_number(TREZOR_MODEL))
 
 ALLPATHS = ['embed/rust',
            'embed/projects/bootloader',
@@ -178,6 +177,7 @@ ALLPATHS = ['embed/rust',
            'embed/util/flash/inc',
            'embed/util/image/inc',
            'embed/util/rsod/inc',
+           'embed/util/scm_revision/inc',
            'embed/util/translations/inc',
            'embed/util/unit_properties/inc',
            'vendor/nanopb',
@@ -193,6 +193,7 @@ env.Replace(
     '-ffreestanding '
     '-fstack-protector-all '
     + CCFLAGS_MOD,
+    LINKFLAGS='',
     CPPPATH=ALLPATHS,
     CPPDEFINES=[
         'BOOTLOADER',
@@ -220,53 +221,24 @@ cmake_gen = env.Command(
     action='$MAKECMAKELISTS --sources $ALLSOURCES --dirs $CPPPATH --defs $ALLDEFS',
 )
 
-
 #
 # Rust library
 #
-
-RUST_TARGET = os.popen("rustc -vV | sed -n 's/host: //p'").read().strip()
-RUST_LIB = 'trezor_lib'
-
+env.get("ENV")["RUST_TARGET"] = os.popen("rustc -vV | sed -n 's/host: //p'").read().strip()
+features = ['bootloader',] + FEATURES_AVAILABLE + RUST_UI_FEATURES
 if ARGUMENTS.get('TREZOR_EMULATOR_DEBUGGABLE', '0') == '1':
-    RUST_PROFILE = 'dev'
-    RUST_LIBDIR = f'build/bootloader_emu/rust/{RUST_TARGET}/debug'
+    profile = 'dev'
 else:
-    RUST_PROFILE = 'release'
-    RUST_LIBDIR = f'build/bootloader_emu/rust/{RUST_TARGET}/release'
+    profile = 'release'
 
-RUST_LIBPATH = f'{RUST_LIBDIR}/lib{RUST_LIB}.a'
+rust = tools.add_rust_lib(
+    env,
+    'bootloader_emu',
+    profile,
+    features,
+    ALLPATHS,
+    str(Dir('.').abspath))
 
-def cargo_build():
-    features = []
-
-    features.extend(RUST_UI_FEATURES)
-    features.append("ui")
-    features.append("bootloader")
-    features.extend(FEATURES_AVAILABLE)
-
-
-    cargo_opts = [
-        f'--target={RUST_TARGET}',
-        '--target-dir=../../build/bootloader_emu/rust',
-        '--no-default-features',
-        '--features ' + ','.join(features),
-        '-Z build-std=core',
-        '-Z build-std-features=panic_immediate_abort',
-    ]
-
-    bindgen_macros = tools.get_bindgen_defines(env.get("CPPDEFINES"), ALLPATHS)
-    build_dir = str(Dir('.').abspath)
-
-    return f'export BINDGEN_MACROS={shlex.quote(bindgen_macros)}; export BUILD_DIR=\'{build_dir}\'; cd embed/rust; cargo build --profile {RUST_PROFILE} ' + ' '.join(cargo_opts)
-
-rust = env.Command(
-    target=RUST_LIBPATH,
-    source='',
-    action=cargo_build(), )
-
-env.Append(LINKFLAGS=f'-L{RUST_LIBDIR}')
-env.Append(LINKFLAGS=f'-l{RUST_LIB}')
 env.Append(LINKFLAGS='-lm')
 env.Append(LINKFLAGS='-Wl,' + ('-dead_strip' if env['PLATFORM'] == 'darwin' else '--gc-sections'))
 
@@ -286,7 +258,7 @@ program_elf = env.Command(
     target='bootloader.elf',
     source=obj_program,
     action=
-    '$CC -o $TARGET $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $LINKFLAGS', )
+    '$CC -o $TARGET $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $LINKFLAGS')
 
 env.Depends(program_elf, rust)
 

@@ -426,6 +426,8 @@ class MessageType(IntEnum):
     BackupDevice = 34
     EntropyRequest = 35
     EntropyAck = 36
+    EntropyCheckReady = 994
+    EntropyCheckContinue = 995
     PassphraseRequest = 41
     PassphraseAck = 42
     RecoveryDevice = 45
@@ -3735,6 +3737,7 @@ class ResetDevice(protobuf.MessageType):
         8: protobuf.Field("skip_backup", "bool", repeated=False, required=False, default=None),
         9: protobuf.Field("no_backup", "bool", repeated=False, required=False, default=None),
         10: protobuf.Field("backup_type", "BackupType", repeated=False, required=False, default=BackupType.Bip39),
+        11: protobuf.Field("entropy_check", "bool", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -3749,6 +3752,7 @@ class ResetDevice(protobuf.MessageType):
         skip_backup: Optional["bool"] = None,
         no_backup: Optional["bool"] = None,
         backup_type: Optional["BackupType"] = BackupType.Bip39,
+        entropy_check: Optional["bool"] = None,
     ) -> None:
         self.strength = strength
         self.passphrase_protection = passphrase_protection
@@ -3759,6 +3763,7 @@ class ResetDevice(protobuf.MessageType):
         self.skip_backup = skip_backup
         self.no_backup = no_backup
         self.backup_type = backup_type
+        self.entropy_check = entropy_check
 
 
 class BackupDevice(protobuf.MessageType):
@@ -3780,6 +3785,19 @@ class BackupDevice(protobuf.MessageType):
 
 class EntropyRequest(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 35
+    FIELDS = {
+        1: protobuf.Field("entropy_commitment", "bytes", repeated=False, required=False, default=None),
+        2: protobuf.Field("prev_entropy", "bytes", repeated=False, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        entropy_commitment: Optional["bytes"] = None,
+        prev_entropy: Optional["bytes"] = None,
+    ) -> None:
+        self.entropy_commitment = entropy_commitment
+        self.prev_entropy = prev_entropy
 
 
 class EntropyAck(protobuf.MessageType):
@@ -3794,6 +3812,24 @@ class EntropyAck(protobuf.MessageType):
         entropy: "bytes",
     ) -> None:
         self.entropy = entropy
+
+
+class EntropyCheckReady(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 994
+
+
+class EntropyCheckContinue(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 995
+    FIELDS = {
+        1: protobuf.Field("finish", "bool", repeated=False, required=False, default=False),
+    }
+
+    def __init__(
+        self,
+        *,
+        finish: Optional["bool"] = False,
+    ) -> None:
+        self.finish = finish
 
 
 class RecoveryDevice(protobuf.MessageType):
@@ -3964,13 +4000,13 @@ class UnlockPath(protobuf.MessageType):
 class UnlockedPathRequest(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 94
     FIELDS = {
-        1: protobuf.Field("mac", "bytes", repeated=False, required=False, default=None),
+        1: protobuf.Field("mac", "bytes", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        mac: Optional["bytes"] = None,
+        mac: "bytes",
     ) -> None:
         self.mac = mac
 
@@ -4100,6 +4136,7 @@ class DebugLinkGetState(protobuf.MessageType):
         1: protobuf.Field("wait_word_list", "bool", repeated=False, required=False, default=None),
         2: protobuf.Field("wait_word_pos", "bool", repeated=False, required=False, default=None),
         3: protobuf.Field("wait_layout", "DebugWaitType", repeated=False, required=False, default=DebugWaitType.IMMEDIATE),
+        4: protobuf.Field("return_empty_state", "bool", repeated=False, required=False, default=False),
     }
 
     def __init__(
@@ -4108,10 +4145,12 @@ class DebugLinkGetState(protobuf.MessageType):
         wait_word_list: Optional["bool"] = None,
         wait_word_pos: Optional["bool"] = None,
         wait_layout: Optional["DebugWaitType"] = DebugWaitType.IMMEDIATE,
+        return_empty_state: Optional["bool"] = False,
     ) -> None:
         self.wait_word_list = wait_word_list
         self.wait_word_pos = wait_word_pos
         self.wait_layout = wait_layout
+        self.return_empty_state = return_empty_state
 
 
 class DebugLinkState(protobuf.MessageType):
@@ -5532,13 +5571,13 @@ class MoneroGetAddress(protobuf.MessageType):
 class MoneroAddress(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 541
     FIELDS = {
-        1: protobuf.Field("address", "bytes", repeated=False, required=False, default=None),
+        1: protobuf.Field("address", "bytes", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        address: Optional["bytes"] = None,
+        address: "bytes",
     ) -> None:
         self.address = address
 
@@ -5563,15 +5602,15 @@ class MoneroGetWatchKey(protobuf.MessageType):
 class MoneroWatchKey(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 543
     FIELDS = {
-        1: protobuf.Field("watch_key", "bytes", repeated=False, required=False, default=None),
-        2: protobuf.Field("address", "bytes", repeated=False, required=False, default=None),
+        1: protobuf.Field("watch_key", "bytes", repeated=False, required=True),
+        2: protobuf.Field("address", "bytes", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        watch_key: Optional["bytes"] = None,
-        address: Optional["bytes"] = None,
+        watch_key: "bytes",
+        address: "bytes",
     ) -> None:
         self.watch_key = watch_key
         self.address = address

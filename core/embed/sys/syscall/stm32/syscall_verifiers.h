@@ -17,8 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TREZORHAL_SYSCALL_VERIFIERS_H
-#define TREZORHAL_SYSCALL_VERIFIERS_H
+#pragma once
 
 #ifdef SYSCALL_DISPATCH
 
@@ -49,6 +48,10 @@ bool display_get_frame_buffer__verified(display_fb_info_t *fb);
 void display_fill__verified(const gfx_bitblt_t *bb);
 
 void display_copy_rgb565__verified(const gfx_bitblt_t *bb);
+
+// ---------------------------------------------------------------------
+#include <io/usb.h>
+void usb_get_state__verified(usb_state_t *state);
 
 // ---------------------------------------------------------------------
 #include <io/usb_hid.h>
@@ -182,6 +185,35 @@ secbool firmware_calc_hash__verified(const uint8_t *challenge,
 
 secbool firmware_get_vendor__verified(char *buff, size_t buff_size);
 
-#endif  // SYSCALL_DISPATCH
+// ---------------------------------------------------------------------
+#ifdef USE_BLE
 
-#endif  // TREZORHAL_SYSCALL_VERIFIERS_H
+#include <io/ble.h>
+
+bool ble_issue_command__verified(ble_command_t *state);
+
+void ble_get_state__verified(ble_state_t *state);
+
+bool ble_get_event__verified(ble_event_t *event);
+
+bool ble_write__verified(const uint8_t *data, size_t len);
+
+secbool ble_read__verified(uint8_t *data, size_t len);
+
+#endif
+
+// ---------------------------------------------------------------------
+#ifdef USE_HW_JPEG_DECODER
+
+#include <gfx/jpegdec.h>
+
+jpegdec_state_t jpegdec_process__verified(jpegdec_input_t *input);
+
+bool jpegdec_get_info__verified(jpegdec_image_t *image);
+
+bool jpegdec_get_slice_rgba8888__verified(void *rgba8888,
+                                          jpegdec_slice_t *slice);
+
+#endif  // USE_HW_JPEG_DECODER
+
+#endif  // SYSCALL_DISPATCH
