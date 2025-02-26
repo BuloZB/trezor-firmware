@@ -154,6 +154,7 @@ def confirm_value_intro(
     subtitle: str | None = None,
     verb: str | None = None,
     verb_cancel: str | None = None,
+    hold: bool = False,
     chunkify: bool = False,
 ) -> LayoutObj[UiResult]:
     """Similar to `confirm_value`, but only the first page is shown.
@@ -241,6 +242,7 @@ def confirm_more(
     title: str,
     button: str,
     button_style_confirm: bool = False,
+    hold: bool = False,
     items: Iterable[tuple[str | bytes, bool]],
 ) -> LayoutObj[UiResult]:
     """Confirm long content with the possibility to go back from any page.
@@ -283,10 +285,10 @@ def confirm_summary(
 def confirm_with_info(
     *,
     title: str,
-    button: str,
-    info_button: str,
-    verb_cancel: str | None = None,
     items: Iterable[tuple[str | bytes, bool]],
+    verb: str,
+    verb_info: str,
+    verb_cancel: str | None = None,
 ) -> LayoutObj[UiResult]:
     """Confirm given items but with third button. Always single page
     without scrolling. In Delizia, the button is placed in
@@ -319,14 +321,15 @@ def flow_confirm_output(
     account_path: str | None,
     br_code: ButtonRequestType,
     br_name: str,
-    address: str | None,
-    address_title: str | None,
+    address_item: (str, str) | None,
+    extra_item: (str, str) | None,
     summary_items: Iterable[tuple[str, str]] | None = None,
     fee_items: Iterable[tuple[str, str]] | None = None,
     summary_title: str | None = None,
     summary_br_code: ButtonRequestType | None = None,
     summary_br_name: str | None = None,
     cancel_text: str | None = None,
+    description: str | None = None,
 ) -> LayoutObj[UiResult]:
     """Confirm the recipient, (optionally) confirm the amount and (optionally) confirm the summary and present a Hold to Sign page."""
 
@@ -444,9 +447,9 @@ def select_word(
 def select_word_count(
     *,
     recovery_type: RecoveryType,
-) -> LayoutObj[int | str]:  # TR returns str
+) -> LayoutObj[int | str | UIResult]:  # TR returns str
     """Select a mnemonic word count from the options: 12, 18, 20, 24, or 33.
-    For unlocking a repeated backup, select from 20 or 33."""
+    For unlocking a repeated backup, select between 20 and 33."""
 
 
 # rust/src/ui/api/firmware_micropython.rs

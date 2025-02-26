@@ -130,6 +130,54 @@ bootloader-version
 OK 2.1.7
 ```
 
+### ble-adv-start
+Starts BLE advertising. Accepts one parameter, advertising name. The command returns `OK` if the operation is successful.
+
+`ble-adv-start <name>`
+
+Example:
+```
+ble-adv-start TREZOR_BLE
+# Advertising started.
+OK
+```
+
+### ble-adv-stop
+Stops BLE advertising. The command returns `OK` if the operation is successful.
+
+`ble-adv-stop`
+
+Example:
+```
+ble-adv-stop
+# Advertising stopped.
+OK
+```
+
+### ble-info
+Reads info about BLE. Currently, it returns only MAC address.
+The advertising needs to be started before the MAC can be read,
+otherwise the address will be random and will not correspond to actual MAC used.
+
+`ble-info`
+
+Example:
+```
+ble-info
+# MAC: 56:0b:b8:99:32:23
+OK
+```
+
+### ble-erase-bonds
+Erases all BLE bonds from the device.
+
+Example:
+```
+ble-erase-bonds
+# Erased 2 bonds.
+OK
+```
+
 ### button-test
 The `button-test` command tests the functionality of the device's hardware buttons. It waits for the user to press and release a specified button in a designated timeout period.
 
@@ -155,6 +203,15 @@ Example:
 ```
 display-border
 # Drawing display border...
+OK
+```
+
+### display-text
+The `display-text` command draws text to the screen
+
+Example:
+```
+display-text hello_world
 OK
 ```
 
@@ -209,6 +266,39 @@ Example (runs the driver for 3s):
 haptic-test 3000
 # Running haptic feedback test for 3000 ms...
 OK
+```
+
+### nrf-communication
+Tests the internal communication between the main MCU and NRF MCU. The command returns `OK` if the communication is successful.
+
+Example:
+```
+nrf-communication
+# Testing SPI communication...
+# Testing UART communication...
+# Testing reboot to bootloader...
+# Testing GPIO TRZ ready...
+# Testing GPIO stay in bootloader...
+# Testing GPIO reserved...
+OK
+```
+
+### nrf-version
+Retrieves the version of the NRF52 MCU. The command returns `OK` followed by the version in the format `<major>.<minor>.<patch>.<tweak>`.
+
+Example:
+```
+nrf-version
+OK 0.1.2.3
+```
+
+### touch-draw
+Starts a drawing canvas, where user can draw with finger on pen. Canvas is exited by sending CTRL+C command.
+```
+touch-draw
+# Starting drawing canvas...
+# Press CTRL+C for exit.
+ERROR abort
 ```
 
 ### touch-test
@@ -660,6 +750,36 @@ powerctl-hibernate
 OK
 ```
 
+### tropic-get-riscv-fw-version
+
+Reads the version of the RISC-V firmware. The command returns `OK` followed by the version.
+
+Example:
+```
+tropic-get-riscv-fw-version
+OK 00020100
+```
+
+### tropic-get-spect-fw-version
+
+Reads the version of the SPECT firmware. The command returns `OK` followed by the version.
+
+Example:
+```
+tropic-get-spect-fw-version
+OK 00000300
+```
+
+### tropic-get-chip-id
+
+Reads the Tropic chip ID. The command returns `OK` followed by the chip ID.
+
+Example:
+```
+tropic-get-chip-id
+OK 00000001000000000000000000000000000000000000000000000000000000000000000001000000054400000000FFFFFFFFFFFF01F00F000544545354303103001300000B54524F50494330312D4553FFFFFFFF000100000000FFFF000100000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF13000300
+```
+
 ### wpc-init
 Reinitializes the wireless power receiver driver, restoring it to its default state.
 
@@ -761,4 +881,39 @@ Example:
 wpc-update
 # Updating STWLC38...
 # WPC update completed 800 ms
+```
+
+### nfc-read-card
+Activate the NFC in reader mode for a given time. Read general information from firstly discovered NFC tag or exits on timeout.
+
+Example:
+```
+nfc-read-card <timeout_seconds>
+# NFC activated in reader mode for <timeout_seconds> seconds.
+# NFC card detected.
+# NFC Type A: UID: %s
+OK
+```
+
+
+### nfc-emulate-card
+Activate NFC in Card Emulator mode for given time.
+
+Example:
+```
+nfc-emulate-card <timeout_seconds>
+# Emulation started for <timeout_seconds>
+# Emulation over
+OK
+```
+
+### nfc-write-card
+Activates the NFC reader for given time. Writes the NDEF URI message into the first discovered NFC tag type A or exits on timeout.
+
+Example:
+```
+nfc-write_card <timeout_seconds>
+# NFC reader on, put the card on the reader (timeout <timeout_seconds> s)
+# Writting URI to NFC tag 7AF403
+OK
 ```

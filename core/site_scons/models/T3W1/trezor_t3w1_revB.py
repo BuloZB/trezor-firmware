@@ -84,12 +84,42 @@ def configure(
         features_available.append("ble")
         defines += [("USE_BLE", "1")]
         sources += ["embed/io/nrf/stm32u5/nrf.c"]
+        sources += ["embed/io/nrf/stm32u5/nrf_test.c"]
         sources += ["embed/io/nrf/crc8.c"]
         paths += ["embed/io/nrf/inc"]
         sources += [
             "vendor/stm32u5xx_hal_driver/Src/stm32u5xx_hal_uart.c",
             "vendor/stm32u5xx_hal_driver/Src/stm32u5xx_hal_uart_ex.c",
         ]
+
+    if "nfc" in features_wanted:
+        sources += ["embed/io/nfc/st25r3916b/nfc.c"]
+        sources += ["embed/io/nfc/st25r3916b/ndef.c"]
+        sources += ["embed/io/nfc/st25r3916b/card_emulation.c"]
+        sources += ["embed/io/nfc/rfal/source/st25r3916/rfal_rfst25r3916.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_analogConfig.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_nfc.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_nfca.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_nfcb.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_nfcf.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_nfcv.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_isoDep.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_nfcDep.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_st25tb.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_t1t.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_t2t.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_iso15693_2.c"]
+        sources += ["embed/io/nfc/rfal/source/rfal_crc.c"]
+        sources += ["embed/io/nfc/rfal/source/st25r3916/st25r3916.c"]
+        sources += ["embed/io/nfc/rfal/source/st25r3916/st25r3916_com.c"]
+        sources += ["embed/io/nfc/rfal/source/st25r3916/st25r3916_led.c"]
+        sources += ["embed/io/nfc/rfal/source/st25r3916/st25r3916_irq.c"]
+        paths += ["embed/io/nfc/inc/"]
+        paths += ["embed/io/nfc/st25r3916b/"]
+        paths += ["embed/io/nfc/rfal/source"]
+        paths += ["embed/io/nfc/rfal/source/st25r3916"]
+        paths += ["embed/io/nfc/rfal/include/"]
+        defines += [("USE_NFC", "1")]
 
     if "optiga" in features_wanted:
         sources += ["embed/sec/optiga/stm32/optiga_hal.c"]
@@ -101,6 +131,35 @@ def configure(
         paths += ["embed/sec/optiga/inc"]
         features_available.append("optiga")
         defines += [("USE_OPTIGA", "1")]
+
+    if "tropic" in features_wanted:
+        sources += ["embed/sec/tropic/stm32/tropic01.c"]
+        sources += ["vendor/libtropic/src/libtropic.c"]
+        sources += ["vendor/libtropic/src/lt_crc16.c"]
+        sources += ["vendor/libtropic/src/lt_l1_port_wrap.c"]
+        sources += ["vendor/libtropic/src/lt_l1.c"]
+        sources += ["vendor/libtropic/src/lt_l2.c"]
+        sources += ["vendor/libtropic/src/lt_l2_frame_check.c"]
+        sources += ["vendor/libtropic/src/lt_l3.c"]
+        sources += ["vendor/libtropic/src/lt_hkdf.c"]
+        sources += ["vendor/libtropic/src/lt_random.c"]
+        sources += [
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_aesgcm.c"
+        ]
+        sources += [
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_ed25519.c"
+        ]
+        sources += [
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_sha256.c"
+        ]
+        sources += [
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_x25519.c"
+        ]
+        paths += ["embed/sec/tropic/inc"]
+        paths += ["vendor/libtropic/include"]
+        paths += ["vendor/libtropic/src"]
+        defines += [("USE_TROPIC", "1")]
+        defines += [("USE_TREZOR_CRYPTO", "1")]
 
     if "sbu" in features_wanted:
         sources += ["embed/io/sbu/stm32/sbu.c"]

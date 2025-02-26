@@ -63,22 +63,54 @@ def confirm_recovery(debug: "DebugLink", title: str = "recovery__title") -> None
             debug.press_right()
 
 
+def cancel_select_number_of_words(
+    debug: "DebugLink",
+    unlock_repeated_backup=False,
+) -> None:
+    if debug.layout_type is LayoutType.Bolt:
+        assert debug.read_layout().text_content() == TR.recovery__num_of_words
+        # click the button from ValuePad
+        if unlock_repeated_backup:
+            coords = buttons.grid34(0, 2)
+        else:
+            coords = buttons.grid34(0, 3)
+        debug.click(coords)
+    elif debug.layout_type is LayoutType.Caesar:
+        debug.press_right()
+        layout = debug.read_layout()
+        assert layout.title() == TR.word_count__title
+        # navigate to the number and confirm it
+        debug.press_left()
+    elif debug.layout_type is LayoutType.Delizia:
+        # click the button from ValuePad
+        if unlock_repeated_backup:
+            coords = buttons.grid34(0, 3)
+        else:
+            coords = buttons.grid34(0, 3)
+        debug.click(coords)
+    else:
+        raise ValueError("Unknown model")
+
+
 def select_number_of_words(
     debug: "DebugLink",
     num_of_words: int = 20,
     unlock_repeated_backup=False,
 ) -> None:
+    layout = debug.read_layout()
+    assert TR.recovery__num_of_words in layout.text_content()
+
     def select_bolt() -> "LayoutContent":
         # click the button from ValuePad
         if unlock_repeated_backup:
-            coords_map = {20: buttons.grid34(0, 2), 33: buttons.grid34(1, 2)}
+            coords_map = {20: buttons.grid34(1, 2), 33: buttons.grid34(2, 2)}
         else:
             coords_map = {
                 12: buttons.grid34(0, 2),
                 18: buttons.grid34(1, 2),
                 20: buttons.grid34(2, 2),
-                24: buttons.grid34(0, 3),
-                33: buttons.grid34(1, 3),
+                24: buttons.grid34(1, 3),
+                33: buttons.grid34(2, 3),
             }
         coords = coords_map.get(num_of_words)
         if coords is None:
@@ -98,14 +130,14 @@ def select_number_of_words(
     def select_delizia() -> "LayoutContent":
         # click the button from ValuePad
         if unlock_repeated_backup:
-            coords_map = {20: buttons.NO_UI_DELIZIA, 33: buttons.YES_UI_DELIZIA}
+            coords_map = {20: buttons.grid34(0, 1), 33: buttons.grid34(2, 1)}
         else:
             coords_map = {
                 12: buttons.grid34(0, 1),
                 18: buttons.grid34(2, 1),
                 20: buttons.grid34(0, 2),
                 24: buttons.grid34(2, 2),
-                33: buttons.grid34(1, 3),
+                33: buttons.grid34(2, 3),
             }
         coords = coords_map.get(num_of_words)
         if coords is None:
@@ -114,7 +146,6 @@ def select_number_of_words(
         return debug.read_layout()
 
     if debug.layout_type is LayoutType.Bolt:
-        assert debug.read_layout().text_content() == TR.recovery__num_of_words
         layout = select_bolt()
     elif debug.layout_type is LayoutType.Caesar:
         debug.press_right()
@@ -302,4 +333,37 @@ def prepare_enter_seed(
 def finalize(debug: "DebugLink") -> None:
     layout = go_next(debug)
     assert layout is not None
+    assert layout.main_component() == "Homescreen"
+
+
+def cancel_recovery(debug: "DebugLink", recovery_type: str = "dry_run") -> None:
+    title = TR.translate(f"recovery__title_{recovery_type}")
+    cancel_title = TR.translate(f"recovery__title_cancel_{recovery_type}")
+
+    layout = debug.read_layout()
+    assert title in layout.title()
+
+    if debug.layout_type is LayoutType.Bolt:
+        debug.click(buttons.CANCEL)
+        layout = debug.read_layout()
+        assert cancel_title in layout.title()
+        debug.click(buttons.OK)
+    elif debug.layout_type is LayoutType.Caesar:
+        debug.press_left()
+        layout = debug.read_layout()
+        assert cancel_title in layout.title()
+        for _ in range(layout.page_count()):
+            debug.press_right()
+    elif debug.layout_type is LayoutType.Delizia:
+        # go to menu
+        debug.click(buttons.CORNER_BUTTON)
+        layout = debug.read_layout()
+        assert (
+            TR.translate(f"recovery__cancel_{recovery_type}") in layout.text_content()
+        )
+        debug.click(buttons.VERTICAL_MENU[0])
+    else:
+        raise ValueError("Unknown model")
+
+    layout = debug.read_layout()
     assert layout.main_component() == "Homescreen"

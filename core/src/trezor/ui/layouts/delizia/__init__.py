@@ -377,6 +377,7 @@ async def confirm_output(
     source_account: str | None = None,
     source_account_path: str | None = None,
     cancel_text: str | None = None,
+    description: str | None = None,
 ) -> None:
     if address_label is not None:
         title = address_label
@@ -397,8 +398,8 @@ async def confirm_output(
             text_mono=True,
             account=source_account,
             account_path=source_account_path,
-            address=None,
-            address_title=None,
+            address_item=None,
+            extra_item=None,
             br_code=br_code,
             br_name="confirm_output",
             summary_items=None,
@@ -407,6 +408,7 @@ async def confirm_output(
             summary_br_name=None,
             summary_br_code=None,
             cancel_text=cancel_text,
+            description=description,
         ),
         br_name=None,
     )
@@ -427,8 +429,8 @@ async def should_show_payment_request_details(
             title=TR.send__title_sending,
             items=[(f"{amount} to\n{recipient_name}", False)]
             + [(memo, False) for memo in memos],
-            button=TR.buttons__confirm,
-            info_button=TR.buttons__details,
+            verb=TR.buttons__confirm,
+            verb_info=TR.buttons__details,
         ),
         "confirm_payment_request",
         ButtonRequestType.ConfirmOutput,
@@ -448,7 +450,7 @@ async def should_show_more(
     button_text: str | None = None,
     br_name: str = "should_show_more",
     br_code: ButtonRequestType = BR_CODE_OTHER,
-    confirm: str | bytes | None = None,
+    confirm: str | None = None,
 ) -> bool:
     """Return True if the user wants to show more (they click a special button)
     and False when the user wants to continue without showing details.
@@ -456,15 +458,13 @@ async def should_show_more(
     Raises ActionCancelled if the user cancels.
     """
     button_text = button_text or TR.buttons__show_all  # def_arg
-    if confirm is None or not isinstance(confirm, str):
-        confirm = TR.buttons__confirm
 
     result = await interact(
         trezorui_api.confirm_with_info(
             title=title,
             items=para,
-            button=confirm,
-            info_button=button_text,
+            verb=confirm or TR.buttons__confirm,
+            verb_info=button_text,
         ),
         br_name,
         br_code,
@@ -491,6 +491,7 @@ def confirm_blob(
     hold: bool = False,
     br_code: ButtonRequestType = BR_CODE_OTHER,
     ask_pagination: bool = False,
+    verb_skip_pagination: str | None = None,
     chunkify: bool = False,
     prompt_screen: bool = True,
 ) -> Awaitable[None]:
@@ -499,8 +500,9 @@ def confirm_blob(
             title=title,
             value=data,
             subtitle=description,
-            verb=verb,
+            verb=verb_skip_pagination or verb,
             verb_cancel=verb_cancel,
+            hold=hold,
             chunkify=chunkify,
         )
         info_layout = trezorui_api.confirm_value(
@@ -511,10 +513,10 @@ def confirm_blob(
             verb=None,
             verb_cancel=verb_cancel,
             info=False,
-            hold=False,
+            hold=hold,
             chunkify=chunkify,
             page_counter=True,
-            prompt_screen=False,
+            prompt_screen=prompt_screen,
             cancel=True,
         )
 
@@ -776,8 +778,8 @@ if not utils.BITCOIN_ONLY:
                 text_mono=True,
                 account=account,
                 account_path=account_path,
-                address=None,
-                address_title=None,
+                address_item=None,
+                extra_item=None,
                 br_code=ButtonRequestType.SignTx,
                 br_name="confirm_output",
                 summary_items=(
@@ -789,6 +791,7 @@ if not utils.BITCOIN_ONLY:
                 summary_br_name="confirm_total",
                 summary_br_code=ButtonRequestType.SignTx,
                 cancel_text=TR.buttons__cancel,
+                description=None,
             ),
             None,
         )
@@ -827,14 +830,15 @@ if not utils.BITCOIN_ONLY:
                 account_path=account_path,
                 br_code=br_code,
                 br_name=br_name,
-                address=address,
-                address_title=address_title,
+                address_item=(address_title, address),
+                extra_item=None,
                 summary_items=summary_items,
                 fee_items=info_items,
                 summary_title=verb,
                 summary_br_name="confirm_total",
                 summary_br_code=ButtonRequestType.SignTx,
                 cancel_text=TR.buttons__cancel,  # cancel staking
+                description=None,
             ),
             br_name=None,
         )
@@ -860,6 +864,47 @@ if not utils.BITCOIN_ONLY:
             extra_items=items,
             br_name=br_name,
             br_code=br_code,
+        )
+
+    async def confirm_solana_staking_tx(
+        title: str,
+        description: str,
+        account: str,
+        account_path: str,
+        vote_account: str,
+        stake_item: tuple[str, str],
+        amount_item: tuple[str, str],
+        fee_item: tuple[str, str],
+        fee_details: Iterable[tuple[str, str]],
+        blockhash_item: tuple[str, str],
+        br_name: str = "confirm_solana_staking_tx",
+        br_code: ButtonRequestType = ButtonRequestType.SignTx,
+    ) -> None:
+        if vote_account:
+            description = f"{description}\n\n{TR.solana__stake_provider}:"
+        await raise_if_not_confirmed(
+            trezorui_api.flow_confirm_output(
+                title=title,
+                subtitle=None,
+                description=description,
+                message=vote_account,
+                amount=None,
+                chunkify=True,
+                text_mono=True,
+                account=account,
+                account_path=account_path,
+                br_code=br_code,
+                br_name=br_name,
+                address_item=stake_item,
+                extra_item=blockhash_item,
+                fee_items=fee_details,
+                summary_title=title,
+                summary_items=(amount_item, fee_item),
+                summary_br_name="confirm_total",
+                summary_br_code=ButtonRequestType.SignTx,
+                cancel_text=TR.buttons__cancel,
+            ),
+            br_name=None,
         )
 
     def confirm_cardano_tx(
@@ -1014,6 +1059,9 @@ def confirm_sign_identity(
     )
 
 
+LONG_MSG_PAGE_THRESHOLD = 5
+
+
 async def confirm_signverify(
     message: str,
     address: str,
@@ -1056,17 +1104,6 @@ async def confirm_signverify(
         horizontal=True,
     )
 
-    message_layout = trezorui_api.confirm_value(
-        title=TR.sign_message__confirm_message,
-        description=None,
-        value=message,
-        extra=None,
-        prompt_screen=True,
-        hold=not verify,
-        info=False,
-        verb=TR.buttons__confirm if verify else None,
-    )
-
     while True:
         try:
             await with_info(address_layout, info_layout, br_name, br_code=BR_CODE_OTHER)
@@ -1084,7 +1121,30 @@ async def confirm_signverify(
         else:
             break
 
-    await interact(message_layout, br_name, BR_CODE_OTHER)
+    message_layout = trezorui_api.confirm_value(
+        title=TR.sign_message__confirm_message,
+        description=None,
+        value=message,
+        extra=None,
+        prompt_screen=True,
+        hold=not verify,
+        info=False,
+        verb=TR.buttons__confirm,
+    )
+
+    if message_layout.page_count() <= LONG_MSG_PAGE_THRESHOLD:
+        await interact(message_layout, br_name, BR_CODE_OTHER)
+    else:
+        await confirm_blob(
+            br_name,
+            TR.sign_message__confirm_message,
+            message,
+            verb="",
+            br_code=BR_CODE_OTHER,
+            hold=not verify,
+            ask_pagination=True,
+            verb_skip_pagination=TR.sign_message__confirm_without_review,
+        )
 
 
 def error_popup(

@@ -9,7 +9,6 @@ use crate::{
     ui::{
         component::{
             connect::Connect,
-            swipe_detect::SwipeSettings,
             text::{
                 op::OpTextLayout,
                 paragraphs::{
@@ -20,7 +19,7 @@ use crate::{
             },
             Border, CachedJpeg, ComponentExt, Empty, FormattedText, Never, Timeout,
         },
-        geometry::{self, Direction, Offset},
+        geometry::{self, Offset},
         layout::{
             obj::{LayoutMaybeTrace, LayoutObj, RootComponent},
             util::{PropsList, RecoveryType},
@@ -35,8 +34,8 @@ use crate::{
 use super::{
     component::{
         check_homescreen_format, Bip39Input, CoinJoinProgress, Frame, Homescreen, Lockscreen,
-        MnemonicKeyboard, PinKeyboard, Progress, SelectWordCount, Slip39Input, StatusScreen,
-        SwipeContent, SwipeUpScreen, VerticalMenu,
+        MnemonicKeyboard, PinKeyboard, Progress, SelectWordCount, SelectWordCountLayout,
+        Slip39Input, StatusScreen, SwipeContent, SwipeUpScreen, VerticalMenu,
     },
     flow::{
         self, new_confirm_action_simple, ConfirmActionExtra, ConfirmActionMenuStrings,
@@ -129,6 +128,7 @@ impl FirmwareUI for UIDelizia {
         subtitle: Option<TString<'static>>,
         verb: Option<TString<'static>>,
         verb_cancel: Option<TString<'static>>,
+        hold: bool,
         chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
         const CONFIRM_VALUE_INTRO_MARGIN: usize = 24;
@@ -138,12 +138,11 @@ impl FirmwareUI for UIDelizia {
             .with_description_font(&theme::TEXT_SUB_GREEN_LIME)
             .with_subtitle(subtitle)
             .with_verb_cancel(verb_cancel)
-            .with_footer_description(Some(
-                TR::buttons__confirm.into(), /* or words__confirm?? */
-            ))
+            .with_footer_description(verb)
             .with_chunkify(chunkify)
             .with_page_limit(Some(1))
             .with_frame_margin(CONFIRM_VALUE_INTRO_MARGIN)
+            .with_hold(hold)
             .into_flow()
             .and_then(LayoutObj::new_root)
             .map(Into::into)
@@ -336,8 +335,7 @@ impl FirmwareUI for UIDelizia {
         let layout = RootComponent::new(SwipeUpScreen::new(
             Frame::left_aligned(TR::modify_amount__title.into(), paragraphs)
                 .with_cancel_button()
-                .with_footer(TR::instructions__swipe_up.into(), None)
-                .with_swipe(Direction::Up, SwipeSettings::default()),
+                .with_swipeup_footer(None),
         ));
         Ok(layout)
     }
@@ -346,6 +344,7 @@ impl FirmwareUI for UIDelizia {
         _title: TString<'static>,
         _button: TString<'static>,
         _button_style_confirm: bool,
+        _hold: bool,
         _items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
@@ -371,8 +370,7 @@ impl FirmwareUI for UIDelizia {
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut summary_params = ShowInfoParams::new(title.unwrap_or(TString::empty()))
             .with_menu_button()
-            .with_footer(TR::instructions__swipe_up.into(), None)
-            .with_swipe_up();
+            .with_swipeup_footer(None);
         summary_params = unwrap!(summary_params.add(amount_label, amount));
         summary_params = unwrap!(summary_params.add(fee_label, fee));
 
@@ -436,10 +434,10 @@ impl FirmwareUI for UIDelizia {
 
     fn confirm_with_info(
         title: TString<'static>,
-        button: TString<'static>,
-        info_button: TString<'static>,
-        _verb_cancel: Option<TString<'static>>,
         items: Obj,
+        verb: TString<'static>,
+        verb_info: TString<'static>,
+        _verb_cancel: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut paragraphs = ParagraphVecShort::new();
 
@@ -461,10 +459,9 @@ impl FirmwareUI for UIDelizia {
         let flow = flow::new_confirm_action_simple(
             paragraphs.into_paragraphs(),
             ConfirmActionExtra::Menu(
-                ConfirmActionMenuStrings::new().with_verb_info(Some(info_button)),
+                ConfirmActionMenuStrings::new().with_verb_info(Some(verb_info)),
             ),
-            ConfirmActionStrings::new(title, None, None, None)
-                .with_footer_description(Some(button)),
+            ConfirmActionStrings::new(title, None, None, None).with_footer_description(Some(verb)),
             false,
             None,
             0,
@@ -510,6 +507,7 @@ impl FirmwareUI for UIDelizia {
     fn flow_confirm_output(
         title: Option<TString<'static>>,
         subtitle: Option<TString<'static>>,
+        description: Option<TString<'static>>,
         message: Obj,
         amount: Option<Obj>,
         chunkify: bool,
@@ -518,8 +516,8 @@ impl FirmwareUI for UIDelizia {
         account_path: Option<TString<'static>>,
         br_code: u16,
         br_name: TString<'static>,
-        address: Option<Obj>,
-        address_title: Option<TString<'static>>,
+        address_item: Option<(TString<'static>, Obj)>,
+        extra_item: Option<(TString<'static>, Obj)>,
         summary_items: Option<Obj>,
         fee_items: Option<Obj>,
         summary_title: Option<TString<'static>>,
@@ -527,28 +525,33 @@ impl FirmwareUI for UIDelizia {
         summary_br_name: Option<TString<'static>>,
         cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let address_title = address_title.unwrap_or(TR::words__address.into());
-
-        let confirm_main = ConfirmValue::new(title.unwrap_or(TString::empty()), message, None)
-            .with_subtitle(subtitle)
-            .with_menu_button()
-            .with_footer(TR::instructions__swipe_up.into(), None)
-            .with_chunkify(chunkify)
-            .with_text_mono(text_mono)
-            .with_swipe_up();
+        let confirm_main =
+            ConfirmValue::new(title.unwrap_or(TString::empty()), message, description)
+                .with_subtitle(subtitle)
+                .with_menu_button()
+                .with_swipeup_footer(None)
+                .with_chunkify(chunkify)
+                .with_text_mono(text_mono);
 
         let confirm_amount = amount.map(|amount| {
             ConfirmValue::new(TR::words__amount.into(), amount, None)
                 .with_subtitle(subtitle)
                 .with_menu_button()
-                .with_footer(TR::instructions__swipe_up.into(), None)
+                .with_swipeup_footer(None)
                 .with_text_mono(text_mono)
-                .with_swipe_up()
                 .with_swipe_down()
         });
 
-        let confirm_value = address.map(|address| {
+        let confirm_address = address_item.map(|(address_title, address)| {
             ConfirmValue::new(address_title, address, None)
+                .with_cancel_button()
+                .with_chunkify(true)
+                .with_text_mono(true)
+                .with_swipe_right()
+        });
+
+        let confirm_extra = extra_item.map(|(extra_title, extra)| {
+            ConfirmValue::new(extra_title, extra, None)
                 .with_cancel_button()
                 .with_chunkify(true)
                 .with_text_mono(true)
@@ -568,8 +571,7 @@ impl FirmwareUI for UIDelizia {
             let mut summary =
                 ShowInfoParams::new(summary_title.unwrap_or(TR::words__title_summary.into()))
                     .with_menu_button()
-                    .with_footer(TR::instructions__swipe_up.into(), None)
-                    .with_swipe_up()
+                    .with_swipeup_footer(None)
                     .with_swipe_down();
             for pair in IterBuf::new().try_iterate(summary_items.unwrap())? {
                 let [label, value]: [TString; 2] = util::iter_into_array(pair)?;
@@ -587,8 +589,8 @@ impl FirmwareUI for UIDelizia {
             br_name,
             br_code,
             confirm_amount,
-            confirm_value,
-            address_title,
+            confirm_address,
+            confirm_extra,
             summary_items_params,
             fee_items_params,
             summary_br_name,
@@ -744,14 +746,16 @@ impl FirmwareUI for UIDelizia {
     }
 
     fn select_word_count(recovery_type: RecoveryType) -> Result<impl LayoutMaybeTrace, Error> {
-        let content = if matches!(recovery_type, RecoveryType::UnlockRepeatedBackup) {
-            SelectWordCount::new_multishare()
-        } else {
-            SelectWordCount::new_all()
-        };
+        let selector = SelectWordCount::new(
+            if matches!(recovery_type, RecoveryType::UnlockRepeatedBackup) {
+                SelectWordCountLayout::LAYOUT_MULTISHARE
+            } else {
+                SelectWordCountLayout::LAYOUT_ALL
+            },
+        );
         let layout = RootComponent::new(Frame::left_aligned(
             TR::recovery__num_of_words.into(),
-            content,
+            selector,
         ));
         Ok(layout)
     }
@@ -810,8 +814,7 @@ impl FirmwareUI for UIDelizia {
 
         let layout = RootComponent::new(SwipeUpScreen::new(
             Frame::left_aligned(title, SwipeContent::new(checklist_content))
-                .with_footer(TR::instructions__swipe_up.into(), None)
-                .with_swipe(Direction::Up, SwipeSettings::default()),
+                .with_swipeup_footer(None),
         ));
         Ok(layout)
     }
@@ -838,13 +841,11 @@ impl FirmwareUI for UIDelizia {
             Frame::left_aligned(title, SwipeContent::new(content))
                 .with_cancel_button()
                 .with_danger()
-                .with_footer(TR::instructions__swipe_up.into(), None)
-                .with_swipe(Direction::Up, SwipeSettings::default())
+                .with_swipeup_footer(None)
         } else {
             Frame::left_aligned(title, SwipeContent::new(content))
                 .with_danger()
-                .with_footer(TR::instructions__swipe_up.into(), None)
-                .with_swipe(Direction::Up, SwipeSettings::default())
+                .with_swipeup_footer(None)
         };
 
         let obj = LayoutObj::new(SwipeUpScreen::new(frame))?;
@@ -864,9 +865,7 @@ impl FirmwareUI for UIDelizia {
         .with_placement(geometry::LinearPlacement::vertical().align_at_center());
 
         let layout = RootComponent::new(SwipeUpScreen::new(
-            Frame::left_aligned("".into(), SwipeContent::new(paragraphs))
-                .with_footer(TR::instructions__swipe_up.into(), None)
-                .with_swipe(Direction::Up, SwipeSettings::default()),
+            Frame::left_aligned("".into(), SwipeContent::new(paragraphs)).with_swipeup_footer(None),
         ));
         Ok(layout)
     }
@@ -890,9 +889,7 @@ impl FirmwareUI for UIDelizia {
     ) -> Result<Gc<LayoutObj>, Error> {
         let content = Paragraphs::new(Paragraph::new(&theme::TEXT_MAIN_GREY_LIGHT, description));
         let obj = LayoutObj::new(SwipeUpScreen::new(
-            Frame::left_aligned(title, SwipeContent::new(content))
-                .with_footer(TR::instructions__swipe_up.into(), None)
-                .with_swipe(Direction::Up, SwipeSettings::default()),
+            Frame::left_aligned(title, SwipeContent::new(content)).with_swipeup_footer(None),
         ))?;
         Ok(obj)
     }
@@ -950,8 +947,7 @@ impl FirmwareUI for UIDelizia {
         let layout = RootComponent::new(SwipeUpScreen::new(
             Frame::left_aligned(title, SwipeContent::new(paragraphs))
                 .with_cancel_button()
-                .with_footer(TR::instructions__swipe_up.into(), Some(button))
-                .with_swipe(Direction::Up, SwipeSettings::default()),
+                .with_swipeup_footer(Some(button)),
         ));
 
         Ok(layout)
@@ -1061,9 +1057,8 @@ impl FirmwareUI for UIDelizia {
                 TR::words__title_success.into(),
                 SwipeContent::new(content).with_no_attach_anim(),
             )
-            .with_footer(TR::instructions__swipe_up.into(), description)
-            .with_result_icon(theme::ICON_BULLET_CHECKMARK, theme::GREEN_LIGHT)
-            .with_swipe(Direction::Up, SwipeSettings::default()),
+            .with_swipeup_footer(description)
+            .with_result_icon(theme::ICON_BULLET_CHECKMARK, theme::GREEN_LIGHT),
         ))?;
         Ok(layout)
     }
@@ -1097,9 +1092,8 @@ impl FirmwareUI for UIDelizia {
         ])
         .into_paragraphs();
 
-        let frame = Frame::left_aligned(title, SwipeContent::new(content))
-            .with_footer(TR::instructions__swipe_up.into(), action)
-            .with_swipe(Direction::Up, SwipeSettings::default());
+        let frame =
+            Frame::left_aligned(title, SwipeContent::new(content)).with_swipeup_footer(action);
 
         let frame_with_icon = if danger {
             frame.with_danger_icon()

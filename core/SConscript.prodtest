@@ -8,8 +8,9 @@ CMAKELISTS = int(ARGUMENTS.get('CMAKELISTS', 0))
 PRODUCTION = ARGUMENTS.get('PRODUCTION', '0') == '1'
 BOOTLOADER_DEVEL = ARGUMENTS.get('BOOTLOADER_DEVEL', '0') == '1'
 HW_REVISION = ARGUMENTS.get('HW_REVISION', None)
+UI_DEBUG_OVERLAY = ARGUMENTS.get('UI_DEBUG_OVERLAY', '0') == '1'
 
-FEATURES_WANTED = ["input", "sbu", "sd_card", "rgb_led", "usb", "consumption_mask", "optiga", "haptic"]
+FEATURES_WANTED = ["input", "sbu", "nfc", "sd_card", "rgb_led", "usb", "consumption_mask", "optiga", "haptic", "tropic", "ble"]
 
 CCFLAGS_MOD = ''
 CPPPATH_MOD = []
@@ -99,6 +100,7 @@ SOURCE_PRODTEST = [
     'embed/projects/prodtest/header.S',
     'embed/projects/prodtest/main.c',
     'embed/projects/prodtest/cmd/prodtest_boardloader.c',
+    'embed/projects/prodtest/cmd/prodtest_ble.c',
     'embed/projects/prodtest/cmd/prodtest_bootloader.c',
     'embed/projects/prodtest/cmd/prodtest_button.c',
     'embed/projects/prodtest/cmd/prodtest_display.c',
@@ -106,6 +108,8 @@ SOURCE_PRODTEST = [
     'embed/projects/prodtest/cmd/prodtest_get_cpuid.c',
     'embed/projects/prodtest/cmd/prodtest_haptic.c',
     'embed/projects/prodtest/cmd/prodtest_help.c',
+    'embed/projects/prodtest/cmd/prodtest_nfc.c',
+    'embed/projects/prodtest/cmd/prodtest_nrf.c',
     'embed/projects/prodtest/cmd/prodtest_optiga.c',
     'embed/projects/prodtest/cmd/prodtest_otp_batch.c',
     'embed/projects/prodtest/cmd/prodtest_otp_variant.c',
@@ -117,6 +121,7 @@ SOURCE_PRODTEST = [
     'embed/projects/prodtest/cmd/prodtest_sdcard.c',
     'embed/projects/prodtest/cmd/prodtest_sbu.c',
     'embed/projects/prodtest/cmd/prodtest_touch.c',
+    'embed/projects/prodtest/cmd/prodtest_tropic.c',
     'embed/projects/prodtest/cmd/prodtest_wpc.c',
 ]
 
@@ -206,6 +211,9 @@ obj_program.extend(env.Object(source=SOURCE_HAL))
 # Rust library
 #
 features = ['prodtest',] + FEATURES_AVAILABLE + RUST_UI_FEATURES
+
+if UI_DEBUG_OVERLAY:
+    features.append('ui_debug_overlay')
 
 
 rust = tools.add_rust_lib(

@@ -63,7 +63,7 @@ pub use keyboard::{
     passphrase::{PassphraseKeyboard, PassphraseKeyboardMsg},
     pin::{PinKeyboard, PinKeyboardMsg},
     slip39::Slip39Input,
-    word_count::{SelectWordCount, SelectWordCountMsg},
+    word_count::{SelectWordCount, SelectWordCountLayout, SelectWordCountMsg},
 };
 pub use loader::{Loader, LoaderMsg, LoaderStyle, LoaderStyleSheet};
 #[cfg(feature = "translations")]
@@ -77,7 +77,7 @@ pub use result::{ResultFooter, ResultScreen, ResultStyle};
 #[cfg(feature = "translations")]
 pub use share_words::ShareWords;
 pub use status_screen::StatusScreen;
-pub use swipe_content::{InternallySwipable, InternallySwipableContent, SwipeContent};
+pub use swipe_content::{InternallySwipableContent, SwipeContent};
 #[cfg(feature = "translations")]
 pub use swipe_up_screen::{SwipeUpScreen, SwipeUpScreenMsg};
 #[cfg(feature = "translations")]

@@ -34,10 +34,10 @@ use crate::{
 
 use super::{
     component::{
-        AddressDetails, ButtonActions, ButtonDetails, ButtonLayout, ButtonPage, CoinJoinProgress,
-        ConfirmHomescreen, Flow, FlowPages, Frame, Homescreen, Lockscreen, NumberInput, Page,
-        PassphraseEntry, PinEntry, Progress, ScrollableFrame, ShareWords, ShowMore, SimpleChoice,
-        WordlistEntry, WordlistType,
+        AddressDetails, ButtonActions, ButtonDetails, ButtonLayout, ButtonPage, ChoiceControls,
+        CoinJoinProgress, ConfirmHomescreen, Flow, FlowPages, Frame, Homescreen, Lockscreen,
+        NumberInput, Page, PassphraseEntry, PinEntry, Progress, ScrollableFrame, ShareWords,
+        ShowMore, SimpleChoice, WordlistEntry, WordlistType,
     },
     constant, fonts, theme, UICaesar,
 };
@@ -180,6 +180,7 @@ impl FirmwareUI for UICaesar {
         _subtitle: Option<TString<'static>>,
         _verb: Option<TString<'static>>,
         _verb_cancel: Option<TString<'static>>,
+        _hold: bool,
         _chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
         Err::<Gc<LayoutObj>, Error>(Error::ValueError(c"confirm_value_intro not implemented"))
@@ -384,6 +385,7 @@ impl FirmwareUI for UICaesar {
         title: TString<'static>,
         button: TString<'static>,
         _button_style_confirm: bool,
+        _hold: bool,
         items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut paragraphs = ParagraphVecLong::new();
@@ -548,15 +550,19 @@ impl FirmwareUI for UICaesar {
                     // Total amount + fee
                     let (btn_layout, btn_actions) = btns_summary_page(!info_pages.is_empty());
 
-                    let ops = OpTextLayout::new(theme::TEXT_MONO)
+                    let mut ops = OpTextLayout::new(theme::TEXT_MONO)
                         .text(amount_label, fonts::FONT_BOLD)
                         .newline()
-                        .text(amount, fonts::FONT_MONO)
-                        .newline()
-                        .newline()
-                        .text(fee_label, fonts::FONT_BOLD)
-                        .newline()
-                        .text(fee, fonts::FONT_MONO);
+                        .text(amount, fonts::FONT_MONO);
+
+                    if !fee_label.is_empty() || !fee.is_empty() {
+                        ops = ops
+                            .newline()
+                            .newline()
+                            .text(fee_label, fonts::FONT_BOLD)
+                            .newline()
+                            .text(fee, fonts::FONT_MONO);
+                    }
 
                     let formatted = FormattedText::new(ops);
                     Page::new(btn_layout, btn_actions, formatted)
@@ -595,10 +601,10 @@ impl FirmwareUI for UICaesar {
 
     fn confirm_with_info(
         title: TString<'static>,
-        button: TString<'static>,
-        _info_button: TString<'static>,
-        verb_cancel: Option<TString<'static>>,
         items: Obj,
+        verb: TString<'static>,
+        _verb_info: TString<'static>,
+        verb_cancel: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut paragraphs = ParagraphVecShort::new();
 
@@ -622,7 +628,7 @@ impl FirmwareUI for UICaesar {
             ShowMore::<Paragraphs<ParagraphVecShort>>::new(
                 paragraphs.into_paragraphs(),
                 verb_cancel,
-                button,
+                verb,
             ),
         ));
         Ok(layout)
@@ -674,6 +680,7 @@ impl FirmwareUI for UICaesar {
     fn flow_confirm_output(
         _title: Option<TString<'static>>,
         _subtitle: Option<TString<'static>>,
+        _description: Option<TString<'static>>,
         _message: Obj,
         _amount: Option<Obj>,
         _chunkify: bool,
@@ -682,8 +689,8 @@ impl FirmwareUI for UICaesar {
         _account_path: Option<TString<'static>>,
         _br_code: u16,
         _br_name: TString<'static>,
-        _address: Option<Obj>,
-        _address_title: Option<TString<'static>>,
+        _address_item: Option<(TString<'static>, Obj)>,
+        _extra_item: Option<(TString<'static>, Obj)>,
         _summary_items: Option<Obj>,
         _fee_items: Option<Obj>,
         _summary_title: Option<TString<'static>>,
@@ -882,7 +889,7 @@ impl FirmwareUI for UICaesar {
         let layout = RootComponent::new(
             Frame::new(
                 description,
-                SimpleChoice::new(words, false)
+                SimpleChoice::new(words, ChoiceControls::Carousel)
                     .with_show_incomplete()
                     .with_return_index(),
             )
@@ -899,12 +906,14 @@ impl FirmwareUI for UICaesar {
             } else {
                 &["12", "18", "20", "24", "33"]
             };
-
             nums.iter().map(|&num| num.into()).collect()
         };
-
         let layout = RootComponent::new(
-            Frame::new(title, SimpleChoice::new(choices, false)).with_title_centered(),
+            Frame::new(
+                title,
+                SimpleChoice::new(choices, ChoiceControls::Cancellable),
+            )
+            .with_title_centered(),
         );
         Ok(layout)
     }
