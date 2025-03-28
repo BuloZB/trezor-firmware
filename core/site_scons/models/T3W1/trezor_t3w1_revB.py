@@ -36,7 +36,11 @@ def configure(
         ("HW_REVISION", str(hw_revision)),
         ("HSE_VALUE", "32000000"),
         ("USE_HSE", "1"),
+        ("USE_LSE", "1"),
         ("FIXED_HW_DEINIT", "1"),
+        ("TERMINAL_FONT_SCALE", "2"),
+        ("TERMINAL_X_PADDING", "4"),
+        ("TERMINAL_Y_PADDING", "12"),
     ]
 
     sources += [
@@ -133,6 +137,7 @@ def configure(
         defines += [("USE_OPTIGA", "1")]
 
     if "tropic" in features_wanted:
+        sources += ["embed/sec/tropic/tropic.c"]
         sources += ["embed/sec/tropic/stm32/tropic01.c"]
         sources += ["vendor/libtropic/src/libtropic.c"]
         sources += ["vendor/libtropic/src/lt_crc16.c"]
@@ -189,6 +194,11 @@ def configure(
         paths += ["embed/io/usb/inc"]
         defines += [("USE_USB", "1")]
 
+    if "hw_revision" in features_wanted:
+        defines += [("USE_HW_REVISION", "1")]
+        paths += ["embed/util/hw_revision/inc"]
+        sources += ["embed/util/hw_revision/stm32/hw_revision.c"]
+
     defines += [
         "FRAMEBUFFER",
         "DISPLAY_RGBA8888",
@@ -219,7 +229,6 @@ def configure(
         ("USE_TAMPER", "1"),
         ("USE_FLASH_BURST", "1"),
         ("USE_OEM_KEYS_CHECK", "1"),
-        ("USE_RESET_TO_BOOT", "1"),
     ]
 
     sources += [

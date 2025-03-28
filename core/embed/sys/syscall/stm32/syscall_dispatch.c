@@ -21,6 +21,7 @@
 
 #include <trezor_rtl.h>
 
+#include <gfx/dma2d_bitblt.h>
 #include <io/display.h>
 #include <io/usb.h>
 #include <io/usb_hid.h>
@@ -419,7 +420,8 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
 
 #ifdef USE_BUTTON
     case SYSCALL_BUTTON_GET_EVENT: {
-      args[0] = button_get_event();
+      button_event_t *event = (button_event_t *)args[0];
+      args[0] = button_get_event__verified(event);
     } break;
 #endif
 
@@ -761,6 +763,98 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       break;
     }
 #endif  // USE_HW_JPEG_DECODER
+
+#ifdef USE_DMA2D
+    case SYSCALL_DMA2D_WAIT: {
+      dma2d_wait();
+    } break;
+
+    case SYSCALL_DMA2D_RGB565_FILL: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgb565_fill__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGB565_COPY_MONO4: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgb565_copy_mono4__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGB565_COPY_RGB565: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgb565_copy_rgb565__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGB565_BLEND_MONO4: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgb565_blend_mono4__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGB565_BLEND_MONO8: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgb565_blend_mono8__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGBA8888_FILL: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgba8888_fill__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGBA8888_COPY_MONO4: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgba8888_copy_mono4__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGBA8888_COPY_RGB565: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgba8888_copy_rgb565__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGBA8888_COPY_RGBA8888: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgba8888_copy_rgba8888__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGBA8888_BLEND_MONO4: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgba8888_blend_mono4__verified(bb);
+    } break;
+
+    case SYSCALL_DMA2D_RGBA8888_BLEND_MONO8: {
+      const gfx_bitblt_t *bb = (const gfx_bitblt_t *)args[0];
+      args[0] = dma2d_rgba8888_blend_mono8__verified(bb);
+    } break;
+#endif  // USE_DMA2D
+
+#ifdef USE_TROPIC
+    case SYSCALL_TROPIC_PING: {
+      const uint8_t *msg_out = (const uint8_t *)args[0];
+      uint8_t *msg_in = (uint8_t *)args[1];
+      uint16_t msg_len = (uint16_t)args[2];
+      args[0] = tropic_ping__verified(msg_out, msg_in, msg_len);
+    } break;
+
+    case SYSCALL_TROPIC_GET_CERT: {
+      uint8_t *buf = (uint8_t *)args[0];
+      uint16_t buf_size = (uint16_t)args[1];
+      args[0] = tropic_get_cert__verified(buf, buf_size);
+    } break;
+    case SYSCALL_TROPIC_ECC_KEY_GENERATE: {
+      uint16_t slot_index = (uint16_t)args[0];
+      args[0] = tropic_ecc_key_generate__verified(slot_index);
+
+    } break;
+    case SYSCALL_TROPIC_ECC_SIGN: {
+      uint16_t key_slot_index = (uint16_t)args[0];
+      const uint8_t *dig = (const uint8_t *)args[1];
+      uint16_t dig_len = (uint16_t)args[2];
+      uint8_t *sig = (uint8_t *)args[3];
+      uint16_t sig_len = (uint16_t)args[4];
+
+      args[0] =
+          tropic_ecc_sign__verified(key_slot_index, dig, dig_len, sig, sig_len);
+
+    } break;
+#endif
 
     default:
       system_exit_fatal("Invalid syscall", __FILE__, __LINE__);

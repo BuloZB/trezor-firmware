@@ -226,4 +226,58 @@ bool jpegdec_get_slice_rgba8888__verified(void *rgba8888,
 
 #endif  // USE_HW_JPEG_DECODER
 
+// ---------------------------------------------------------------------
+#ifdef USE_DMA2D
+
+#include <gfx/dma2d_bitblt.h>
+
+bool dma2d_rgb565_fill__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgb565_copy_mono4__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgb565_copy_rgb565__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgb565_blend_mono4__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgb565_blend_mono8__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgba8888_fill__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgba8888_copy_mono4__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgba8888_copy_rgb565__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgba8888_copy_rgba8888__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgba8888_blend_mono4__verified(const gfx_bitblt_t *bb);
+
+bool dma2d_rgba8888_blend_mono8__verified(const gfx_bitblt_t *bb);
+
+#endif
+
+// ---------------------------------------------------------------------
+#ifdef USE_BUTTON
+
+#include <io/button.h>
+
+bool button_get_event__verified(button_event_t *event);
+
+#endif
+
+// ---------------------------------------------------------------------
+#ifdef USE_TROPIC
+
+bool tropic_ping__verified(const uint8_t *msg_out, uint8_t *msg_in,
+                           uint16_t msg_len);
+
+bool tropic_get_cert__verified(uint8_t *buf, uint16_t buf_size);
+
+bool tropic_ecc_key_generate__verified(uint16_t slot_index);
+
+bool tropic_ecc_sign__verified(uint16_t key_slot_index, const uint8_t *dig,
+                               uint16_t dig_len, uint8_t *sig,
+                               uint16_t sig_len);
+
+#endif
+
 #endif  // SYSCALL_DISPATCH

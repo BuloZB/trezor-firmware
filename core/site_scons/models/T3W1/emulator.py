@@ -52,6 +52,33 @@ def configure(
         features_available.append("optiga")
         defines += [("USE_OPTIGA", "1")]
 
+    if "tropic" in features_wanted:
+        sources += [
+            "embed/sec/secret/unix/secret.c",
+            "embed/sec/tropic/tropic.c",
+            "embed/sec/tropic/unix/tropic01.c",
+            "vendor/libtropic/src/libtropic.c",
+            "vendor/libtropic/src/lt_crc16.c",
+            "vendor/libtropic/src/lt_hkdf.c",
+            "vendor/libtropic/src/lt_l1.c",
+            "vendor/libtropic/src/lt_l1_port_wrap.c",
+            "vendor/libtropic/src/lt_l2.c",
+            "vendor/libtropic/src/lt_l2_frame_check.c",
+            "vendor/libtropic/src/lt_l3.c",
+            "vendor/libtropic/src/lt_random.c",
+            "vendor/libtropic/hal/port/unix/lt_port_unix.c",
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_aesgcm.c",
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_ed25519.c",
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_sha256.c",
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_x25519.c",
+        ]
+        paths += ["embed/sec/tropic/inc"]
+        paths += ["vendor/libtropic/include"]
+        paths += ["vendor/libtropic/src"]
+        defines += ["USE_TREZOR_CRYPTO"]
+        features_available.append("tropic")
+        defines += ["USE_TROPIC=1"]
+
     if "input" in features_wanted:
         sources += ["embed/io/touch/unix/touch.c"]
         paths += ["embed/io/touch/inc"]

@@ -393,9 +393,11 @@ async def confirm_output(
             title=TR.words__address,
             subtitle=title,
             message=address,
+            extra=None,
             amount=amount,
             chunkify=chunkify,
             text_mono=True,
+            account_title=TR.send__send_from,
             account=source_account,
             account_path=source_account_path,
             address_item=None,
@@ -623,9 +625,6 @@ def confirm_value(
 ) -> Awaitable[None]:
     """General confirmation dialog, used by many other confirm_* functions."""
 
-    if not verb and not hold:
-        raise ValueError("Either verb or hold=True must be set")
-
     info_items = info_items or []
     info_layout = trezorui_api.show_info_with_cancel(
         title=info_title if info_title else TR.words__title_information,
@@ -772,10 +771,13 @@ if not utils.BITCOIN_ONLY:
                     if not is_contract_interaction
                     else TR.ethereum__interaction_contract
                 ),
+                description=None,
+                extra=None,
                 message=(recipient or TR.ethereum__new_contract),
                 amount=None,
                 chunkify=(chunkify if recipient else False),
                 text_mono=True,
+                account_title=TR.send__send_from,
                 account=account,
                 account_path=account_path,
                 address_item=None,
@@ -791,7 +793,6 @@ if not utils.BITCOIN_ONLY:
                 summary_br_name="confirm_total",
                 summary_br_code=ButtonRequestType.SignTx,
                 cancel_text=TR.buttons__cancel,
-                description=None,
             ),
             None,
         )
@@ -822,10 +823,13 @@ if not utils.BITCOIN_ONLY:
             trezorui_api.flow_confirm_output(
                 title=verb,
                 subtitle=None,
+                description=None,
+                extra=None,
                 message=intro_question,
                 amount=None,
                 chunkify=False,
                 text_mono=False,
+                account_title=TR.address_details__account_info,
                 account=account,
                 account_path=account_path,
                 br_code=br_code,
@@ -838,7 +842,6 @@ if not utils.BITCOIN_ONLY:
                 summary_br_name="confirm_total",
                 summary_br_code=ButtonRequestType.SignTx,
                 cancel_text=TR.buttons__cancel,  # cancel staking
-                description=None,
             ),
             br_name=None,
         )
@@ -872,7 +875,7 @@ if not utils.BITCOIN_ONLY:
         account: str,
         account_path: str,
         vote_account: str,
-        stake_item: tuple[str, str],
+        stake_item: tuple[str, str] | None,
         amount_item: tuple[str, str],
         fee_item: tuple[str, str],
         fee_details: Iterable[tuple[str, str]],
@@ -880,17 +883,17 @@ if not utils.BITCOIN_ONLY:
         br_name: str = "confirm_solana_staking_tx",
         br_code: ButtonRequestType = ButtonRequestType.SignTx,
     ) -> None:
-        if vote_account:
-            description = f"{description}\n\n{TR.solana__stake_provider}:"
         await raise_if_not_confirmed(
             trezorui_api.flow_confirm_output(
                 title=title,
                 subtitle=None,
                 description=description,
+                extra=f"\n{TR.solana__stake_provider}:" if vote_account else None,
                 message=vote_account,
                 amount=None,
                 chunkify=True,
                 text_mono=True,
+                account_title=TR.address_details__account_info,
                 account=account,
                 account_path=account_path,
                 br_code=br_code,

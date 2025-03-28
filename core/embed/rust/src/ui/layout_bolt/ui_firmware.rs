@@ -555,10 +555,12 @@ impl FirmwareUI for UIBolt {
         _title: Option<TString<'static>>,
         _subtitle: Option<TString<'static>>,
         _description: Option<TString<'static>>,
+        _extra: Option<TString<'static>>,
         _message: Obj,
         _amount: Option<Obj>,
         _chunkify: bool,
         _text_mono: bool,
+        _account_title: TString<'static>,
         _account: Option<TString<'static>>,
         _account_path: Option<TString<'static>>,
         _br_code: u16,
@@ -1292,9 +1294,11 @@ impl ConfirmValue {
     }
 
     fn into_layout(self) -> Result<Gc<LayoutObj>, Error> {
+        let description = self.description.unwrap_or("".into());
+        let extra = self.extra.unwrap_or("".into());
         let paragraphs = ConfirmValueParams {
-            description: self.description.unwrap_or("".into()),
-            extra: self.extra.unwrap_or("".into()),
+            description,
+            extra,
             value: self.value.try_into()?,
             font: if self.chunkify {
                 let value: TString = self.value.try_into()?;
@@ -1304,8 +1308,12 @@ impl ConfirmValue {
             } else {
                 &theme::TEXT_NORMAL
             },
-            description_font: &theme::TEXT_NORMAL,
-            extra_font: &theme::TEXT_DEMIBOLD,
+            description_font: if extra.is_empty() {
+                &theme::TEXT_NORMAL
+            } else {
+                &theme::TEXT_DEMIBOLD
+            },
+            extra_font: &theme::TEXT_NORMAL,
         }
         .into_paragraphs();
 

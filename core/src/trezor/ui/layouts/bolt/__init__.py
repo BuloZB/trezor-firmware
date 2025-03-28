@@ -707,9 +707,6 @@ def confirm_value(
     if description and value:
         description += ":"
 
-    if not verb and not hold:
-        raise ValueError("Either verb or hold=True must be set")
-
     info_items = info_items or []
     info_layout = trezorui_api.show_info_with_cancel(
         title=info_title if info_title else TR.words__title_information,
@@ -983,7 +980,7 @@ if not utils.BITCOIN_ONLY:
         account: str,
         account_path: str,
         vote_account: str,
-        stake_item: tuple[str, str],
+        stake_item: tuple[str, str] | None,
         amount_item: tuple[str, str],
         fee_item: tuple[str, str],
         fee_details: Iterable[tuple[str, str]],
@@ -1003,14 +1000,17 @@ if not utils.BITCOIN_ONLY:
             info=True,
         )
 
+        items = [
+            (f"{TR.words__account}:", account),
+            (f"{TR.address_details__derivation_path}:", account_path),
+        ]
+        if stake_item is not None:
+            items.append(stake_item)
+        items.append(blockhash_item)
+
         info_layout = trezorui_api.show_info_with_cancel(
             title=title,
-            items=(
-                (f"{TR.words__account}:", account),
-                (f"{TR.address_details__derivation_path}:", account_path),
-                stake_item,
-                blockhash_item,
-            ),
+            items=items,
             horizontal=True,
         )
 
@@ -1407,13 +1407,24 @@ def confirm_set_new_pin(
     )
 
 
-def confirm_firmware_update(description: str, fingerprint: str) -> Awaitable[None]:
-    return raise_if_not_confirmed(
-        trezorui_api.confirm_firmware_update(
-            description=description, fingerprint=fingerprint
-        ),
-        "firmware_update",
-        BR_CODE_OTHER,
+async def confirm_firmware_update(description: str, fingerprint: str) -> None:
+    main = trezorui_api.confirm_value(
+        title=TR.firmware_update__title,
+        description=description,
+        value="",
+        verb=TR.buttons__install,
+        info=True,
+    )
+    info = trezorui_api.show_info_with_cancel(
+        title=TR.firmware_update__title_fingerprint,
+        items=(("", fingerprint),),
+        chunkify=True,
+    )
+    await with_info(
+        main,
+        info,
+        br_name="firmware_update",
+        br_code=BR_CODE_OTHER,
     )
 
 

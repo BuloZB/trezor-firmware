@@ -26,6 +26,8 @@ class LayoutObj(Generic[T]):
         """Receive a progress event."""
     def usb_event(self, connected: bool) -> LayoutState | None:
         """Receive a USB connect/disconnect event."""
+    def ble_event(self, event: tuple[int, int | None]) -> LayoutState | None:
+        """Receive a BLE event."""
     def timer(self, token: int) -> LayoutState | None:
         """Callback for the timer set by `attach_timer_fn`.
         This function should be called by the executor after the corresponding
@@ -314,9 +316,12 @@ def flow_confirm_output(
     title: str | None,
     subtitle: str | None,
     message: str,
+    description: str | None,
+    extra: str | None,
     amount: str | None,
     chunkify: bool,
     text_mono: bool,
+    account_title: str,
     account: str | None,
     account_path: str | None,
     br_code: ButtonRequestType,
@@ -329,7 +334,6 @@ def flow_confirm_output(
     summary_br_code: ButtonRequestType | None = None,
     summary_br_name: str | None = None,
     cancel_text: str | None = None,
-    description: str | None = None,
 ) -> LayoutObj[UiResult]:
     """Confirm the recipient, (optionally) confirm the amount and (optionally) confirm the summary and present a Hold to Sign page."""
 

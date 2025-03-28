@@ -5,7 +5,6 @@ from enum import Enum
 
 from trezorlib.debuglink import LayoutType
 
-from .. import buttons
 from .. import translations as TR
 
 if t.TYPE_CHECKING:
@@ -49,7 +48,7 @@ def get_char_category(char: str) -> PassphraseCategory:
 
 def go_next(debug: "DebugLink") -> LayoutContent:
     if debug.layout_type is LayoutType.Bolt:
-        debug.click(buttons.OK)
+        debug.click(debug.screen_buttons.ok())
     elif debug.layout_type is LayoutType.Caesar:
         debug.press_right()
     elif debug.layout_type is LayoutType.Delizia:
@@ -61,7 +60,7 @@ def go_next(debug: "DebugLink") -> LayoutContent:
 
 def go_back(debug: "DebugLink", r_middle: bool = False) -> LayoutContent:
     if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia):
-        debug.click(buttons.CANCEL)
+        debug.click(debug.screen_buttons.cancel())
     elif debug.layout_type is LayoutType.Caesar:
         if r_middle:
             debug.press_middle()
@@ -116,11 +115,11 @@ def _carousel_steps(current_index: int, wanted_index: int, length: int) -> int:
 
 def unlock_gesture(debug: "DebugLink") -> LayoutContent:
     if debug.layout_type is LayoutType.Bolt:
-        debug.click(buttons.OK)
+        debug.click(debug.screen_buttons.ok())
     elif debug.layout_type is LayoutType.Caesar:
         debug.press_right()
     elif debug.layout_type is LayoutType.Delizia:
-        debug.click(buttons.TAP_TO_CONFIRM)
+        debug.click(debug.screen_buttons.tap_to_confirm())
     else:
         raise RuntimeError("Unknown model")
     return debug.read_layout()

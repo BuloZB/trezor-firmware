@@ -508,10 +508,12 @@ impl FirmwareUI for UIDelizia {
         title: Option<TString<'static>>,
         subtitle: Option<TString<'static>>,
         description: Option<TString<'static>>,
+        extra: Option<TString<'static>>,
         message: Obj,
         amount: Option<Obj>,
         chunkify: bool,
         text_mono: bool,
+        account_title: TString<'static>,
         account: Option<TString<'static>>,
         account_path: Option<TString<'static>>,
         br_code: u16,
@@ -527,7 +529,10 @@ impl FirmwareUI for UIDelizia {
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let confirm_main =
             ConfirmValue::new(title.unwrap_or(TString::empty()), message, description)
+                .with_description_font(&theme::TEXT_MAIN_GREY_LIGHT)
                 .with_subtitle(subtitle)
+                .with_extra(extra)
+                .with_extra_font(&theme::TEXT_SUB_GREY)
                 .with_menu_button()
                 .with_swipeup_footer(None)
                 .with_chunkify(chunkify)
@@ -584,6 +589,7 @@ impl FirmwareUI for UIDelizia {
 
         let flow = flow::confirm_output::new_confirm_output(
             confirm_main,
+            account_title,
             account,
             account_path,
             br_name,

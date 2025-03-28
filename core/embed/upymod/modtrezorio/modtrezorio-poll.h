@@ -48,6 +48,31 @@
 
 extern uint32_t last_touch_sample_time;
 
+#ifdef USE_BLE
+
+static mp_obj_t parse_ble_event_data(const ble_event_t *event) {
+  if (event->data_len == 0) {
+    return mp_const_none;
+  }
+  if (event->type != BLE_PAIRING_REQUEST) {
+    return mp_const_none;
+  }
+  // Parse pairing code
+  _Static_assert(sizeof(event->data) <= 6);
+  uint32_t code = 0;
+  for (int i = 0; i < event->data_len; ++i) {
+    uint8_t byte = event->data[i];
+    if (byte >= '0' && byte <= '9') {
+      code = 10 * code + (byte - '0');
+    } else {
+      mp_raise_ValueError("Invalid pairing code");
+    }
+  }
+  return mp_obj_new_int_from_uint(code);
+}
+
+#endif
+
 /// package: trezorio.__init__
 
 /// def poll(ifaces: Iterable[int], list_ref: list, timeout_ms: int) -> bool:
@@ -155,11 +180,12 @@ STATIC mp_obj_t mod_trezorio_poll(mp_obj_t ifaces, mp_obj_t list_ref,
       }
 #if USE_BUTTON
       else if (iface == BUTTON_IFACE) {
-        const uint32_t evt = button_get_event();
-        if (evt & (BTN_EVT_DOWN | BTN_EVT_UP)) {
+        button_event_t btn_event = {0};
+        const bool btn = button_get_event(&btn_event);
+        if (btn) {
           mp_obj_tuple_t *tuple = MP_OBJ_TO_PTR(mp_obj_new_tuple(2, NULL));
-          uint32_t etype = (evt >> 24) & 0x3U;  // button down/up
-          uint32_t en = evt & 0xFFFF;           // button number
+          uint32_t etype = btn_event.event_type;
+          uint32_t en = btn_event.button;
           if (display_get_orientation() == 180) {
             en = (en == BTN_LEFT) ? BTN_RIGHT : BTN_LEFT;
           }
@@ -209,7 +235,7 @@ STATIC mp_obj_t mod_trezorio_poll(mp_obj_t ifaces, mp_obj_t list_ref,
         if (read) {
           mp_obj_tuple_t *tuple = MP_OBJ_TO_PTR(mp_obj_new_tuple(2, NULL));
           tuple->items[0] = MP_OBJ_NEW_SMALL_INT(event.type);
-          tuple->items[1] = mp_obj_new_bytes(event.data, event.data_len);
+          tuple->items[1] = parse_ble_event_data(&event);
           ret->items[0] = MP_OBJ_NEW_SMALL_INT(i);
           ret->items[1] = MP_OBJ_FROM_PTR(tuple);
           return mp_const_true;

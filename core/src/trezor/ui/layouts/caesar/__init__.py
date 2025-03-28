@@ -770,9 +770,6 @@ async def confirm_value(
     if description and value:
         description += ":"
 
-    if not verb and not hold:
-        raise ValueError("Either verb or hold=True must be set")
-
     if info_items is None:
         return await raise_if_not_confirmed(
             trezorui_api.confirm_value(
@@ -792,6 +789,7 @@ async def confirm_value(
     else:
         info_items_list = list(info_items)
         if len(info_items_list) > 1:
+            # TODO: Support more than one info item!
             raise NotImplementedError("Only one info item is supported")
 
         send_button_request = True
@@ -948,12 +946,12 @@ if not utils.BITCOIN_ONLY:
         )
 
     async def confirm_solana_staking_tx(
-        title: str,
+        title: str | None,
         description: str,
         account: str,
         account_path: str,
         vote_account: str,
-        stake_item: tuple[str, str],
+        stake_item: tuple[str, str] | None,
         amount_item: tuple[str, str],
         fee_item: tuple[str, str],
         fee_details: Iterable[tuple[str, str]],
@@ -966,23 +964,28 @@ if not utils.BITCOIN_ONLY:
         if not fee_label and not fee:
             amount_label = f"\n\n{amount_label}"
 
-        items = (
+        items = [
             (f"{TR.words__account}:", account),
             (f"{TR.address_details__derivation_path}:", account_path),
-            stake_item,
-            blockhash_item,
-        )
+        ]
+        if stake_item is not None:
+            items.append(stake_item)
+        items.append(blockhash_item)
+
+        extra_title = title
         if vote_account:
             description = f"{description}\n{TR.solana__stake_provider}:"
+            title = None  # so the layout will fit in a single page
         else:
-            description = f"\n\n{description}"
+            description = f"\n{description}"
         await raise_if_not_confirmed(
             trezorui_api.confirm_summary(
+                title=title,
                 amount=vote_account,
                 amount_label=description,
                 fee="",
                 fee_label="",
-                extra_title=title,
+                extra_title=extra_title,
                 extra_items=items,
             ),
             br_name,
@@ -996,7 +999,6 @@ if not utils.BITCOIN_ONLY:
                 fee=fee,
                 fee_label=fee_label,
                 account_items=None,
-                title=title,
                 extra_title=TR.confirm_total__title_fee,
                 extra_items=fee_details,
             ),

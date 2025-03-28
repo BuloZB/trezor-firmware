@@ -432,12 +432,14 @@ extern "C" fn new_flow_confirm_output(n_args: usize, args: *const Obj, kwargs: *
     let block = move |_args: &[Obj], kwargs: &Map| {
         let title: Option<TString> = kwargs.get(Qstr::MP_QSTR_title)?.try_into_option()?;
         let subtitle: Option<TString> = kwargs.get(Qstr::MP_QSTR_subtitle)?.try_into_option()?;
+        let extra: Option<TString> = kwargs.get(Qstr::MP_QSTR_extra)?.try_into_option()?;
         let description: Option<TString> =
             kwargs.get(Qstr::MP_QSTR_description)?.try_into_option()?;
         let message: Obj = kwargs.get(Qstr::MP_QSTR_message)?;
         let amount: Option<Obj> = kwargs.get(Qstr::MP_QSTR_amount)?.try_into_option()?;
         let chunkify: bool = kwargs.get_or(Qstr::MP_QSTR_chunkify, false)?;
         let text_mono: bool = kwargs.get_or(Qstr::MP_QSTR_text_mono, true)?;
+        let account_title: TString = kwargs.get(Qstr::MP_QSTR_account_title)?.try_into()?;
         let account: Option<TString> = kwargs.get(Qstr::MP_QSTR_account)?.try_into_option()?;
         let account_path: Option<TString> =
             kwargs.get(Qstr::MP_QSTR_account_path)?.try_into_option()?;
@@ -478,10 +480,12 @@ extern "C" fn new_flow_confirm_output(n_args: usize, args: *const Obj, kwargs: *
             title,
             subtitle,
             description,
+            extra,
             message,
             amount,
             chunkify,
             text_mono,
+            account_title,
             account,
             account_path,
             br_code,
@@ -1064,6 +1068,9 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     def usb_event(self, connected: bool) -> LayoutState | None:
     ///         """Receive a USB connect/disconnect event."""
     ///
+    ///     def ble_event(self, event: tuple[int, int | None]) -> LayoutState | None:
+    ///         """Receive a BLE event."""
+    ///
     ///     def timer(self, token: int) -> LayoutState | None:
     ///         """Callback for the timer set by `attach_timer_fn`.
     ///
@@ -1350,9 +1357,12 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     title: str | None,
     ///     subtitle: str | None,
     ///     message: str,
+    ///     description: str | None,
+    ///     extra: str | None,
     ///     amount: str | None,
     ///     chunkify: bool,
     ///     text_mono: bool,
+    ///     account_title: str,
     ///     account: str | None,
     ///     account_path: str | None,
     ///     br_code: ButtonRequestType,
@@ -1365,7 +1375,6 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     summary_br_code: ButtonRequestType | None = None,
     ///     summary_br_name: str | None = None,
     ///     cancel_text: str | None = None,
-    ///     description: str | None = None,
     /// ) -> LayoutObj[UiResult]:
     ///     """Confirm the recipient, (optionally) confirm the amount and (optionally) confirm the summary and present a Hold to Sign page."""
     Qstr::MP_QSTR_flow_confirm_output => obj_fn_kw!(0, new_flow_confirm_output).as_obj(),

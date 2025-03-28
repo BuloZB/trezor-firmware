@@ -86,6 +86,14 @@
 #include "cmd/prodtest_ble.h"
 #endif
 
+#ifdef USE_HW_REVISION
+#include <util/hw_revision.h>
+#endif
+
+#ifdef USE_TAMPER
+#include <sys/tamper.h>
+#endif
+
 #ifdef TREZOR_MODEL_T2T1
 #define MODEL_IDENTIFIER "TREZOR2-"
 #else
@@ -157,13 +165,12 @@ static void usb_init_all(void) {
 }
 
 static void show_welcome_screen(void) {
-  char dom[32] = {0};
-  // format: {MODEL_IDENTIFIER}YYMMDD
-  if ((sectrue ==
-           flash_otp_read(FLASH_OTP_BLOCK_BATCH, 0, (uint8_t *)dom, 32) &&
-       dom[31] == 0 && cstr_starts_with(dom, MODEL_IDENTIFIER))) {
-    screen_prodtest_info(dom, strlen(dom), dom + sizeof(MODEL_IDENTIFIER) - 1,
-                         strlen(dom) - sizeof(MODEL_IDENTIFIER) + 1);
+  char device_id[FLASH_OTP_BLOCK_SIZE];
+
+  if (sectrue == flash_otp_read(FLASH_OTP_BLOCK_DEVICE_ID, 0,
+                                (uint8_t *)device_id, sizeof(device_id)) &&
+      (device_id[0] != 0xFF)) {
+    screen_prodtest_info(device_id, strnlen(device_id, sizeof(device_id) - 1));
   } else {
     screen_prodtest_welcome();
   }
@@ -176,6 +183,9 @@ static void drivers_init(void) {
 
   display_init(DISPLAY_RESET_CONTENT);
 
+#ifdef USE_TAMPER
+  tamper_init();
+#endif
 #ifdef USE_STORAGE_HWKEY
   secure_aes_init();
 #endif
@@ -206,6 +216,9 @@ static void drivers_init(void) {
 #endif
 #ifdef USE_TROPIC
   tropic_init();
+#endif
+#ifdef USE_HW_REVISION
+  hw_revision_init();
 #endif
 }
 

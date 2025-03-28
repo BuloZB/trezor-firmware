@@ -36,7 +36,11 @@ def configure(
         ("HW_REVISION", str(hw_revision)),
         ("HSE_VALUE", "32000000"),
         ("USE_HSE", "1"),
+        ("USE_LSE", "1"),
         ("FIXED_HW_DEINIT", "1"),
+        ("TERMINAL_FONT_SCALE", "2"),
+        ("TERMINAL_X_PADDING", "4"),
+        ("TERMINAL_Y_PADDING", "12"),
     ]
 
     sources += [
@@ -84,6 +88,7 @@ def configure(
         features_available.append("ble")
         defines += [("USE_BLE", "1")]
         sources += ["embed/io/nrf/stm32u5/nrf.c"]
+        sources += ["embed/io/nrf/stm32u5/nrf_test.c"]
         sources += ["embed/io/nrf/crc8.c"]
         paths += ["embed/io/nrf/inc"]
         sources += [
@@ -118,7 +123,6 @@ def configure(
         paths += ["embed/io/nfc/rfal/source"]
         paths += ["embed/io/nfc/rfal/source/st25r3916"]
         paths += ["embed/io/nfc/rfal/include/"]
-        features_available.append("nfc")
         defines += [("USE_NFC", "1")]
 
     if "optiga" in features_wanted:
@@ -133,6 +137,7 @@ def configure(
         defines += [("USE_OPTIGA", "1")]
 
     if "tropic" in features_wanted:
+        sources += ["embed/sec/tropic/tropic.c"]
         sources += ["embed/sec/tropic/stm32/tropic01.c"]
         sources += ["vendor/libtropic/src/libtropic.c"]
         sources += ["vendor/libtropic/src/lt_crc16.c"]
@@ -219,7 +224,6 @@ def configure(
         ("USE_TAMPER", "1"),
         ("USE_FLASH_BURST", "1"),
         ("USE_OEM_KEYS_CHECK", "1"),
-        ("USE_RESET_TO_BOOT", "1"),
     ]
 
     sources += [

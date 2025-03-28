@@ -31,7 +31,7 @@ impl ProdtestUI for UIBolt {
         display::fade_backlight_duration(theme::backlight::get_backlight_normal(), 150);
     }
 
-    fn screen_prodtest_info(id: &str, date: &str) {
+    fn screen_prodtest_info(id: &str) {
         display::sync();
         let qr = Qr::new(id, true);
         let mut qr = unwrap!(qr).with_border(4);
@@ -50,7 +50,7 @@ impl ProdtestUI for UIBolt {
 
             shape::Text::new(
                 screen().bottom_center() - Offset::y(10),
-                date,
+                id,
                 fonts::FONT_BOLD_UPPER,
             )
             .with_fg(Color::white())
@@ -147,19 +147,16 @@ impl ProdtestUI for UIBolt {
                 match ev {
                     TouchStart(p) => {
                         shape::Bar::new(Rect::from_center_and_size(*p, Offset::new(3, 3)))
-                            .with_fg(Color::rgb(0, 255, 0))
                             .with_bg(Color::rgb(0, 255, 0))
                             .render(target);
                     }
                     TouchMove(p) => {
                         shape::Bar::new(Rect::from_center_and_size(*p, Offset::new(1, 1)))
-                            .with_fg(Color::white())
                             .with_bg(Color::white())
                             .render(target);
                     }
                     TouchEnd(p) => {
                         shape::Bar::new(Rect::from_center_and_size(*p, Offset::new(3, 3)))
-                            .with_fg(Color::rgb(255, 0, 0))
                             .with_bg(Color::rgb(255, 0, 0))
                             .render(target);
                     }

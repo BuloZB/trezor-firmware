@@ -11,17 +11,20 @@ TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T2T1')
 CMAKELISTS = int(ARGUMENTS.get('CMAKELISTS', 0))
 HW_REVISION ='emulator'
 THP = ARGUMENTS.get('THP', '0') == '1' # Trezor-Host Protocol
+DISABLE_TROPIC = ARGUMENTS.get('DISABLE_TROPIC', '0') == '1'
 BENCHMARK = ARGUMENTS.get('BENCHMARK', '0') == '1'
 PYOPT = ARGUMENTS.get('PYOPT', '1')
 FROZEN = ARGUMENTS.get('TREZOR_EMULATOR_FROZEN', 0)
 RASPI = os.getenv('TREZOR_EMULATOR_RASPI') == '1'
-
 
 if BENCHMARK and PYOPT != '0':
   print("BENCHMARK=1 works only with PYOPT=0.")
   exit(1)
 
 FEATURES_WANTED = ["input", "sd_card", "dma2d", "optiga"]
+
+if not DISABLE_TROPIC:
+    FEATURES_WANTED.append('tropic')
 
 if not models.has_emulator(TREZOR_MODEL):
     # skip unix build
@@ -251,6 +254,9 @@ SOURCE_MOD += [
     'embed/upymod/modutime.c',
 ]
 
+CPPDEFINES_MOD += ['USE_TREZOR_CRYPTO']
+
+
 SOURCE_MICROPYTHON = [
     'vendor/micropython/extmod/modubinascii.c',
     'vendor/micropython/extmod/moductypes.c',
@@ -413,13 +419,13 @@ ui.init_ui(TREZOR_MODEL, "firmware", RUST_UI_FEATURES)
 SOURCE_QSTR = SOURCE_MOD + SOURCE_MICROPYTHON + SOURCE_UNIX
 
 if PYOPT == '0' or not FROZEN:
-    STATIC="-DSTATIC="
+    DEBUG_FLAGS = "-DMICROPY_OOM_CALLBACK=1 -DSTATIC="
 else:
-    STATIC=""
+    DEBUG_FLAGS = "-DMICROPY_OOM_CALLBACK=0"
 
 env = Environment(
     ENV=os.environ,
-    CFLAGS=ARGUMENTS.get("CFLAGS", "") + f" -DCONFIDENTIAL= -DPYOPT={PYOPT} -DBITCOIN_ONLY={BITCOIN_ONLY} {STATIC}",
+    CFLAGS=ARGUMENTS.get("CFLAGS", "") + f" -DCONFIDENTIAL= -DPYOPT={PYOPT} -DBITCOIN_ONLY={BITCOIN_ONLY} {DEBUG_FLAGS}",
     CPPDEFPREFIX="-D'",
     CPPDEFSUFFIX="'",
 )
@@ -485,6 +491,7 @@ ALLPATHS=['.',
          'embed/io/usb/inc',
          'embed/sec/entropy/inc',
          'embed/sec/random_delays/inc',
+         'embed/sec/secret/inc',
          'embed/sec/time_estimate/inc',
          'embed/sys/bsp/inc',
          'embed/sec/rng/inc',
@@ -721,6 +728,11 @@ if FROZEN:
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nem/*/*.py'))
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/NEM*.py'))
 
+        if PYOPT == '0':
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nostr/*.py'))
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nostr/*/*.py'))
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Nostr*.py'))
+
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/ripple/*.py'))
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Ripple*.py'))
 
@@ -753,6 +765,8 @@ if FROZEN:
         bitcoin_only=BITCOIN_ONLY,
         backlight='backlight' in FEATURES_AVAILABLE,
         optiga='optiga' in FEATURES_AVAILABLE,
+        tropic='tropic' in FEATURES_AVAILABLE,
+        use_ble='ble' in FEATURES_AVAILABLE,
         use_button='button' in FEATURES_AVAILABLE,
         use_touch='touch' in FEATURES_AVAILABLE,
         ui_layout=ui.get_ui_layout(TREZOR_MODEL),
@@ -828,12 +842,13 @@ if EVERYTHING:
     features.append('universal_fw')
 
 rust = tools.add_rust_lib(
-    env,
-    'firmware',
-    profile,
-    features,
-    ALLPATHS,
-    str(Dir('.').abspath))
+    env=env,
+    build='unix',
+    profile=profile,
+    features=features,
+    all_paths=ALLPATHS,
+    build_dir=str(Dir('.').abspath),
+)
 
 
 env.Depends(rust, protobuf_blobs)

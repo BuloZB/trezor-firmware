@@ -5,6 +5,16 @@
 #pragma GCC diagnostic ignored "-Wunused-function"
 
 static void _librust_qstrs(void) {
+  MP_QSTR_0;
+  MP_QSTR_1;
+  MP_QSTR_2;
+  MP_QSTR_3;
+  MP_QSTR_4;
+  MP_QSTR_5;
+  MP_QSTR_6;
+  MP_QSTR_7;
+  MP_QSTR_8;
+  MP_QSTR_9;
   MP_QSTR_;
   MP_QSTR_ATTACHED;
   MP_QSTR_AttachType;
@@ -39,6 +49,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_account;
   MP_QSTR_account_items;
   MP_QSTR_account_path;
+  MP_QSTR_account_title;
   MP_QSTR_accounts;
   MP_QSTR_action;
   MP_QSTR_active;
@@ -339,6 +350,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_modify_fee__transaction_fee;
   MP_QSTR_more_info_callback;
   MP_QSTR_multiple_pages_texts;
+  MP_QSTR_nostr__event_kind_template;
   MP_QSTR_notification;
   MP_QSTR_notification_level;
   MP_QSTR_page_count;

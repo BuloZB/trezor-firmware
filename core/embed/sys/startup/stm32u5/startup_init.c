@@ -69,6 +69,92 @@ uint32_t SystemCoreClock = DEFAULT_FREQ * 1000000U;
 #pragma GCC optimize( \
     "no-stack-protector")  // applies to all functions in this file
 
+// This function replaces calls to universal, but flash-wasting
+//  function HAL_RCC_OscConfig.
+//
+//  This is the configuration before the optimization:
+//   osc_init_def.OscillatorType = RCC_OSCILLATORTYPE_LSI;
+//  osc_init_def.LSIState = RCC_LSI_ON;
+//   HAL_RCC_OscConfig(&osc_init_def);
+void lsi_init(void) {
+  // Update LSI configuration in Backup Domain control register
+  // Requires to enable write access to Backup Domain of necessary
+
+  if (HAL_IS_BIT_CLR(PWR->DBPR, PWR_DBPR_DBP)) {
+    // Enable write access to Backup domain
+    SET_BIT(PWR->DBPR, PWR_DBPR_DBP);
+
+    // Wait for Backup domain Write protection disable
+    while (HAL_IS_BIT_CLR(PWR->DBPR, PWR_DBPR_DBP))
+      ;
+  }
+
+  uint32_t bdcr_temp = RCC->BDCR;
+
+  if (RCC_LSI_DIV1 != (bdcr_temp & RCC_BDCR_LSIPREDIV)) {
+    if (((bdcr_temp & RCC_BDCR_LSIRDY) == RCC_BDCR_LSIRDY) &&
+        ((bdcr_temp & RCC_BDCR_LSION) != RCC_BDCR_LSION)) {
+      // If LSIRDY is set while LSION is not enabled, LSIPREDIV can't be updated
+      // The LSIPREDIV cannot be changed if the LSI is used by the IWDG or by
+      // the RTC
+      return;
+    }
+
+    // Turn off LSI before changing RCC_BDCR_LSIPREDIV
+    if ((bdcr_temp & RCC_BDCR_LSION) == RCC_BDCR_LSION) {
+      __HAL_RCC_LSI_DISABLE();
+
+      // Wait till LSI is disabled
+      while (READ_BIT(RCC->BDCR, RCC_BDCR_LSIRDY) != 0U)
+        ;
+    }
+
+    // Set LSI division factor
+    MODIFY_REG(RCC->BDCR, RCC_BDCR_LSIPREDIV, 0);
+  }
+
+  // Enable the Internal Low Speed oscillator (LSI)
+  __HAL_RCC_LSI_ENABLE();
+
+  // Wait till LSI is ready
+  while (READ_BIT(RCC->BDCR, RCC_BDCR_LSIRDY) == 0U)
+    ;
+}
+
+// This function replaces calls to universal, but flash-wasting
+// function HAL_RCC_OscConfig.
+//
+// This is the configuration before the optimization:
+//  osc_init_def.OscillatorType = RCC_OSCILLATORTYPE_LSE;
+//  osc_init_def.LSEState = RCC_LSE_ON;
+//  HAL_RCC_OscConfig(&osc_init_def);
+void lse_init(void) {
+  // Update LSE configuration in Backup Domain control register
+  // Requires to enable write access to Backup Domain of necessary */
+
+  if (HAL_IS_BIT_CLR(PWR->DBPR, PWR_DBPR_DBP)) {
+    // Enable write access to Backup domain
+    SET_BIT(PWR->DBPR, PWR_DBPR_DBP);
+
+    while (HAL_IS_BIT_CLR(PWR->DBPR, PWR_DBPR_DBP))
+      ;
+  }
+
+  // LSE oscillator enable
+  SET_BIT(RCC->BDCR, RCC_BDCR_LSEON);
+
+  // Wait till LSE is ready
+  while (READ_BIT(RCC->BDCR, RCC_BDCR_LSERDY) == 0U)
+    ;
+
+  // Make sure LSESYSEN/LSESYSRDY are reset
+  CLEAR_BIT(RCC->BDCR, RCC_BDCR_LSESYSEN);
+
+  // Wait till LSESYSRDY is cleared
+  while (READ_BIT(RCC->BDCR, RCC_BDCR_LSESYSRDY) != 0U)
+    ;
+}
+
 void SystemInit(void) {
   // set flash wait states for an increasing HCLK frequency
 
@@ -78,26 +164,26 @@ void SystemInit(void) {
   while ((FLASH->ACR & FLASH_ACR_LATENCY) != FLASH_ACR_LATENCY_5WS)
     ;
 
-  /* Reset the RCC clock configuration to the default reset state ------------*/
-  /* Set MSION bit */
+  // Reset the RCC clock configuration to the default reset state
+  // Set MSION bit
   RCC->CR = RCC_CR_MSISON;
 
-  /* Reset CFGR register */
+  // Reset CFGR register
   RCC->CFGR1 = 0U;
   RCC->CFGR2 = 0U;
   RCC->CFGR3 = 0U;
 
-  /* Reset HSEON, CSSON , HSION, PLLxON bits */
+  // Reset HSEON, CSSON , HSION, PLLxON bits
   RCC->CR &= ~(RCC_CR_HSEON | RCC_CR_CSSON | RCC_CR_PLL1ON | RCC_CR_PLL2ON |
                RCC_CR_PLL3ON | RCC_CR_HSI48ON);
 
-  /* Reset PLLCFGR register */
+  // Reset PLLCFGR register
   RCC->PLL1CFGR = 0U;
 
-  /* Reset HSEBYP bit */
+  // Reset HSEBYP bit
   RCC->CR &= ~(RCC_CR_HSEBYP);
 
-  /* Disable all interrupts */
+  // Disable all interrupts
   RCC->CIER = 0U;
 
   __HAL_RCC_PWR_CLK_ENABLE();
@@ -139,8 +225,7 @@ void SystemInit(void) {
   while (READ_BIT(RCC->CR, RCC_CR_HSI48RDY) == 0U)
     ;
 
-  /** Initializes the CPU, AHB and APB buses clocks
-   */
+  // Initializes the CPU, AHB and APB buses clocks
   FLASH->ACR = FLASH_ACR_LATENCY_4WS;
   // wait until the new wait state config takes effect -- per section 3.5.1
   // guidance
@@ -153,23 +238,25 @@ void SystemInit(void) {
 
   MODIFY_REG(RCC->CFGR1, RCC_CFGR1_SW, RCC_SYSCLKSOURCE_PLLCLK);
 
-  /*
-   * Disable the internal Pull-Up in Dead Battery pins of UCPD peripheral
-   */
+  // Disable the internal Pull-Up in Dead Battery pins of UCPD peripheral
   HAL_PWREx_DisableUCPDDeadBattery();
 
 #ifdef USE_SMPS
-  /*
-   * Switch to SMPS regulator instead of LDO
-   */
+  // Switch to SMPS regulator instead of LDO
   SET_BIT(PWR->CR3, PWR_CR3_REGSEL);
-  /* Wait until system switch on new regulator */
+  // Wait until system switch on new regulator
   while (HAL_IS_BIT_CLR(PWR->SVMSR, PWR_SVMSR_REGS))
     ;
 #endif
 
   // enable power supply for GPIOG 2 to 15
   PWR->SVMCR |= PWR_SVMCR_IO2SV;
+
+#ifdef USE_LSE
+  lse_init();
+#else
+  lsi_init();
+#endif
 
   __HAL_RCC_PWR_CLK_DISABLE();
 
@@ -202,15 +289,15 @@ void SystemInit(void) {
   // enable instruction cache in default 2-way mode
   ICACHE->CR = ICACHE_CR_EN;
 
-  /* Configure Flash prefetch */
+  // Configure Flash prefetch
 #if (PREFETCH_ENABLE != 0U)
   __HAL_FLASH_PREFETCH_BUFFER_ENABLE();
-#endif /* PREFETCH_ENABLE */
+#endif
 
-  /* Set Interrupt Group Priority */
+  // Set Interrupt Group Priority
   HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
-  /* Update the SystemCoreClock global variable */
+  // Update the SystemCoreClock global variable
   /// SystemCoreClock = HAL_RCC_GetSysClockFreq() >> AHBPrescTable[(RCC->CFGR2 &
   /// RCC_CFGR2_HPRE) >> RCC_CFGR2_HPRE_Pos];
 

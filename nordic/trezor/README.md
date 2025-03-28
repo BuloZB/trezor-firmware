@@ -31,12 +31,12 @@ Follow these steps to set up the project on your local machine.
 
 Using nrfutil, install the required toolchain for the nRF Connect SDK:
 ```sh
-nrfutil toolchain-manager install --ncs-version v2.6.2
+nrfutil toolchain-manager install --ncs-version v2.9.0
 ```
 
 ### Launch the nRF Shell
 
-First, launch the nRF shell using the `nrfutil` toolchain manager:
+First, launch the nRF shell using the `nrfutil` toolchain manager and set the NCS to chosen version:
 
 ```sh
 nrfutil toolchain-manager launch --shell
@@ -45,7 +45,7 @@ nrfutil toolchain-manager launch --shell
 ### Initialize the Workspace
 Initialize your West workspace for the Trezor BLE Gateway project:
 ```sh
-cd west
+cd nordic
 west init -l ./trezor
 ```
 
@@ -62,6 +62,8 @@ west update
 cd trezor
 west build ./trezor-ble -b t3w1_revA_nrf52832 --sysbuild
 ```
+
+When building for first time, add `--pristine=always` so that NCS versions and their cached files don't mix and fubar each other.
 
 Debug builds can be built using the debug overlay configuration:
 Build the application for the t3w1_revA_nrf52832 board:

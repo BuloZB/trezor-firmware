@@ -363,8 +363,8 @@ secbool secret_bootloader_locked(void) {
 
 #include <io/button.h>
 
-uint32_t button_get_event(void) {
-  return syscall_invoke0(SYSCALL_BUTTON_GET_EVENT);
+bool button_get_event(button_event_t *event) {
+  return (bool)syscall_invoke1((uint32_t)event, SYSCALL_BUTTON_GET_EVENT);
 }
 
 #endif
@@ -705,15 +705,7 @@ bool powerctl_get_status(powerctl_status_t *status) {
 
 bool jpegdec_open(void) { return (bool)syscall_invoke0(SYSCALL_JPEGDEC_OPEN); }
 
-void jpegdec_close(void) {
-  {
-    // Temporary hack to fix the problem with dual DMA2D driver in
-    // user/kernel space - will be removed in the future with DMA2D syscalls
-    extern void dma2d_invalidate_clut();
-    dma2d_invalidate_clut();
-  }
-  syscall_invoke0(SYSCALL_JPEGDEC_CLOSE);
-}
+void jpegdec_close(void) { syscall_invoke0(SYSCALL_JPEGDEC_CLOSE); }
 
 jpegdec_state_t jpegdec_process(jpegdec_input_t *input) {
   return (jpegdec_state_t)syscall_invoke1((uint32_t)input,
@@ -730,5 +722,90 @@ bool jpegdec_get_slice_rgba8888(uint32_t *rgba8888, jpegdec_slice_t *slice) {
 }
 
 #endif  // USE_HW_JPEG_DECODER
+
+// =============================================================================
+// gfx_bitblt.h
+// =============================================================================
+
+#ifdef USE_DMA2D
+
+#include <gfx/dma2d_bitblt.h>
+
+void dma2d_wait(void) { syscall_invoke0(SYSCALL_DMA2D_WAIT); }
+
+bool dma2d_rgb565_fill(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb, SYSCALL_DMA2D_RGB565_FILL);
+}
+
+bool dma2d_rgb565_copy_mono4(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb, SYSCALL_DMA2D_RGB565_COPY_MONO4);
+}
+
+bool dma2d_rgb565_copy_rgb565(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb, SYSCALL_DMA2D_RGB565_COPY_RGB565);
+}
+
+bool dma2d_rgb565_blend_mono4(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb, SYSCALL_DMA2D_RGB565_BLEND_MONO4);
+}
+
+bool dma2d_rgb565_blend_mono8(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb, SYSCALL_DMA2D_RGB565_BLEND_MONO8);
+}
+
+bool dma2d_rgba8888_fill(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb, SYSCALL_DMA2D_RGBA8888_FILL);
+}
+
+bool dma2d_rgba8888_copy_mono4(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb, SYSCALL_DMA2D_RGBA8888_COPY_MONO4);
+}
+
+bool dma2d_rgba8888_copy_rgb565(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb,
+                               SYSCALL_DMA2D_RGBA8888_COPY_RGB565);
+}
+
+bool dma2d_rgba8888_copy_rgba8888(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb,
+                               SYSCALL_DMA2D_RGBA8888_COPY_RGBA8888);
+}
+
+bool dma2d_rgba8888_blend_mono4(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb,
+                               SYSCALL_DMA2D_RGBA8888_BLEND_MONO4);
+}
+
+bool dma2d_rgba8888_blend_mono8(const gfx_bitblt_t *bb) {
+  return (bool)syscall_invoke1((uint32_t)bb,
+                               SYSCALL_DMA2D_RGBA8888_BLEND_MONO8);
+}
+
+#endif  // USE_DMA2D
+
+#ifdef USE_TROPIC
+
+bool tropic_ping(const uint8_t *msg_in, uint8_t *msg_out, uint16_t msg_len) {
+  return (bool)syscall_invoke3((uint32_t)msg_in, (uint32_t)msg_out, msg_len,
+                               SYSCALL_TROPIC_PING);
+}
+
+bool tropic_get_cert(uint8_t *buf, uint16_t buf_size) {
+  return (bool)syscall_invoke2((uint32_t)buf, buf_size,
+                               SYSCALL_TROPIC_GET_CERT);
+}
+
+bool tropic_ecc_key_generate(uint16_t slot_index) {
+  return (bool)syscall_invoke1((uint32_t)slot_index,
+                               SYSCALL_TROPIC_ECC_KEY_GENERATE);
+}
+
+bool tropic_ecc_sign(uint16_t key_slot_index, const uint8_t *dig,
+                     uint16_t dig_len, uint8_t *sig, uint16_t sig_len) {
+  return (bool)syscall_invoke5((uint32_t)key_slot_index, (uint32_t)dig, dig_len,
+                               (uint32_t)sig, sig_len, SYSCALL_TROPIC_ECC_SIGN);
+}
+
+#endif
 
 #endif  // KERNEL_MODE

@@ -163,10 +163,12 @@ pub trait FirmwareUI {
         title: Option<TString<'static>>,
         subtitle: Option<TString<'static>>,
         description: Option<TString<'static>>,
+        extra: Option<TString<'static>>,
         message: Obj,        // TODO: replace Obj
         amount: Option<Obj>, // TODO: replace Obj
         chunkify: bool,
         text_mono: bool,
+        account_title: TString<'static>,
         account: Option<TString<'static>>,
         account_path: Option<TString<'static>>,
         br_code: u16,

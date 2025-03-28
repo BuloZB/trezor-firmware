@@ -19,7 +19,9 @@ HW_REVISION = ARGUMENTS.get('HW_REVISION', None)
 SCM_REVISION = ARGUMENTS.get('SCM_REVISION', None)
 THP = ARGUMENTS.get('THP', '0') == '1' # Trezor-Host Protocol
 BENCHMARK = ARGUMENTS.get('BENCHMARK', '0') == '1'
+LOG_STACK_USAGE = ARGUMENTS.get('LOG_STACK_USAGE', '0') == '1'
 DISABLE_ANIMATION = ARGUMENTS.get('TREZOR_DISABLE_ANIMATION', '0') == '1'
+BLOCK_ON_VCP = ARGUMENTS.get('BLOCK_ON_VCP', '0') == '1'
 UI_DEBUG_OVERLAY = ARGUMENTS.get('UI_DEBUG_OVERLAY', '0') == '1'
 
 STORAGE_INSECURE_TESTING_MODE = ARGUMENTS.get('STORAGE_INSECURE_TESTING_MODE', '0') == '1'
@@ -33,13 +35,17 @@ if BENCHMARK and PYOPT != '0':
   print("BENCHMARK=1 works only with PYOPT=0.")
   exit(1)
 
+if LOG_STACK_USAGE and PYOPT != '0':
+  print("LOG_STACK_USAGE=1 works only with PYOPT=0.")
+  exit(1)
+
 FEATURE_FLAGS = {
     "RDI": True,
     "SECP256K1_ZKP": True,  # required for trezor.crypto.curve.bip340 (BIP340/Taproot)
     "AES_GCM": BENCHMARK or THP,
 }
 
-FEATURES_WANTED = ["input", "sd_card", "rgb_led", "dma2d", "consumption_mask", "usb" ,"optiga", "haptic", "ble"]
+FEATURES_WANTED = ["input", "sd_card", "rgb_led", "dma2d", "consumption_mask", "usb" ,"optiga", "haptic", "ble", "tropic"]
 if DISABLE_OPTIGA:
     if PYOPT != '0':
         raise RuntimeError("DISABLE_OPTIGA requires PYOPT=0")
@@ -82,6 +88,8 @@ CPPDEFINES_MOD += [
     ('USE_NEM', '1' if (EVERYTHING and TREZOR_MODEL == "T2T1") else '0'),
     ('USE_EOS', '1' if (EVERYTHING and TREZOR_MODEL == "T2T1") else '0'),
     ('DISABLE_ANIMATION', '1' if DISABLE_ANIMATION else '0'),
+    ('LOG_STACK_USAGE', '1' if LOG_STACK_USAGE else '0'),
+    ('BLOCK_ON_VCP', '1' if BLOCK_ON_VCP else '0')
 ]
 SOURCE_MOD += [
     'embed/upymod/trezorobj.c',
@@ -387,9 +395,17 @@ ui.init_ui(TREZOR_MODEL, "firmware", RUST_UI_FEATURES)
 
 SOURCE_QSTR = SOURCE_MOD + SOURCE_MICROPYTHON + SOURCE_MICROPYTHON_SPEED
 
+if PYOPT == '0':
+    DEBUG_FLAGS = "-DMICROPY_OOM_CALLBACK=1 -DSTATIC="
+else:
+    DEBUG_FLAGS = "-DMICROPY_OOM_CALLBACK=0"
+
 env = Environment(
     ENV=os.environ,
-    CFLAGS=f"{ARGUMENTS.get('CFLAGS', '')} -DPRODUCTION={int(PRODUCTION)} -DPYOPT={PYOPT} -DBOOTLOADER_QA={int(BOOTLOADER_QA)} -DBITCOIN_ONLY={BITCOIN_ONLY}",
+    CFLAGS=(
+        f"{ARGUMENTS.get('CFLAGS', '')} -DPRODUCTION={int(PRODUCTION)} -DPYOPT={PYOPT} "
+        f"-DBOOTLOADER_QA={int(BOOTLOADER_QA)} -DBITCOIN_ONLY={BITCOIN_ONLY} {DEBUG_FLAGS}"
+    ),
     CPPDEFINES_IMPLICIT=[],
     CPPDEFPREFIX="-D'",
     CPPDEFSUFFIX="'",
@@ -662,6 +678,11 @@ if FROZEN:
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nem/*/*.py'))
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/NEM*.py'))
 
+        if PYOPT == '0':
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nostr/*.py'))
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nostr/*/*.py'))
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Nostr*.py'))
+
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/ripple/*.py'))
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Ripple*.py'))
 
@@ -692,9 +713,11 @@ if FROZEN:
         bitcoin_only=BITCOIN_ONLY,
         backlight='backlight' in FEATURES_AVAILABLE,
         optiga='optiga' in FEATURES_AVAILABLE,
+        use_ble='ble' in FEATURES_AVAILABLE,
         use_button='button' in FEATURES_AVAILABLE,
         use_touch='touch' in FEATURES_AVAILABLE,
         ui_layout=ui.get_ui_layout(TREZOR_MODEL),
+        tropic='tropic' in FEATURES_AVAILABLE,
         thp=THP,
         )
 
@@ -764,12 +787,13 @@ if UI_DEBUG_OVERLAY:
     features.append('ui_debug_overlay')
 
 rust = tools.add_rust_lib(
-    env,
-    'firmware',
-    'release',
-    features,
-    ALLPATHS,
-    str(Dir('.').abspath))
+    env=env,
+    build='firmware',
+    profile='release',
+    features=features,
+    all_paths=ALLPATHS,
+    build_dir=str(Dir('.').abspath),
+)
 
 
 env.Depends(rust, protobuf_blobs)

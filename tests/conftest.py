@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import typing as t
 from enum import IntEnum
@@ -30,7 +31,7 @@ from trezorlib import debuglink, log, models
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.device import apply_settings
 from trezorlib.device import wipe as wipe_device
-from trezorlib.transport import enumerate_devices, get_transport
+from trezorlib.transport import Timeout, enumerate_devices, get_transport, protocol
 
 # register rewrites before importing from local package
 # so that we see details of failed asserts from this module
@@ -134,6 +135,10 @@ def _raw_client(request: pytest.FixtureRequest) -> Client:
         client = emu_fixture.client
     else:
         interact = os.environ.get("INTERACT") == "1"
+        if not interact:
+            # prevent tests from getting stuck in case there is an USB packet loss
+            protocol._DEFAULT_READ_TIMEOUT = 50.0
+
         path = os.environ.get("TREZOR_PATH")
         if path:
             client = _client_from_path(request, path, interact)
@@ -329,6 +334,7 @@ def client(
             label="test",
             needs_backup=setup_params["needs_backup"],  # type: ignore
             no_backup=setup_params["no_backup"],  # type: ignore
+            _skip_init_device=True,
         )
 
         if request.node.get_closest_marker("experimental"):
@@ -337,7 +343,8 @@ def client(
         if use_passphrase and isinstance(setup_params["passphrase"], str):
             _raw_client.use_passphrase(setup_params["passphrase"])
 
-        _raw_client.clear_session()
+        _raw_client.lock(_refresh_features=False)
+        _raw_client.init_device(new_session=True)
 
     with ui_tests.screen_recording(_raw_client, request):
         yield _raw_client
@@ -435,6 +442,12 @@ def pytest_addoption(parser: "Parser") -> None:
         choices=translations.LANGUAGES,
         help="Run tests with a specified language: 'en' is the default",
     )
+    parser.addoption(
+        "--verbose-log-file",
+        action="store",
+        default=None,
+        help="File path for verbose logging",
+    )
 
 
 def pytest_configure(config: "Config") -> None:
@@ -463,6 +476,11 @@ def pytest_configure(config: "Config") -> None:
     if verbosity:
         log.enable_debug_output(verbosity)
 
+        verbose_log_file = config.getoption("verbose_log_file")
+        if verbose_log_file:
+            handler = logging.FileHandler(verbose_log_file)
+            log.enable_debug_output(verbosity, handler)
+
     idval_orig = IdMaker._idval_from_value
 
     def idval_from_value(self: IdMaker, val: object) -> str | None:
@@ -485,6 +503,10 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     skip_altcoins = int(os.environ.get("TREZOR_PYTEST_SKIP_ALTCOINS", 0))
     if item.get_closest_marker("altcoin") and skip_altcoins:
         pytest.skip("Skipping altcoin test")
+
+
+def pytest_set_filtered_exceptions():
+    return (Timeout, protocol.UnexpectedMagic)
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
