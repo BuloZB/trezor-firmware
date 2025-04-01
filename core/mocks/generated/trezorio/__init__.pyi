@@ -1,7 +1,7 @@
 from typing import *
 
 
-# extmod/modtrezorio/modtrezorio-hid.h
+# upymod/modtrezorio/modtrezorio-hid.h
 class HID:
     """
     USB HID interface configuration.
@@ -32,13 +32,22 @@ class HID:
         Sends message using USB HID (device) or UDP (emulator).
         """
 
+    def read(self, buf: bytearray, offset: int = 0) -> int:
+        """
+        Reads message using USB HID (device) or UDP (emulator).
+        """
+
     def write_blocking(self, msg: bytes, timeout_ms: int) -> int:
         """
         Sends message using USB HID (device) or UDP (emulator).
         """
+    RX_PACKET_LEN: ClassVar[int]
+    """Length of one USB RX packet."""
+    TX_PACKET_LEN: ClassVar[int]
+    """Length of one USB TX packet."""
 
 
-# extmod/modtrezorio/modtrezorio-poll.h
+# upymod/modtrezorio/modtrezorio-poll.h
 def poll(ifaces: Iterable[int], list_ref: list, timeout_ms: int) -> bool:
     """
     Wait until one of `ifaces` is ready to read or write (using masks
@@ -56,7 +65,7 @@ def poll(ifaces: Iterable[int], list_ref: list, timeout_ms: int) -> bool:
     """
 
 
-# extmod/modtrezorio/modtrezorio-usb.h
+# upymod/modtrezorio/modtrezorio-usb.h
 class USB:
     """
     USB device configuration.
@@ -95,7 +104,7 @@ class USB:
         """
 
 
-# extmod/modtrezorio/modtrezorio-vcp.h
+# upymod/modtrezorio/modtrezorio-vcp.h
 class VCP:
     """
     USB VCP interface configuration.
@@ -119,7 +128,7 @@ class VCP:
         """
 
 
-# extmod/modtrezorio/modtrezorio-webusb.h
+# upymod/modtrezorio/modtrezorio-webusb.h
 class WebUSB:
     """
     USB WebUSB interface configuration.
@@ -148,9 +157,21 @@ class WebUSB:
         """
         Sends message using USB WebUSB (device) or UDP (emulator).
         """
-from . import fatfs, haptic, sdcard
+
+    def read(self, buf: bytearray, offset: int = 0) -> int:
+        """
+        Reads message using USB WebUSB (device) or UDP (emulator).
+        """
+    RX_PACKET_LEN: ClassVar[int]
+    """Length of one USB RX packet."""
+    TX_PACKET_LEN: ClassVar[int]
+    """Length of one USB TX packet."""
+from . import fatfs, haptic, sdcard, ble
 POLL_READ: int  # wait until interface is readable and return read data
 POLL_WRITE: int  # wait until interface is writable
+
+BLE: int  # interface id of the BLE events
+BLE_EVENT: int # interface id for BLE events
 
 TOUCH: int  # interface id of the touch events
 TOUCH_START: int  # event id of touch start event
@@ -161,5 +182,5 @@ BUTTON_PRESSED: int  # button down event
 BUTTON_RELEASED: int  # button up event
 BUTTON_LEFT: int  # button number of left button
 BUTTON_RIGHT: int  # button number of right button
-USB_CHECK: int # interface id for check of USB data connection
-WireInterface = Union[HID, WebUSB]
+USB_EVENT: int # interface id for USB events
+WireInterface = Union[HID, WebUSB, BleInterface]

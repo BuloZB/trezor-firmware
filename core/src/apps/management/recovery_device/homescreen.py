@@ -7,6 +7,7 @@ from trezor import TR, wire
 from trezor.messages import Success
 
 from apps.common import backup_types
+from apps.management.recovery_device.recover import RecoveryAborted
 
 from . import layout, recover
 
@@ -38,7 +39,7 @@ async def recovery_process() -> Success:
 
     recovery_type = storage_recovery.get_type()
 
-    wire.AVOID_RESTARTING_FOR = (
+    wire.message_handler.AVOID_RESTARTING_FOR = (
         MessageType.Initialize,
         MessageType.GetFeatures,
         MessageType.EndSession,
@@ -59,7 +60,7 @@ async def _continue_repeated_backup() -> None:
     from apps.common import backup
     from apps.management.backup_device import perform_backup
 
-    wire.AVOID_RESTARTING_FOR = (
+    wire.message_handler.AVOID_RESTARTING_FOR = (
         MessageType.Initialize,
         MessageType.GetFeatures,
         MessageType.EndSession,
@@ -96,14 +97,17 @@ async def _continue_recovery_process() -> Success:
         if is_first_step:
             # If we are starting recovery, ask for word count first...
             # _request_word_count
-            # For others than model_tr, just continue straight to word count keyboard
+            # For others than Caesar (TS3), just continue straight to word count keyboard
             # pylint: disable-next=consider-using-in
-            if utils.INTERNAL_MODEL == "T2B1" or utils.INTERNAL_MODEL == "T3B1":
+            if utils.UI_LAYOUT == "CAESAR":
                 await layout.homescreen_dialog(
                     TR.buttons__continue, TR.recovery__num_of_words
                 )
             # ask for the number of words
-            word_count = await layout.request_word_count(recovery_type)
+            try:
+                word_count = await layout.request_word_count(recovery_type)
+            except wire.ActionCancelled:
+                raise RecoveryAborted
             # ...and only then show the starting screen with word count.
             await _request_share_first_screen(word_count, recovery_type)
         assert word_count is not None
@@ -212,9 +216,8 @@ async def _finish_recovery(secret: bytes, backup_type: BackupType) -> Success:
     if backup_type is None:
         raise RuntimeError
 
-    storage_device.store_mnemonic_secret(
-        secret, backup_type, needs_backup=False, no_backup=False
-    )
+    storage_device.store_mnemonic_secret(secret, needs_backup=False, no_backup=False)
+    storage_device.set_backup_type(backup_type)
     if backup_types.is_slip39_backup_type(backup_type):
         if not backup_types.is_extendable_backup_type(backup_type):
             identifier = storage_recovery.get_slip39_identifier()
@@ -275,20 +278,18 @@ async def _request_share_first_screen(
                 button_label,
                 text,
                 TR.recovery__word_count_template.format(word_count),
-                show_info=True,
+                show_instructions=True,
             )
     else:  # BIP-39
         await layout.homescreen_dialog(
             TR.buttons__continue,
             TR.recovery__enter_backup,
             TR.recovery__word_count_template.format(word_count),
-            show_info=True,
+            show_instructions=True,
         )
 
 
 async def _request_share_next_screen() -> None:
-    from trezor import strings
-
     remaining = storage_recovery.fetch_slip39_remaining_shares()
     group_count = storage_recovery.get_slip39_group_count()
     if not remaining:
@@ -296,25 +297,12 @@ async def _request_share_next_screen() -> None:
         raise RuntimeError
 
     if group_count > 1:
-        await layout.homescreen_dialog(
-            TR.buttons__enter,
-            TR.recovery__more_shares_needed,
-            remaining_shares_info=_get_remaining_groups_and_shares(),
+        await layout.enter_share(
+            remaining_shares_info=_get_remaining_groups_and_shares()
         )
     else:
-        still_needed_shares = remaining[0]
-        already_entered_shares = len(storage_recovery_shares.fetch_group(0))
-        overall_needed = still_needed_shares + already_entered_shares
-        # TODO: consider kwargs in format here
-        entered = TR.recovery__x_of_y_entered_template.format(
-            already_entered_shares, overall_needed
-        )
-        needed = strings.format_plural(
-            TR.recovery__x_more_shares_needed_template_plural,
-            still_needed_shares,
-            TR.plurals__x_shares_needed,
-        )
-        await layout.homescreen_dialog(TR.buttons__enter_share, entered, needed)
+        entered = len(storage_recovery_shares.fetch_group(0))
+        await layout.enter_share(entered_remaining=(entered, remaining[0]))
 
 
 def _get_remaining_groups_and_shares() -> "RemainingSharesInfo":

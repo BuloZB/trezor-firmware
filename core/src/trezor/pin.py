@@ -5,7 +5,7 @@ from . import config
 if TYPE_CHECKING:
     from typing import Any, Container
 
-    from trezor.ui.layouts.common import ProgressLayout
+    from trezor.ui import ProgressLayout
 
 _previous_seconds: int | None = None
 _previous_remaining: str | None = None
@@ -91,5 +91,6 @@ def show_pin_timeout(
     # drop the layout when done so trezor.ui doesn't have to remain in memory
     if progress >= 1000:
         _progress_layout = None
+        _previous_remaining = None
 
     return False

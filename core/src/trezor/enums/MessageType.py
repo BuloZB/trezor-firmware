@@ -29,6 +29,8 @@ Nonce = 33
 BackupDevice = 34
 EntropyRequest = 35
 EntropyAck = 36
+EntropyCheckReady = 994
+EntropyCheckContinue = 995
 PassphraseRequest = 41
 PassphraseAck = 42
 RecoveryDevice = 45
@@ -248,3 +250,7 @@ if not utils.BITCOIN_ONLY:
     SolanaAddress = 903
     SolanaSignTx = 904
     SolanaTxSignature = 905
+    NostrGetPubkey = 2001
+    NostrPubkey = 2002
+    NostrSignEvent = 2003
+    NostrEventSignature = 2004

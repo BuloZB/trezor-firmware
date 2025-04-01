@@ -140,14 +140,14 @@ def reformat_toif_icons(p: str | Path) -> None:
 
 def change_icon_format():
     # bootloader icons
-    reformat_c_icons(CORE_DIR / "embed/bootloader")
+    reformat_c_icons(CORE_DIR / "embed/projects/bootloader")
 
     # bootloader_ci icons
-    reformat_c_icons(CORE_DIR / "embed/bootloader_ci")
+    reformat_c_icons(CORE_DIR / "embed/projects/bootloader_ci")
 
     # rust icons
-    reformat_toif_icons(CORE_DIR / "embed/rust/src/ui/model_tr/res")
-    reformat_toif_icons(CORE_DIR / "embed/rust/src/ui/model_tt/res")
+    reformat_toif_icons(CORE_DIR / "embed/rust/src/ui/layout_caesar/res")
+    reformat_toif_icons(CORE_DIR / "embed/rust/src/ui/layout_bolt/res")
 
     # python icons
     reformat_toif_icons(CORE_DIR / "src/trezor/res")

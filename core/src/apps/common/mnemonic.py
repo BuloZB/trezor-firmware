@@ -7,7 +7,7 @@ from . import backup_types
 
 if TYPE_CHECKING:
     from trezor.enums import BackupType
-    from trezor.ui.layouts.common import ProgressLayout
+    from trezor.ui import ProgressLayout
 
 
 def get() -> tuple[bytes | None, BackupType]:
@@ -32,8 +32,12 @@ def is_bip39() -> bool:
     return get_type() == BackupType.Bip39
 
 
-def get_seed(passphrase: str = "", progress_bar: bool = True) -> bytes:
-    mnemonic_secret = get_secret()
+def get_seed(
+    passphrase: str = "",
+    progress_bar: bool = True,
+    mnemonic_secret: bytes | None = None,
+) -> bytes:
+    mnemonic_secret = mnemonic_secret or get_secret()
     if mnemonic_secret is None:
         raise ValueError  # Mnemonic not set
 

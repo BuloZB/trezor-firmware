@@ -10,6 +10,7 @@ import construct as c
 from construct_classes import Struct, subcon
 from typing_extensions import Self, TypedDict
 
+from ..debuglink import LayoutType
 from ..firmware.models import Model
 from ..models import TrezorModel
 from ..tools import EnumAdapter, TupleAdapter
@@ -39,7 +40,7 @@ class JsonHeader(TypedDict):
 
 class JsonDef(TypedDict):
     header: JsonHeader
-    translations: dict[str, str]
+    translations: dict[str, str | dict[str, str]]
     fonts: dict[str, JsonFontInfo]
 
 
@@ -188,13 +189,12 @@ class FontsTable(BlobTable):
     @classmethod
     def from_dir(cls, model_fonts: dict[str, str], font_dir: Path) -> Self:
         """Example structure of the font dict:
-        (The beginning number corresponds to the C representation of each font)
+        (The key number corresponds to the index representation of each font set in `gen_font.py`)
         {
-        "1_FONT_NORMAL": "font_tthoves_regular_21_cs.json",
-        "2_FONT_BOLD": "font_tthoves_bold_17_cs.json",
-        "3_FONT_MONO": "font_robotomono_medium_20_cs.json",
-        "4_FONT_BIG": null,
-        "5_FONT_DEMIBOLD": "font_tthoves_demibold_21_cs.json"
+          "1": "font_tthoves_regular_21_cs.json",
+          "3": "font_robotomono_medium_20_cs.json",
+          "5": "font_tthoves_demibold_21_cs.json",
+          "7": "font_tthoves_bold_17_upper_cs.json"
         }
         """
         fonts = {}
@@ -202,7 +202,7 @@ class FontsTable(BlobTable):
             if not file_name:
                 continue
             file_path = font_dir / file_name
-            font_num = int(font_name.split("_")[0])
+            font_num = int(font_name)
             try:
                 fonts[font_num] = Font.from_file(file_path).build()
             except Exception as e:
@@ -292,9 +292,45 @@ class TranslationsBlob(Struct):
 
 # ====================
 
+# layouts with translation support
+ALL_LAYOUTS = frozenset(LayoutType) - {LayoutType.T1}
+ALL_LAYOUT_NAMES = frozenset(layout.name for layout in ALL_LAYOUTS)
+
+
+def check_blob(lang_data: JsonDef):
+    json_header: JsonHeader = lang_data["header"]
+    lang_version = f"{json_header['language']} v{json_header['version']}"
+
+    font_layout_names = set(lang_data["fonts"].keys())
+    if font_layout_names != ALL_LAYOUT_NAMES:
+        raise ValueError(
+            f"Invalid font layout names for {lang_version}: {font_layout_names}"
+        )
+
+    for key, item in lang_data["translations"].items():
+        if isinstance(item, dict):
+            item_layouts = set(item.keys())
+            unknown_layouts = item_layouts - ALL_LAYOUT_NAMES
+            missing_layouts = ALL_LAYOUT_NAMES - item_layouts
+
+            if unknown_layouts or missing_layouts:
+                raise ValueError(
+                    f"Invalid translation layouts for {lang_version}: {key}"
+                    f"\nUnknown layouts: {list(unknown_layouts)}"
+                    f"\nMissing layouts: {list(missing_layouts)}"
+                )
+
 
 def order_from_json(json_order: dict[str, str]) -> Order:
     return {int(k): v for k, v in json_order.items()}
+
+
+def get_translation(lang_data: JsonDef, key: str, layout_type: LayoutType) -> str:
+    item = lang_data["translations"].get(key, "")
+    if isinstance(item, dict):
+        return item.get(layout_type.name, "")
+
+    return item  # Same translation for all layouts
 
 
 def blob_from_defs(
@@ -305,20 +341,21 @@ def blob_from_defs(
     fonts_dir: Path,
 ) -> TranslationsBlob:
     json_header: JsonHeader = lang_data["header"]
+    layout_type = LayoutType.from_model(model)
 
     # order translations -- python dicts keep insertion order
     translations_ordered: list[str] = [
-        lang_data["translations"].get(key, "") for _, key in sorted(order.items())
+        get_translation(lang_data, key, layout_type) for _, key in sorted(order.items())
     ]
 
     translations = TranslatedStrings.from_items(translations_ordered)
 
-    if model.internal_name not in lang_data["fonts"]:
+    if layout_type.name not in lang_data["fonts"]:
         raise ValueError(
-            f"Model {model.internal_name} not found in header for {json_header['language']} v{json_header['version']}"
+            f"Layout {layout_type.name} not found in header for {json_header['language']} v{json_header['version']}"
         )
 
-    model_fonts = lang_data["fonts"][model.internal_name]
+    model_fonts = lang_data["fonts"][layout_type.name]
     fonts = FontsTable.from_dir(model_fonts, fonts_dir)
 
     translations_bytes = translations.build()

@@ -1,173 +1,23 @@
 use super::ffi;
-use core::{ops::DerefMut, ptr};
-use cty::c_int;
-
-use crate::trezorhal::buffers::BufferText;
-
-pub use ffi::{DISPLAY_RESX, DISPLAY_RESY};
 
 #[cfg(feature = "framebuffer")]
-pub use ffi::{
-    DISPLAY_FRAMEBUFFER_OFFSET_X, DISPLAY_FRAMEBUFFER_OFFSET_Y, DISPLAY_FRAMEBUFFER_WIDTH,
-};
+use core::ptr;
 
-#[cfg(all(feature = "framebuffer", not(feature = "framebuffer32bit")))]
-#[derive(Copy, Clone)]
-pub struct FrameBuffer(pub *mut u16);
+use ffi::{DISPLAY_RESX_, DISPLAY_RESY_};
 
-#[cfg(all(feature = "framebuffer", feature = "framebuffer32bit"))]
-#[derive(Copy, Clone)]
-pub struct FrameBuffer(pub *mut u32);
+pub const DISPLAY_RESX: u32 = DISPLAY_RESX_;
+pub const DISPLAY_RESY: u32 = DISPLAY_RESY_;
 
 pub fn backlight(val: i32) -> i32 {
-    unsafe { ffi::display_backlight(val) }
-}
-
-pub fn text(baseline_x: i16, baseline_y: i16, text: &str, font: i32, fgcolor: u16, bgcolor: u16) {
-    unsafe {
-        ffi::display_text(
-            baseline_x.into(),
-            baseline_y.into(),
-            text.as_ptr() as _,
-            text.len() as _,
-            font,
-            fgcolor,
-            bgcolor,
-        )
-    }
-}
-
-pub fn text_into_buffer(text: &str, font: i32, buffer: &mut BufferText, x_offset: i16) {
-    unsafe {
-        ffi::display_text_render_buffer(
-            text.as_ptr() as _,
-            text.len() as _,
-            font,
-            buffer.deref_mut(),
-            x_offset.into(),
-        )
-    }
-}
-
-pub fn text_width(text: &str, font: i32) -> i16 {
-    unsafe {
-        ffi::font_text_width(font, text.as_ptr() as _, text.len() as _)
-            .try_into()
-            .unwrap_or(i16::MAX)
-    }
-}
-
-pub fn char_width(ch: char, font: i32) -> i16 {
-    let mut buf = [0u8; 4];
-    let encoding = ch.encode_utf8(&mut buf);
-    text_width(encoding, font)
-}
-
-pub fn get_char_glyph(ch: u16, font: i32) -> *const u8 {
-    unsafe { ffi::font_get_glyph(font, ch) }
-}
-
-pub fn text_height(font: i32) -> i16 {
-    unsafe { ffi::font_height(font).try_into().unwrap_or(i16::MAX) }
-}
-
-pub fn text_max_height(font: i32) -> i16 {
-    unsafe { ffi::font_max_height(font).try_into().unwrap_or(i16::MAX) }
-}
-
-pub fn text_baseline(font: i32) -> i16 {
-    unsafe { ffi::font_baseline(font).try_into().unwrap_or(i16::MAX) }
-}
-
-#[inline(always)]
-#[cfg(all(
-    not(feature = "framebuffer"),
-    feature = "disp_i8080_16bit_dw",
-    not(feature = "disp_i8080_8bit_dw")
-))]
-#[allow(unused_variables)]
-pub fn pixeldata(c: u16) {
-    #[cfg(not(feature = "new_rendering"))]
-    unsafe {
-        ffi::DISPLAY_DATA_ADDRESS.write_volatile(c);
-    }
-}
-
-#[cfg(feature = "framebuffer")]
-pub fn get_fb_addr() -> FrameBuffer {
-    unsafe { FrameBuffer(ffi::display_get_fb_addr() as _) }
-}
-
-#[inline(always)]
-#[cfg(all(not(feature = "framebuffer"), feature = "disp_i8080_8bit_dw"))]
-#[allow(unused_variables)]
-pub fn pixeldata(c: u16) {
-    #[cfg(not(feature = "new_rendering"))]
-    unsafe {
-        ffi::DISPLAY_DATA_ADDRESS.write_volatile((c & 0xff) as u8);
-        ffi::DISPLAY_DATA_ADDRESS.write_volatile((c >> 8) as u8);
-    }
-}
-
-#[inline(always)]
-#[cfg(all(feature = "framebuffer", not(feature = "framebuffer32bit")))]
-pub fn pixel(fb: FrameBuffer, x: i16, y: i16, c: u16) {
-    unsafe {
-        let addr = fb.0.offset(
-            ((y as u32 + DISPLAY_FRAMEBUFFER_OFFSET_Y) * DISPLAY_FRAMEBUFFER_WIDTH
-                + (x as u32 + DISPLAY_FRAMEBUFFER_OFFSET_X)) as isize,
-        );
-        addr.write_volatile(c);
-    }
-}
-
-#[inline(always)]
-#[cfg(all(feature = "framebuffer", feature = "framebuffer32bit"))]
-pub fn pixel(fb: FrameBuffer, x: i16, y: i16, c: u32) {
-    unsafe {
-        let addr = fb.0.offset(
-            ((y as u32 + DISPLAY_FRAMEBUFFER_OFFSET_Y) * DISPLAY_FRAMEBUFFER_WIDTH
-                + (x as u32 + DISPLAY_FRAMEBUFFER_OFFSET_X)) as isize,
-        );
-        addr.write_volatile(c);
-    }
-}
-
-#[inline(always)]
-#[cfg(any(
-    feature = "framebuffer",
-    not(any(feature = "disp_i8080_16bit_dw", feature = "disp_i8080_8bit_dw"))
-))]
-pub fn pixeldata(c: u16) {
-    unsafe {
-        ffi::display_pixeldata(c);
-    }
-}
-
-pub fn pixeldata_dirty() {
-    unsafe {
-        ffi::display_pixeldata_dirty();
-    }
-}
-
-pub fn set_window(x0: u16, y0: u16, x1: u16, y1: u16) {
-    unsafe {
-        ffi::display_set_window(x0, y0, x1, y1);
-    }
-}
-
-pub fn get_offset() -> (i16, i16) {
-    unsafe {
-        let mut x: c_int = 0;
-        let mut y: c_int = 0;
-        ffi::display_offset(ptr::null_mut(), &mut x, &mut y);
-        (x as i16, y as i16)
-    }
+    unsafe { ffi::display_set_backlight(val) }
 }
 
 pub fn sync() {
+    // NOTE: The sync operation is not called for tests because the linker
+    // would otherwise report missing symbols if the tests are built with ASAN.
+    #[cfg(not(any(feature = "framebuffer", feature = "test")))]
     unsafe {
-        ffi::display_sync();
+        ffi::display_wait_for_sync();
     }
 }
 
@@ -177,22 +27,21 @@ pub fn refresh() {
     }
 }
 
-pub fn clear() {
-    unsafe {
-        ffi::display_clear();
-    }
-}
-
-#[cfg(feature = "xframebuffer")]
-pub fn get_frame_buffer() -> (&'static mut [u8], usize) {
-    let fb_info = unsafe { ffi::display_get_frame_buffer() };
-
-    let fb = unsafe {
-        core::slice::from_raw_parts_mut(
-            fb_info.ptr as *mut u8,
-            DISPLAY_RESY as usize * fb_info.stride,
-        )
+#[cfg(feature = "framebuffer")]
+pub fn get_frame_buffer() -> Option<(&'static mut [u8], usize)> {
+    let mut fb_info = ffi::display_fb_info_t {
+        ptr: ptr::null_mut(),
+        size: 0,
+        stride: 0,
     };
 
-    (fb, fb_info.stride)
+    unsafe { ffi::display_get_frame_buffer(&mut fb_info) };
+
+    if fb_info.ptr.is_null() {
+        return None;
+    }
+
+    let fb = unsafe { core::slice::from_raw_parts_mut(fb_info.ptr as *mut u8, fb_info.size) };
+
+    Some((fb, fb_info.stride))
 }

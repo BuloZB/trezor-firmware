@@ -22,7 +22,6 @@ from trezorlib.debuglink import LayoutType
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import Cancelled, TrezorFailure
 
-from .. import buttons
 from ..input_flows import (
     InputFlowCodeChangeFail,
     InputFlowNewCodeMismatch,
@@ -64,7 +63,7 @@ def test_set_pin(client: Client):
 
     # Let's set new PIN
     with client:
-        if client.layout_type is LayoutType.TR:
+        if client.layout_type is LayoutType.Caesar:
             br_count = 6
         else:
             br_count = 4
@@ -89,7 +88,7 @@ def test_change_pin(client: Client):
     # Let's change PIN
     with client:
         client.use_pin_sequence([PIN4, PIN_MAX, PIN_MAX])
-        if client.layout_type is LayoutType.TR:
+        if client.layout_type is LayoutType.Caesar:
             br_count = 6
         else:
             br_count = 5
@@ -133,7 +132,7 @@ def test_set_failed(client: Client):
     _check_no_pin(client)
 
     with client, pytest.raises(TrezorFailure):
-        IF = InputFlowNewCodeMismatch(client, PIN4, PIN60)
+        IF = InputFlowNewCodeMismatch(client, PIN4, PIN60, what="pin")
         client.set_input_flow(IF.get())
 
         device.change_pin(client)
@@ -182,22 +181,22 @@ def test_change_invalid_current(client: Client):
     _check_pin(client, PIN4)
 
 
-@pytest.mark.models("mercury")
+@pytest.mark.models("delizia")
 @pytest.mark.setup_client(pin=None)
 def test_pin_menu_cancel_setup(client: Client):
     def cancel_pin_setup_input_flow():
         yield
         # enter context menu
-        client.debug.click(buttons.CORNER_BUTTON)
+        client.debug.click(client.debug.screen_buttons.menu())
         client.debug.synchronize_at("VerticalMenu")
         # click "Cancel PIN setup"
-        client.debug.click(buttons.VERTICAL_MENU[0])
+        client.debug.click(client.debug.screen_buttons.vertical_menu_items()[0])
         client.debug.synchronize_at("Paragraphs")
         # swipe through info screen
         client.debug.swipe_up()
         client.debug.synchronize_at("PromptScreen")
         # tap to confirm
-        client.debug.click(buttons.TAP_TO_CONFIRM)
+        client.debug.click(client.debug.screen_buttons.tap_to_confirm())
 
     with client, pytest.raises(Cancelled):
         client.set_input_flow(cancel_pin_setup_input_flow)

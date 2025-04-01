@@ -15,47 +15,80 @@ def configure(
     board = "T3W1/boards/t3w1-unix.h"
     hw_model = get_hw_model_as_number("T3W1")
     hw_revision = 0
-    mcu = "STM32F427xx"
+    mcu = "STM32U5G9xx"
 
-    defines += ["XFRAMEBUFFER", "DISPLAY_RGB585"]
-    features_available.append("xframebuffer")
-    features_available.append("display_rgb565")
+    defines += [
+        "FRAMEBUFFER",
+        ("USE_RGB_COLORS", "1"),
+        "DISPLAY_RGBA8888",
+        "UI_COLOR_32BIT",
+        ("DISPLAY_RESX", "380"),
+        ("DISPLAY_RESY", "520"),
+    ]
+    features_available.append("framebuffer")
+    features_available.append("display_rgba8888")
+    features_available.append("ui_color_32bit")
 
-    defines += [mcu]
-    defines += [f'TREZOR_BOARD=\\"{board}\\"']
-    defines += [f"HW_MODEL={hw_model}"]
-    defines += [f"HW_REVISION={hw_revision}"]
-    defines += [f"MCU_TYPE={mcu}"]
-    # todo change to blockwise flash when implemented in unix
-    defines += ["FLASH_BIT_ACCESS=1"]
-    defines += ["FLASH_BLOCK_WORDS=1"]
-
-    if "dma2d" in features_wanted:
-        features_available.append("dma2d")
-        if "new_rendering" in features_wanted:
-            sources += [
-                "embed/trezorhal/unix/dma2d_bitblt.c",
-            ]
-        else:
-            sources += ["embed/lib/dma2d_emul.c"]
-        defines += ["USE_DMA2D"]
+    defines += [
+        mcu,
+        ("TREZOR_BOARD", f'"{board}"'),
+        ("HW_MODEL", str(hw_model)),
+        ("HW_REVISION", str(hw_revision)),
+        ("MCU_TYPE", mcu),
+        # todo change to blockwise flash when implemented in unix
+        ("FLASH_BIT_ACCESS", "1"),
+        ("FLASH_BLOCK_WORDS", "1"),
+    ]
 
     if "sbu" in features_wanted:
-        sources += ["embed/trezorhal/unix/sbu.c"]
-
-    if "optiga_hal" in features_wanted:
-        sources += ["embed/trezorhal/unix/optiga_hal.c"]
+        sources += ["embed/io/sbu/unix/sbu.c"]
+        paths += ["embed/io/sbu/inc"]
+        defines += [("USE_SBU", "1")]
 
     if "optiga" in features_wanted:
-        sources += ["embed/trezorhal/unix/optiga.c"]
+        sources += ["embed/sec/optiga/unix/optiga_hal.c"]
+        sources += ["embed/sec/optiga/unix/optiga.c"]
+        paths += ["embed/sec/optiga/inc"]
         features_available.append("optiga")
+        defines += [("USE_OPTIGA", "1")]
+
+    if "tropic" in features_wanted:
+        sources += [
+            "embed/sec/secret/unix/secret.c",
+            "embed/sec/tropic/tropic.c",
+            "embed/sec/tropic/unix/tropic01.c",
+            "vendor/libtropic/src/libtropic.c",
+            "vendor/libtropic/src/lt_crc16.c",
+            "vendor/libtropic/src/lt_hkdf.c",
+            "vendor/libtropic/src/lt_l1.c",
+            "vendor/libtropic/src/lt_l1_port_wrap.c",
+            "vendor/libtropic/src/lt_l2.c",
+            "vendor/libtropic/src/lt_l2_frame_check.c",
+            "vendor/libtropic/src/lt_l3.c",
+            "vendor/libtropic/src/lt_random.c",
+            "vendor/libtropic/hal/port/unix/lt_port_unix.c",
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_aesgcm.c",
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_ed25519.c",
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_sha256.c",
+            "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_x25519.c",
+        ]
+        paths += ["embed/sec/tropic/inc"]
+        paths += ["vendor/libtropic/include"]
+        paths += ["vendor/libtropic/src"]
+        defines += ["USE_TREZOR_CRYPTO"]
+        features_available.append("tropic")
+        defines += ["USE_TROPIC=1"]
 
     if "input" in features_wanted:
-        sources += ["embed/trezorhal/unix/touch.c"]
+        sources += ["embed/io/touch/unix/touch.c"]
+        sources += ["embed/io/touch/touch_fsm.c"]
+        paths += ["embed/io/touch/inc"]
         features_available.append("touch")
+        defines += [("USE_TOUCH", "1")]
 
     features_available.append("backlight")
+    defines += [("USE_BACKLIGHT", "1")]
 
-    sources += ["embed/trezorhal/stm32f4/layout.c"]
+    sources += ["embed/util/flash/stm32u5/flash_layout.c"]
 
     return features_available

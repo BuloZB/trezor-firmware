@@ -5,7 +5,7 @@ from storage import common
 from trezor import utils
 
 if TYPE_CHECKING:
-    from trezor.enums import BackupType
+    from trezor.enums import BackupType, DisplayRotation
     from typing_extensions import Literal
 
 # Namespace:
@@ -50,7 +50,6 @@ if TYPE_CHECKING:
     StorageSafetyCheckLevel = Literal[0, 1]
 # fmt: on
 
-HOMESCREEN_MAXSIZE = const(16384)
 LABEL_MAXLENGTH = const(32)
 
 if __debug__:
@@ -95,16 +94,27 @@ def get_device_id() -> str:
     return dev_id.decode()
 
 
-def get_rotation() -> int:
+def get_rotation() -> DisplayRotation:
+    from trezor.enums import DisplayRotation
+
     rotation = common.get(_NAMESPACE, _ROTATION, public=True)
     if not rotation:
-        return 0
-    return int.from_bytes(rotation, "big")
+        return DisplayRotation.North  # Default to North if no rotation is set
+
+    value = int.from_bytes(rotation, "big")
+    if value == 90:
+        rotation = DisplayRotation.East
+    elif value == 180:
+        rotation = DisplayRotation.South
+    elif value == 270:
+        rotation = DisplayRotation.West
+    else:
+        rotation = DisplayRotation.North
+
+    return rotation
 
 
-def set_rotation(value: int) -> None:
-    if value not in (0, 90, 180, 270):
-        raise ValueError  # unsupported display rotation
+def set_rotation(value: DisplayRotation) -> None:
     common.set(_NAMESPACE, _ROTATION, value.to_bytes(2, "big"), True)  # public
 
 
@@ -160,20 +170,18 @@ def set_passphrase_enabled(enable: bool) -> None:
 
 
 def set_homescreen(homescreen: bytes) -> None:
-    if len(homescreen) > HOMESCREEN_MAXSIZE:
+    if len(homescreen) > utils.HOMESCREEN_MAXSIZE:
         raise ValueError  # homescreen too large
     common.set(_NAMESPACE, _HOMESCREEN, homescreen, public=True)
 
 
 def store_mnemonic_secret(
     secret: bytes,
-    backup_type: BackupType,
     needs_backup: bool = False,
     no_backup: bool = False,
 ) -> None:
     set_version(common.STORAGE_VERSION_CURRENT)
     common.set(_NAMESPACE, _MNEMONIC_SECRET, secret)
-    common.set_uint8(_NAMESPACE, _BACKUP_TYPE, backup_type)
     common.set_true_or_delete(_NAMESPACE, _NO_BACKUP, no_backup)
     common.set_bool(_NAMESPACE, INITIALIZED, True, public=True)
     if not no_backup:

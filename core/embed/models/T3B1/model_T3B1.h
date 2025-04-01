@@ -3,7 +3,7 @@
 
 #include "bootloaders/bootloader_hashes.h"
 
-#include "sizedefs.h"
+#include <rtl/sizedefs.h>
 
 #define MODEL_NAME "Safe 3"
 #define MODEL_FULL_NAME "Trezor Safe 3"
@@ -12,6 +12,7 @@
 #define MODEL_INTERNAL_NAME_QSTR MP_QSTR_T3B1
 #define MODEL_USB_MANUFACTURER "Trezor Company"
 #define MODEL_USB_PRODUCT MODEL_FULL_NAME
+#define MODEL_HOMESCREEN_MAXSIZE 16384
 
 #define MODEL_BOARDLOADER_KEYS \
   (const uint8_t *)"\xbb\xc2\x1a\xdb\xc1\xb4\x4d\x6b\xfe\x10\xc5\x22\x3d\xe3\x3c\x28\x42\x9e\x52\x68\x07\x07\xd3\x24\x90\x07\xed\x42\xdc\xc5\xbe\x13", \
@@ -25,7 +26,9 @@
 
 #define IMAGE_CHUNK_SIZE (128 * 1024)
 #define IMAGE_HASH_SHA256
+
 #define DISPLAY_JUMP_BEHAVIOR DISPLAY_RETAIN_CONTENT
+#define RSOD_INFINITE_LOOP 1
 
 // SHARED WITH MAKEFILE, LINKER SCRIPT etc.
 // misc
@@ -40,7 +43,7 @@
 
 // overlaps with secret
 #define BHK_START 0x0C002000
-#define BHK_MAXSIZE (2 * 8 * 1024)  // 8 kB
+#define BHK_MAXSIZE (1 * 8 * 1024)  // 8 kB
 #define BHK_SECTOR_START 0x1
 #define BHK_SECTOR_END 0x1
 
@@ -73,7 +76,6 @@
 #define FIRMWARE_SECTOR_END 0xF7
 #define KERNEL_START 0x0C050000
 #define KERNEL_MAXSIZE (512 * 1024)  // 512 kB
-#define KERNEL_U_FLASH_SIZE 512
 
 #define ASSETS_START 0x0C1F0000
 #define ASSETS_MAXSIZE (8 * 8 * 1024)  // 64 kB
@@ -81,12 +83,31 @@
 #define ASSETS_SECTOR_END 0xFF
 
 // RAM layout
-#define KERNEL_U_RAM_SIZE 512
-#define KERNEL_SRAM1_SIZE 16 * 1024
-#define KERNEL_SRAM2_SIZE 8 * 1024
-#define KERNEL_SRAM3_SIZE 0x38400
+#define AUX1_RAM_START 0x30000000
+#define AUX1_RAM_SIZE (192 * 1024 - 512)
 
+// 256 bytes skipped - trustzone alignment vs fixed bootargs position
+
+#define BOOTARGS_START 0x3002FF00
 #define BOOTARGS_SIZE 0x100
+
+#define MAIN_RAM_START 0x30030000
+#define MAIN_RAM_SIZE (24 * 1024 - 512)
+
+#define SAES_RAM_START 0x30035E00
+#define SAES_RAM_SIZE 512
+
+#define AUX2_RAM_START 0x30036000
+#define AUX2_RAM_SIZE (544 * 1024)
+
+#define FB1_RAM_START 0x300BE000
+#define FB1_RAM_SIZE (0x2000)
+
+#define FB2_RAM_START 0x300C0000
+#define FB2_RAM_SIZE (0)
+
+// misc
 #define CODE_ALIGNMENT 0x200
+#define COREAPP_ALIGNMENT 0x2000
 
 #endif

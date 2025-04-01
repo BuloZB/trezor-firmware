@@ -16,7 +16,7 @@
 
 import pytest
 
-from trezorlib import ethereum, exceptions, messages, models
+from trezorlib import ethereum, exceptions, messages
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.debuglink import message_filters
 from trezorlib.exceptions import TrezorFailure
@@ -24,6 +24,7 @@ from trezorlib.tools import parse_path, unharden
 
 from ...common import parametrize_using_common_fixtures
 from ...input_flows import (
+    InputFlowConfirmAllWarnings,
     InputFlowEthereumSignTxDataGoBack,
     InputFlowEthereumSignTxDataScrollDown,
     InputFlowEthereumSignTxDataSkip,
@@ -56,7 +57,12 @@ def make_defs(parameters: dict) -> messages.EthereumDefinitions:
 )
 @pytest.mark.parametrize("chunkify", (True, False))
 def test_signtx(client: Client, chunkify: bool, parameters: dict, result: dict):
-    _do_test_signtx(client, parameters, result, chunkify=chunkify)
+    input_flow = (
+        InputFlowConfirmAllWarnings(client).get()
+        if not client.debug.legacy_debug
+        else None
+    )
+    _do_test_signtx(client, parameters, result, input_flow, chunkify=chunkify)
 
 
 def _do_test_signtx(
@@ -126,8 +132,8 @@ def test_signtx_fee_info(client: Client):
 
 @pytest.mark.models(
     "core",
-    skip="mercury",
-    reason="T1 does not support input flows; Mercury can't send Cancel on Summary",
+    skip="delizia",
+    reason="T1 does not support input flows; Delizia can't send Cancel on Summary",
 )
 def test_signtx_go_back_from_summary(client: Client):
     input_flow = InputFlowEthereumSignTxGoBackFromSummary(client).get()
@@ -143,6 +149,8 @@ def test_signtx_go_back_from_summary(client: Client):
 @pytest.mark.parametrize("chunkify", (True, False))
 def test_signtx_eip1559(client: Client, chunkify: bool, parameters: dict, result: dict):
     with client:
+        if not client.debug.legacy_debug:
+            client.set_input_flow(InputFlowConfirmAllWarnings(client).get())
         sig_v, sig_r, sig_s = ethereum.sign_tx_eip1559(
             client,
             n=parse_path(parameters["path"]),
@@ -212,15 +220,10 @@ def test_data_streaming(client: Client):
     checked in vectorized function above.
     """
     with client:
-        is_t1 = client.model is models.T1B1
         client.set_expected_responses(
             [
                 messages.ButtonRequest(code=messages.ButtonRequestType.SignTx),
-                (is_t1, messages.ButtonRequest(code=messages.ButtonRequestType.SignTx)),
-                (
-                    not is_t1,
-                    messages.ButtonRequest(code=messages.ButtonRequestType.Other),
-                ),
+                messages.ButtonRequest(code=messages.ButtonRequestType.SignTx),
                 messages.ButtonRequest(code=messages.ButtonRequestType.SignTx),
                 message_filters.EthereumTxRequest(
                     data_length=1_024,
@@ -434,7 +437,7 @@ HEXDATA = "0123456789abcd000023456789abcd010003456789abcd020000456789abcd0300000
 @pytest.mark.parametrize(
     "flow", (input_flow_data_skip, input_flow_data_scroll_down, input_flow_data_go_back)
 )
-@pytest.mark.models("core", skip="mercury", reason="Not yet implemented in new UI")
+@pytest.mark.models("core", skip="delizia", reason="Not yet implemented in new UI")
 def test_signtx_data_pagination(client: Client, flow):
     def _sign_tx_call():
         ethereum.sign_tx(
@@ -455,10 +458,11 @@ def test_signtx_data_pagination(client: Client, flow):
         client.set_input_flow(flow(client))
         _sign_tx_call()
 
-    with client, pytest.raises(exceptions.Cancelled):
-        client.watch_layout()
-        client.set_input_flow(flow(client, cancel=True))
-        _sign_tx_call()
+    if flow is not input_flow_data_scroll_down:
+        with client, pytest.raises(exceptions.Cancelled):
+            client.watch_layout()
+            client.set_input_flow(flow(client, cancel=True))
+            _sign_tx_call()
 
 
 @pytest.mark.models("core")

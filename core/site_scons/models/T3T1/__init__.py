@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from . import emulator, trezor_t3t1_revE, trezor_t3t1_v4
+from . import emulator, trezor_t3t1_revE
 
 
 def configure_board(
@@ -13,13 +13,15 @@ def configure_board(
     sources: list[str],
     paths: list[str],
 ):
+    defines += (("MODEL_HEADER", '"T3T1/model_T3T1.h"'),)
+    defines += (("VERSIONS_HEADER", '"T3T1/versions.h"'),)
+
     # Set default revision if None
     revision = revision or "E"
 
     # Mapping of revisions to their respective configurations
     revision_map = {
         "emulator": emulator,
-        4: trezor_t3t1_v4,
         "E": trezor_t3t1_revE,
     }
 
@@ -32,7 +34,7 @@ def configure_board(
 
 
 def get_model_ui() -> str:
-    return "mercury"
+    return "delizia"
 
 
 def get_model_ui_conf() -> list[str]:

@@ -39,13 +39,16 @@ let
     sha256 = "02s3qkb6kz3ndyx7rfndjbvp4vlwiqc42fxypn3g6jnc0v5jyz95";
   }) { };
   moneroTests = nixpkgs.fetchurl {
-    url = "https://github.com/ph4r05/monero/releases/download/v0.18.1.1-dev-tests-u18.04-02/trezor_tests";
-    sha256 = "81424cfc3965abdc24de573274bf631337b52fd25cefc895513214c613fe05c9";
+    url = "https://github.com/ph4r05/monero/releases/download/v0.18.3.1-dev-tests-u18.04-01/trezor_tests";
+    sha256 = "d8938679b69f53132ddacea1de4b38b225b06b37b3309aa17911cfbe09b70b4a";
   };
   moneroTestsPatched = nixpkgs.runCommandCC "monero_trezor_tests" {} ''
     cp ${moneroTests} $out
     chmod +wx $out
-    ${nixpkgs.patchelf}/bin/patchelf --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" "$out"
+    ${nixpkgs.patchelf}/bin/patchelf \
+      --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+      --add-rpath "${nixpkgs.udev}/lib" \
+      "$out"
     chmod -w $out
   '';
   # do not expose rust's gcc: https://github.com/oxalica/rust-overlay/issues/70
@@ -70,19 +73,29 @@ let
     # to use official binary, remove rustfmt from buildInputs and add it to extensions:
     extensions = [ "rust-src" "clippy" "rustfmt" ];
   };
-  openocd-stm = (nixpkgs.openocd.overrideAttrs (oldAttrs: {
-    src = nixpkgs.fetchFromGitHub {
+  openocd-stm = (newNixpkgs.openocd.overrideAttrs (oldAttrs: {
+    src = newNixpkgs.fetchFromGitHub {
       owner = "STMicroelectronics";
       repo = "OpenOCD";
-      rev = "openocd-cubeide-v1.12.0";
-      sha256 = "7REQi9pcT6pn8yiAMpQpRQ+0ouMQelcciMAHyUonkVA=";
+      rev = "openocd-cubeide-v1.13.0";
+      sha256 = "a811402e19f0bfe496f6eecdc05ecea57f79a323879a810efaaff101cb0f420f";
     };
-    version = "stm-cubeide-v1.12.0";
-    nativeBuildInputs = oldAttrs.nativeBuildInputs ++ [ nixpkgs.autoreconfHook ];
-
-    # following two lines can be removed after bumping nixpkgs to newer than c58e6fbf258df1572b535ac1868ec42faf7675dd
-    buildInputs = oldAttrs.buildInputs ++ [ nixpkgs.jimtcl nixpkgs.libjaylink ];
-    configureFlags = oldAttrs.configureFlags ++ [ "--disable-internal-jimtcl" "--disable-internal-libjaylink" ];
+    version = "stm-cubeide-v1.13.0";
+    nativeBuildInputs = oldAttrs.nativeBuildInputs ++ [ newNixpkgs.autoreconfHook ];
+  }));
+  # backport https://github.com/NixOS/nixpkgs/pull/229537
+  # remove after nixpkgs bump
+  gcc-arm-embedded-gdbfix = (nixpkgs.gcc-arm-embedded.overrideAttrs (oldAttrs: {
+    postFixup = ''
+      mv $out/bin/arm-none-eabi-gdb $out/bin/arm-none-eabi-gdb-unwrapped
+      cat <<EOF > $out/bin/arm-none-eabi-gdb
+      #!${nixpkgs.runtimeShell}
+      export PYTHONPATH=${nixpkgs.python38}/lib/python3.8
+      export PYTHONHOME=${nixpkgs.python38}/bin/python3.8
+      exec $out/bin/arm-none-eabi-gdb-unwrapped "\$@"
+      EOF
+      chmod +x $out/bin/arm-none-eabi-gdb
+    '';
   }));
   llvmPackages = nixpkgs.llvmPackages_14;
   # see pyright/README.md for update procedure
@@ -110,8 +123,8 @@ stdenvNoCC.mkDerivation ({
     check
     crowdin-cli  # for translations
     curl  # for connect tests
-    editorconfig-checker
-    gcc-arm-embedded
+    newNixpkgs.editorconfig-checker
+    (if devTools then gcc-arm-embedded-gdbfix else gcc-arm-embedded)
     git
     gitAndTools.git-subrepo
     gnumake
@@ -153,8 +166,10 @@ stdenvNoCC.mkDerivation ({
     dejavu_fonts
   ] ++ lib.optionals devTools [
     shellcheck
-    gdb
     openocd-stm
+  ] ++ lib.optionals (devTools && !stdenv.isDarwin) [
+    gdb
+    kcachegrind
   ] ++ lib.optionals (devTools && acceptJlink) [
     nrfutil
     nrfconnect

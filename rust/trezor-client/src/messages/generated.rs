@@ -24,6 +24,8 @@ trezor_message_impl! {
     BackupDevice => MessageType_BackupDevice,
     EntropyRequest => MessageType_EntropyRequest,
     EntropyAck => MessageType_EntropyAck,
+    EntropyCheckReady => MessageType_EntropyCheckReady,
+    EntropyCheckContinue => MessageType_EntropyCheckContinue,
     PassphraseRequest => MessageType_PassphraseRequest,
     PassphraseAck => MessageType_PassphraseAck,
     RecoveryDevice => MessageType_RecoveryDevice,
@@ -233,6 +235,14 @@ trezor_message_impl! {
     NEMSignedTx => MessageType_NEMSignedTx,
     NEMDecryptMessage => MessageType_NEMDecryptMessage,
     NEMDecryptedMessage => MessageType_NEMDecryptedMessage,
+}
+
+#[cfg(feature = "nostr")]
+trezor_message_impl! {
+    NostrGetPubkey => MessageType_NostrGetPubkey,
+    NostrPubkey => MessageType_NostrPubkey,
+    NostrSignEvent => MessageType_NostrSignEvent,
+    NostrEventSignature => MessageType_NostrEventSignature,
 }
 
 #[cfg(feature = "ripple")]

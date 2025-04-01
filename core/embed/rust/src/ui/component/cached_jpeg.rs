@@ -1,13 +1,15 @@
 use crate::{
+    error::Error,
     io::BinaryData,
     ui::{
         component::{Component, Event, EventCtx, Never},
         display::image::ImageInfo,
         geometry::{Offset, Point, Rect},
-        shape,
-        shape::{render_on_canvas, ImageBuffer, Renderer, Rgb565Canvas},
+        shape::{self, render_on_canvas, ImageBuffer, Renderer, Rgb565Canvas},
     },
 };
+
+use super::paginated::SinglePage;
 
 pub struct CachedJpeg {
     area: Rect,
@@ -17,7 +19,7 @@ pub struct CachedJpeg {
 }
 
 impl CachedJpeg {
-    pub fn new(image: BinaryData<'static>, scale: u8) -> Self {
+    pub fn new(image: BinaryData<'static>, scale: u8) -> Result<Self, Error> {
         let size = match ImageInfo::parse(image) {
             ImageInfo::Jpeg(info) => {
                 if info.mcu_height() > 16 {
@@ -29,7 +31,7 @@ impl CachedJpeg {
             _ => Offset::zero(),
         };
 
-        let mut buf = unwrap!(ImageBuffer::new(size), "no image buf");
+        let mut buf = ImageBuffer::new(size)?;
 
         render_on_canvas(buf.canvas(), None, |target| {
             shape::JpegImage::new_image(Point::zero(), image)
@@ -37,12 +39,12 @@ impl CachedJpeg {
                 .render(target);
         });
 
-        Self {
+        Ok(Self {
             area: Rect::zero(),
             image_size: size,
             jpeg: buf,
             scale,
-        }
+        })
     }
 }
 
@@ -58,8 +60,6 @@ impl Component for CachedJpeg {
         None
     }
 
-    fn paint(&mut self) {}
-
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
         let off = Offset::new(
             self.image_size.x / (2 << self.scale),
@@ -74,6 +74,8 @@ impl Component for CachedJpeg {
         .render(target);
     }
 }
+
+impl SinglePage for CachedJpeg {}
 
 #[cfg(feature = "ui_debug")]
 impl crate::trace::Trace for CachedJpeg {

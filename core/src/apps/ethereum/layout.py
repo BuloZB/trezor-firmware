@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from trezor import TR, ui
+from trezor import TR
 from trezor.enums import ButtonRequestType
 from trezor.ui.layouts import (
     confirm_blob,
@@ -35,18 +35,13 @@ async def require_confirm_tx(
     fee_info_items: Iterable[tuple[str, str]],
     network: EthereumNetworkInfo,
     token: EthereumTokenInfo | None,
+    is_contract_interaction: bool,
     chunkify: bool,
 ) -> None:
     from trezor.ui.layouts import confirm_ethereum_tx
 
-    if to_bytes:
-        to_str = address_from_bytes(to_bytes, network)
-    else:
-        to_str = TR.ethereum__new_contract
-        chunkify = False
-
+    to_str = address_from_bytes(to_bytes, network) if to_bytes else None
     total_amount = format_ethereum_amount(value, token, network)
-
     account, account_path = get_account_and_path(address_n)
 
     await confirm_ethereum_tx(
@@ -56,6 +51,7 @@ async def require_confirm_tx(
         account_path,
         maximum_fee,
         fee_info_items,
+        is_contract_interaction,
         chunkify=chunkify,
     )
 
@@ -145,17 +141,23 @@ async def require_confirm_claim(
     )
 
 
-def require_confirm_unknown_token(address_bytes: bytes) -> Awaitable[None]:
+async def require_confirm_unknown_token(address_bytes: bytes) -> None:
     from ubinascii import hexlify
 
-    from trezor.ui.layouts import confirm_address
+    from trezor.ui.layouts import (
+        confirm_address,
+        confirm_ethereum_unknown_contract_warning,
+    )
+
+    await confirm_ethereum_unknown_contract_warning()
 
     contract_address_hex = "0x" + hexlify(address_bytes).decode()
-    return confirm_address(
-        TR.ethereum__unknown_token,
+    await confirm_address(
+        TR.words__address,
         contract_address_hex,
-        TR.ethereum__contract,
-        "unknown_token",
+        subtitle=TR.ethereum__token_contract,
+        verb=TR.buttons__continue,
+        br_name="unknown_token",
         br_code=ButtonRequestType.SignTx,
     )
 
@@ -176,9 +178,11 @@ def require_confirm_address(address_bytes: bytes) -> Awaitable[None]:
 def require_confirm_other_data(data: bytes, data_total: int) -> Awaitable[None]:
     return confirm_blob(
         "confirm_data",
-        TR.ethereum__title_confirm_data,
+        TR.ethereum__title_input_data,
         data,
-        TR.ethereum__data_size_template.format(data_total),
+        description=TR.ethereum__data_size_template.format(data_total),
+        verb=TR.buttons__confirm,
+        verb_cancel=TR.send__cancel_sign,
         br_code=ButtonRequestType.SignTx,
         ask_pagination=True,
     )
@@ -210,9 +214,9 @@ async def should_show_domain(name: bytes, version: bytes) -> bool:
     domain_version = decode_typed_data(version, "string")
 
     para = (
-        (ui.NORMAL, TR.ethereum__name_and_version),
-        (ui.DEMIBOLD, domain_name),
-        (ui.DEMIBOLD, domain_version),
+        (TR.ethereum__name_and_version, False),
+        (domain_name, False),
+        (domain_version, False),
     )
     return await should_show_more(
         TR.ethereum__title_confirm_domain,
@@ -239,12 +243,9 @@ async def should_show_struct(
     contains_plural = f"{TR.words__contains} {plural}"
 
     para = (
-        (ui.DEMIBOLD, description),
-        (
-            ui.NORMAL,
-            contains_plural,
-        ),
-        (ui.NORMAL, ", ".join(field.name for field in data_members)),
+        (description, False),
+        (contains_plural, False),
+        (", ".join(field.name for field in data_members), False),
     )
     return await should_show_more(
         title,
@@ -264,7 +265,7 @@ async def should_show_array(
     # Leaving english plural form because of dynamic noun - data_type
     plural = format_plural_english("{count} {plural}", size, data_type)
     array_of_plural = f"{TR.words__array_of} {plural}"
-    para = ((ui.NORMAL, array_of_plural),)
+    para = ((array_of_plural, False),)
     return await should_show_more(
         limit_str(".".join(parent_objects)),
         para,
@@ -301,7 +302,6 @@ async def confirm_typed_value(
             title,
             data,
             description,
-            ask_pagination=True,
         )
     else:
         await confirm_text(

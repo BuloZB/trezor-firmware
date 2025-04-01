@@ -4,6 +4,8 @@ use crate::ui::{
     shape::Renderer,
 };
 
+use super::paginated::SinglePage;
+
 pub struct GridPlaced<T> {
     inner: T,
     grid: Grid,
@@ -61,10 +63,6 @@ where
         self.inner.event(ctx, event)
     }
 
-    fn paint(&mut self) {
-        self.inner.paint()
-    }
-
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
         self.inner.render(target);
     }
@@ -106,10 +104,6 @@ where
 
     fn event(&mut self, ctx: &mut EventCtx, event: Event) -> Option<Self::Msg> {
         self.inner.event(ctx, event)
-    }
-
-    fn paint(&mut self) {
-        self.inner.paint()
     }
 
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
@@ -182,10 +176,6 @@ where
 
     fn event(&mut self, ctx: &mut EventCtx, event: Event) -> Option<Self::Msg> {
         self.inner.event(ctx, event)
-    }
-
-    fn paint(&mut self) {
-        self.inner.paint()
     }
 
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
@@ -278,16 +268,13 @@ where
             .or_else(|| self.second.event(ctx, event))
     }
 
-    fn paint(&mut self) {
-        self.first.paint();
-        self.second.paint();
-    }
-
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
         self.first.render(target);
         self.second.render(target);
     }
 }
+
+impl<T, U> SinglePage for Split<T, U> {}
 
 #[cfg(feature = "ui_debug")]
 impl<T, U> crate::trace::Trace for Split<T, U>

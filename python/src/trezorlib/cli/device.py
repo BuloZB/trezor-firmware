@@ -23,12 +23,12 @@ import typing as t
 import click
 import requests
 
-from .. import debuglink, device, exceptions, messages, ui
+from .. import authentication, debuglink, device, exceptions, messages, ui
+from ..tools import format_path
 from . import ChoiceType, with_client
 
 if t.TYPE_CHECKING:
     from ..client import TrezorClient
-    from ..protobuf import MessageType
     from . import TrezorConnection
 
 RECOVERY_DEVICE_INPUT_METHOD = {
@@ -65,7 +65,7 @@ def cli() -> None:
     is_flag=True,
 )
 @with_client
-def wipe(client: "TrezorClient", bootloader: bool) -> str:
+def wipe(client: "TrezorClient", bootloader: bool) -> None:
     """Reset device to factory defaults and remove all private data."""
     if bootloader:
         if not client.features.bootloader_mode:
@@ -86,11 +86,7 @@ def wipe(client: "TrezorClient", bootloader: bool) -> str:
         else:
             click.echo("Wiping user data!")
 
-    try:
-        return device.wipe(client)
-    except exceptions.TrezorFailure as e:
-        click.echo("Action failed: {} {}".format(*e.args))
-        sys.exit(3)
+    device.wipe(client)
 
 
 @cli.command()
@@ -100,6 +96,7 @@ def wipe(client: "TrezorClient", bootloader: bool) -> str:
 @click.option("-l", "--label", default="")
 @click.option("-i", "--ignore-checksum", is_flag=True)
 @click.option("-s", "--slip0014", is_flag=True)
+@click.option("-a", "--academic", is_flag=True)
 @click.option("-b", "--needs-backup", is_flag=True)
 @click.option("-n", "--no-backup", is_flag=True)
 @with_client
@@ -111,23 +108,30 @@ def load(
     label: str,
     ignore_checksum: bool,
     slip0014: bool,
+    academic: bool,
     needs_backup: bool,
     no_backup: bool,
-) -> str:
+) -> None:
     """Upload seed and custom configuration to the device.
 
     This functionality is only available in debug mode.
     """
-    if slip0014 and mnemonic:
-        raise click.ClickException("Cannot use -s and -m together.")
+    if sum((slip0014, academic, bool(mnemonic))) > 1:
+        raise click.ClickException("Cannot use the options -a, -m, and -s together.")
 
     if slip0014:
         mnemonic = [" ".join(["all"] * 12)]
         if not label:
             label = "SLIP-0014"
+    elif academic:
+        mnemonic = [
+            "academic again academic academic academic academic academic academic academic academic academic academic academic academic academic academic academic pecan provide remember"
+        ]
+        if not label:
+            label = "ACADEMIC"
 
     try:
-        return debuglink.load_device(
+        debuglink.load_device(
             client,
             mnemonic=list(mnemonic),
             pin=pin,
@@ -175,7 +179,7 @@ def recover(
     input_method: messages.RecoveryDeviceInputMethod,
     dry_run: bool,
     unlock_repeated_backup: bool,
-) -> "MessageType":
+) -> None:
     """Start safe recovery workflow."""
     if input_method == messages.RecoveryDeviceInputMethod.ScrambledWords:
         input_callback = ui.mnemonic_words(expand)
@@ -192,7 +196,7 @@ def recover(
     if unlock_repeated_backup:
         type = messages.RecoveryType.UnlockRepeatedBackup
 
-    return device.recover(
+    device.recover(
         client,
         word_count=int(words),
         passphrase_protection=passphrase_protection,
@@ -214,6 +218,7 @@ def recover(
 @click.option("-s", "--skip-backup", is_flag=True)
 @click.option("-n", "--no-backup", is_flag=True)
 @click.option("-b", "--backup-type", type=ChoiceType(BACKUP_TYPE))
+@click.option("-e", "--entropy-check-count", type=click.IntRange(0))
 @with_client
 def setup(
     client: "TrezorClient",
@@ -225,20 +230,13 @@ def setup(
     skip_backup: bool,
     no_backup: bool,
     backup_type: messages.BackupType | None,
-) -> str:
+    entropy_check_count: int | None,
+) -> None:
     """Perform device setup and generate new seed."""
     if strength:
         strength = int(strength)
 
     BT = messages.BackupType
-
-    if backup_type is None:
-        if client.version >= (2, 7, 1):
-            # SLIP39 extendable was introduced in 2.7.1
-            backup_type = BT.Slip39_Single_Extendable
-        else:
-            # this includes both T1 and older trezor-cores
-            backup_type = BT.Bip39
 
     if (
         backup_type
@@ -253,7 +251,7 @@ def setup(
             "backup type. Traditional BIP39 backup may be generated instead."
         )
 
-    return device.reset(
+    path_xpubs = device.setup(
         client,
         strength=strength,
         passphrase_protection=passphrase_protection,
@@ -263,7 +261,13 @@ def setup(
         skip_backup=skip_backup,
         no_backup=no_backup,
         backup_type=backup_type,
+        entropy_check_count=entropy_check_count,
     )
+
+    if path_xpubs:
+        click.echo("XPUBs for the generated seed")
+        for path, xpub in path_xpubs:
+            click.echo(f"{format_path(path)}: {xpub}")
 
 
 @cli.command()
@@ -274,10 +278,9 @@ def backup(
     client: "TrezorClient",
     group_threshold: int | None = None,
     groups: t.Sequence[tuple[int, int]] = (),
-) -> str:
+) -> None:
     """Perform device seed backup."""
-
-    return device.backup(client, group_threshold, groups)
+    device.backup(client, group_threshold, groups)
 
 
 @cli.command()
@@ -285,7 +288,7 @@ def backup(
 @with_client
 def sd_protect(
     client: "TrezorClient", operation: messages.SdProtectOperationType
-) -> str:
+) -> None:
     """Secure the device with SD card protection.
 
     When SD card protection is enabled, a randomly generated secret is stored
@@ -301,34 +304,31 @@ def sd_protect(
     """
     if client.features.model == "1":
         raise click.ClickException("Trezor One does not support SD card protection.")
-    return device.sd_protect(client, operation)
+    device.sd_protect(client, operation)
 
 
 @cli.command()
 @click.pass_obj
-def reboot_to_bootloader(obj: "TrezorConnection") -> str:
-    """Reboot device into bootloader mode.
-
-    Currently only supported on Trezor Model One.
-    """
+def reboot_to_bootloader(obj: "TrezorConnection") -> None:
+    """Reboot device into bootloader mode."""
     # avoid using @with_client because it closes the session afterwards,
     # which triggers double prompt on device
     with obj.client_context() as client:
-        return device.reboot_to_bootloader(client)
+        device.reboot_to_bootloader(client)
 
 
 @cli.command()
 @with_client
-def tutorial(client: "TrezorClient") -> str:
+def tutorial(client: "TrezorClient") -> None:
     """Show on-device tutorial."""
-    return device.show_device_tutorial(client)
+    device.show_device_tutorial(client)
 
 
 @cli.command()
 @with_client
-def unlock_bootloader(client: "TrezorClient") -> str:
+def unlock_bootloader(client: "TrezorClient") -> None:
     """Unlocks bootloader. Irreversible."""
-    return device.unlock_bootloader(client)
+    device.unlock_bootloader(client)
 
 
 @cli.command()
@@ -340,10 +340,11 @@ def unlock_bootloader(client: "TrezorClient") -> str:
     help="Dialog expiry in seconds.",
 )
 @with_client
-def set_busy(client: "TrezorClient", enable: bool | None, expiry: int | None) -> str:
+def set_busy(client: "TrezorClient", enable: bool | None, expiry: int | None) -> None:
     """Show a "Do not disconnect" dialog."""
     if enable is False:
-        return device.set_busy(client, None)
+        device.set_busy(client, None)
+        return
 
     if expiry is None:
         raise click.ClickException("Missing option '-e' / '--expiry'.")
@@ -353,7 +354,7 @@ def set_busy(client: "TrezorClient", enable: bool | None, expiry: int | None) ->
             f"Invalid value for '-e' / '--expiry': '{expiry}' is not a positive integer."
         )
 
-    return device.set_busy(client, expiry * 1000)
+    device.set_busy(client, expiry * 1000)
 
 
 PUBKEY_WHITELIST_URL_TEMPLATE = (
@@ -389,10 +390,6 @@ def authenticate(
     authenticity. By default, it will also check the public keys against a whitelist
     downloaded from Trezor servers. You can skip this check with the --skip-whitelist
     option.
-
-    \b
-    When not using --raw, 'cryptography' library is required. You can install it via:
-      pip3 install trezor[authentication]
     """
     if hex_challenge is None:
         hex_challenge = secrets.token_hex(32)
@@ -408,15 +405,6 @@ def authenticate(
         for cert in msg.certificates[1:]:
             click.echo(f"CA certificate: {cert.hex()}")
         return
-
-    try:
-        from .. import authentication
-    except ImportError as e:
-        click.echo("Failed to import the authentication module.")
-        click.echo(f"Error: {e}")
-        click.echo("Make sure you have the required dependencies:")
-        click.echo("  pip3 install trezor[authentication]")
-        sys.exit(4)
 
     if root is not None:
         root_bytes = root.read()

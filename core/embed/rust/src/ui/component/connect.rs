@@ -2,7 +2,7 @@ use crate::{
     strutil::TString,
     ui::{
         component::{Component, Event, EventCtx, Never, Pad},
-        display::{self, Color, Font},
+        display::{Color, Font},
         geometry::{Alignment, Offset, Rect},
         shape::{self, Renderer},
     },
@@ -12,10 +12,11 @@ pub struct Connect {
     fg: Color,
     bg: Pad,
     message: TString<'static>,
+    font: Font,
 }
 
 impl Connect {
-    pub fn new<T>(message: T, fg: Color, bg: Color) -> Self
+    pub fn new<T>(message: T, font: Font, fg: Color, bg: Color) -> Self
     where
         T: Into<TString<'static>>,
     {
@@ -23,6 +24,7 @@ impl Connect {
             fg,
             bg: Pad::with_background(bg),
             message: message.into(),
+            font,
         };
 
         instance.bg.clear();
@@ -42,32 +44,18 @@ impl Component for Connect {
         None
     }
 
-    fn paint(&mut self) {
-        let font = Font::NORMAL;
-
-        self.bg.paint();
-        self.message.map(|t| {
-            display::text_center(
-                self.bg.area.center() + Offset::y(font.text_height() / 2),
-                t,
-                font,
-                self.fg,
-                self.bg.color,
-            )
-        });
-    }
-
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
-        let font = Font::NORMAL;
-
         self.bg.render(target);
 
         self.message.map(|t| {
-            shape::Text::new(self.bg.area.center() + Offset::y(font.text_height() / 2), t)
-                .with_fg(self.fg)
-                .with_font(font)
-                .with_align(Alignment::Center)
-                .render(target);
+            shape::Text::new(
+                self.bg.area.center() + Offset::y(self.font.text_height() / 2),
+                t,
+                self.font,
+            )
+            .with_fg(self.fg)
+            .with_align(Alignment::Center)
+            .render(target);
         });
     }
 }

@@ -45,18 +45,13 @@ def test_2of3_dryrun(client: Client):
             client, EXTRA_GROUP_SHARE + MNEMONIC_SLIP39_ADVANCED_20
         )
         client.set_input_flow(IF.get())
-        ret = device.recover(
+        device.recover(
             client,
             passphrase_protection=False,
             pin_protection=False,
             label="label",
-            dry_run=True,
+            type=messages.RecoveryType.DryRun,
         )
-
-    # Dry run was successful
-    assert ret == messages.Success(
-        message="The seed is valid and matches the one in the device"
-    )
 
 
 @pytest.mark.setup_client(mnemonic=MNEMONIC_SLIP39_ADVANCED_20)
@@ -74,5 +69,5 @@ def test_2of3_invalid_seed_dryrun(client: Client):
             passphrase_protection=False,
             pin_protection=False,
             label="label",
-            dry_run=True,
+            type=messages.RecoveryType.DryRun,
         )

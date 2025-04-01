@@ -1,17 +1,13 @@
 from typing import *
 
 
-# extmod/modtrezorui/modtrezorui-display.h
+# upymod/modtrezorui/modtrezorui-display.h
 class Display:
     """
     Provide access to device display.
     """
     WIDTH: int  # display width in pixels
     HEIGHT: int  # display height in pixels
-    FONT_MONO: int  # id of monospace font
-    FONT_NORMAL: int  # id of normal-width font
-    FONT_DEMIBOLD: int  # id of demibold font
-    FONT_BOLD_UPPER: int # id of bold-width-uppercased font
 
     def __init__(self) -> None:
         """
@@ -35,12 +31,6 @@ class Display:
         Everything needs to be redrawn again when this function is used.
         Call without the degrees parameter to just perform the read of the
         value.
-        """
-
-    def backlight(self, val: int | None = None) -> int:
-        """
-        Sets backlight intensity to the value specified in val.
-        Call without the val parameter to just perform the read of the value.
         """
 
     def save(self, prefix: str) -> None:

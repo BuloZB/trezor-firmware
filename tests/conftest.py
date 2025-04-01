@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import typing as t
 from enum import IntEnum
@@ -30,7 +31,7 @@ from trezorlib import debuglink, log, models
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.device import apply_settings
 from trezorlib.device import wipe as wipe_device
-from trezorlib.transport import enumerate_devices, get_transport
+from trezorlib.transport import Timeout, enumerate_devices, get_transport, protocol
 
 # register rewrites before importing from local package
 # so that we see details of failed asserts from this module
@@ -52,6 +53,11 @@ if t.TYPE_CHECKING:
 
 HERE = Path(__file__).resolve().parent
 CORE = HERE.parent / "core"
+
+# So that we see details of failed asserts from this module
+pytest.register_assert_rewrite("tests.common")
+pytest.register_assert_rewrite("tests.input_flows")
+pytest.register_assert_rewrite("tests.input_flows_helpers")
 
 
 def _emulator_wrapper_main_args() -> list[str]:
@@ -106,21 +112,13 @@ def emulator(request: pytest.FixtureRequest) -> t.Generator["Emulator", None, No
             "Legacy emulator is not supported until it can be run on arbitrary ports."
         )
 
-    def _get_port() -> int:
-        """Get a unique port for this worker process on which it can run.
-
-        Guarantees to be unique because each worker has a different name.
-        gw0=>20000, gw1=>20003, gw2=>20006, etc.
-        """
-        worker_id = xdist.get_xdist_worker_id(request)
-        assert worker_id.startswith("gw")
-        # One emulator instance occupies 3 consecutive ports:
-        # 1. normal link, 2. debug link and 3. webauthn fake interface
-        return 20000 + int(worker_id[2:]) * 3
+    worker_id = xdist.get_xdist_worker_id(request)
+    assert worker_id.startswith("gw")
+    worker_id = int(worker_id[2:])
 
     with EmulatorWrapper(
         model,
-        port=_get_port(),
+        worker_id=worker_id,
         headless=True,
         auto_interact=not interact,
         main_args=_emulator_wrapper_main_args(),
@@ -137,6 +135,10 @@ def _raw_client(request: pytest.FixtureRequest) -> Client:
         client = emu_fixture.client
     else:
         interact = os.environ.get("INTERACT") == "1"
+        if not interact:
+            # prevent tests from getting stuck in case there is an USB packet loss
+            protocol._DEFAULT_READ_TIMEOUT = 50.0
+
         path = os.environ.get("TREZOR_PATH")
         if path:
             client = _client_from_path(request, path, interact)
@@ -179,7 +181,7 @@ class ModelsFilter:
         "safe": {models.T2B1, models.T3T1, models.T3B1},
         "safe3": {models.T2B1, models.T3B1},
         "safe5": {models.T3T1},
-        "mercury": {models.T3T1},
+        "delizia": {models.T3T1},
     }
 
     def __init__(self, node: Node) -> None:
@@ -281,6 +283,7 @@ def client(
     _raw_client.reset_debug_features()
     _raw_client.open()
     try:
+        _raw_client.sync_responses()
         _raw_client.init_device()
     except Exception:
         request.session.shouldstop = "Failed to communicate with Trezor"
@@ -303,8 +306,7 @@ def client(
     if _raw_client.model is not models.T1B1:
         lang = request.session.config.getoption("lang") or "en"
         assert isinstance(lang, str)
-        if lang != "en":
-            translations.set_language(_raw_client, lang)
+        translations.set_language(_raw_client, lang)
 
     setup_params = dict(
         uninitialized=False,
@@ -332,6 +334,7 @@ def client(
             label="test",
             needs_backup=setup_params["needs_backup"],  # type: ignore
             no_backup=setup_params["no_backup"],  # type: ignore
+            _skip_init_device=True,
         )
 
         if request.node.get_closest_marker("experimental"):
@@ -340,7 +343,8 @@ def client(
         if use_passphrase and isinstance(setup_params["passphrase"], str):
             _raw_client.use_passphrase(setup_params["passphrase"])
 
-        _raw_client.clear_session()
+        _raw_client.lock(_refresh_features=False)
+        _raw_client.init_device(new_session=True)
 
     with ui_tests.screen_recording(_raw_client, request):
         yield _raw_client
@@ -370,7 +374,6 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: pytest.ExitCode) -
             exitstatus,
             test_ui,  # type: ignore
             bool(session.config.getoption("ui_check_missing")),
-            bool(session.config.getoption("record_text_layout")),
             bool(session.config.getoption("do_master_diff")),
         )
 
@@ -439,6 +442,12 @@ def pytest_addoption(parser: "Parser") -> None:
         choices=translations.LANGUAGES,
         help="Run tests with a specified language: 'en' is the default",
     )
+    parser.addoption(
+        "--verbose-log-file",
+        action="store",
+        default=None,
+        help="File path for verbose logging",
+    )
 
 
 def pytest_configure(config: "Config") -> None:
@@ -462,9 +471,15 @@ def pytest_configure(config: "Config") -> None:
         for line in f:
             config.addinivalue_line("markers", line.strip())
 
-    # enable debug
-    if config.getoption("verbose"):
-        log.enable_debug_output()
+    # enable debug if `-v` flag is passed (use multiple times for higher verbosity)
+    verbosity = config.getoption("verbose")
+    if verbosity:
+        log.enable_debug_output(verbosity)
+
+        verbose_log_file = config.getoption("verbose_log_file")
+        if verbose_log_file:
+            handler = logging.FileHandler(verbose_log_file)
+            log.enable_debug_output(verbosity, handler)
 
     idval_orig = IdMaker._idval_from_value
 
@@ -488,6 +503,10 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     skip_altcoins = int(os.environ.get("TREZOR_PYTEST_SKIP_ALTCOINS", 0))
     if item.get_closest_marker("altcoin") and skip_altcoins:
         pytest.skip("Skipping altcoin test")
+
+
+def pytest_set_filtered_exceptions():
+    return (Timeout, protocol.UnexpectedMagic)
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)

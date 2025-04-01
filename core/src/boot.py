@@ -68,7 +68,7 @@ async def bootscreen() -> None:
                 lockscreen = Lockscreen(
                     label=storage.device.get_label(), bootscreen=True
                 )
-                await lockscreen
+                await lockscreen.get_result()
                 lockscreen.__del__()
                 await verify_user_pin()
                 storage.init_unlocked()
@@ -103,6 +103,10 @@ async def bootscreen() -> None:
                 log.exception(__name__, e)
             utils.halt(e.__class__.__name__)
 
+
+# Display emulator warning.
+if utils.EMULATOR:
+    print("\x1b[1;31m*** TREZOR EMULATOR IS FOR DEVELOPMENT PURPOSES ONLY ***\x1b[0m")
 
 # Ignore all automated PIN messages in the boot-phase (turned off in `bootscreen()`), unless Optiga throttling delays are active.
 if not utils.USE_OPTIGA or (optiga.get_sec() or 0) < 150:

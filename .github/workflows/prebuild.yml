@@ -5,6 +5,14 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '13 23 * * *'  # every day @ 23:13
+  push:
+    branches:
+      - 'release/**'
+
+# cancel any previous runs on the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 env:
   CARGOLOCK_COMMENT: Looks like you changed `Cargo.lock`. Please make sure to review the dependencies and update [internal version list](https://www.notion.so/satoshilabs/Rust-dependencies-a9cc6e8dab934def8eb27896c001e6e2).
@@ -28,6 +36,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Initialize and update ts-tvl
+        run: |
+          git submodule update --init --recursive vendor/ts-tvl
       - uses: ./.github/actions/environment
       - name: "Run style check"
         run: nix-shell --run "poetry run make style_check"
@@ -75,7 +86,7 @@ jobs:
   # Checking the format of release commit messages.
   release_commit_msg_check:
     name: Release commit message check
-    if: ${{ startsWith(github.ref, 'refs/tags/release/') && github.repository == 'trezor/trezor-firmware' }}
+    if: ${{ startsWith(github.ref, 'refs/heads/release/') && github.repository == 'trezor/trezor-firmware' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

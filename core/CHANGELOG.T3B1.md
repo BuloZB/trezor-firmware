@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.8.9] (19th March 2025)
+
+### Added
+- Ability to cancel recovery on word count selection screen.  [#3503]
+- New UI for confirming long messages.  [#4541]
+- Solana staking confirmation dialogs.  [#4560]
+
+### Fixed
+- Cancelling device recovery after aborting from Suite.  [#3503]
+
+## [2.8.8] (internal release)
+
+### Fixed
+- Fix "PIN attempts exceeded" screen.  [#3324]
+- Fix behavior of a button press during "hold to confirm".  [#3772]
+- Fix backup failing if middle button is pressed during confirmation.  [#4500]
+
+## [2.8.7] (22th January 2025)
+
+### Added
+- Add benchmark application.  [#4101]
+- Show last typed PIN number for short period of time.  [#3863]
+- Add P2WSH support for Unchained BIP32 paths.  [#4271]
+- Entropy check workflow in ResetDevice.  [#4155]
+- Added support for lexicographic sorting of pubkeys in multisig.  [#4351]
+
+### Changed
+- Simplify UI of Cardano transactions initiated by Trezor Suite.  [#4284]
+- Improve UI synchronization, ordering, and responsiveness (Global Layout project).  [#2299]
+- Improve device responsiveness by removing unnecessary screen refreshes.  [#3633]
+- Forbid multisig to singlesig change outputs.  [#4351]
+- Forbid per-node paths in multisig change outputs and multisig receive addresses.  [#4351]
+
+### Removed
+- Removed deprecated Unchained Capital's multisig path.  [#4351]
+
+### Fixed
+- Fix ETH account number detection.  [#3627]
+- New EVM call contract flow UI.  [#4251]
+- Fix translation of the 'Enable labeling' screen.  [#3813]
+- Improve paginated blob display.  [#4302]
+- UI: Fix auto-mover hitting wall scenario.  [#3692]
+
+## [2.8.6] (internal release)
+
+## [2.8.5] (internal release)
+
+## [2.8.4] (internal release)
+
 ## [2.8.3] (18th September 2024)
 
 ### Added
@@ -19,22 +68,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - Fix persistent word when going to previous word during recovery process.  [#3859]
-- Fix display orientation _south_.  [#3990]
 - Fixed SLIP-10 fingerprints for ed25519 and curve25519.  [#4093]
 
-## [2.8.1] (unreleased)
+## [2.8.1] (21st August 2024)
 
 ### Added
+- Added support for T3B1.  [#3728]
 - Improve precision of PIN timeout countdown.  [#4000]
+
+### Changed
 
 ### Fixed
 - Solana: added support for deprecated AToken Create `rent_sysvar` argument.  [#3976]
 
-
 ## [2.8.0] (9th July 2024)
 
 ### Added
-- Expose value of the Optiga SEC counter in `Features` message.
 
 ### Changed
 - Reworked PIN processing.
@@ -43,13 +92,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - CoSi functionality.  [#3442]
 
 ### Fixed
-- Increase Optiga read timeout to avoid spurious RSODs.
 
 
 ## [2.7.2] (14th June 2024)
 
 ### Fixed
-- Fixed device freeze after setup.  [#3925]
 - Translation fixes.  [#3916]
 
 
@@ -75,7 +122,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Add translations capability.  [#3206]
 - Stellar: add support for `StellarClaimClaimableBalanceOp`.  [#3434]
-- Add loader to homescreen when locking the device.  [#3440]
 - Allow for going back to previous word in recovery process.  [#3458]
 - Clear sign ETH staking transactions on Everstake pool.  [#3517]
 - Send BIP-380 descriptor in GetPublicKey response.  [#3539]
@@ -87,7 +133,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Improved UI of multiple Solana instructions.  [#3445]
 - Solana multisig instruction warning will be displayed before instruction details are displayed.  [#3445]
 - Fixed Solana Memo instruction being unknown - it will now be recognized and displayed properly.  [#3445]
-- Add missing semicolon character to the passphrase entry.  [#3477]
 
 
 ## [2.6.4] (20th December 2023)
@@ -100,7 +145,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - Fix invalid encoding of signatures from Optiga.  [#3411]
-- Re-added missing address confirmation screens.  [#3424]
 
 
 ## [2.6.3] (15th November 2023)
@@ -108,7 +152,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Support interaction-less upgrade.  [#2919]
 - Allowed non-zero address index in Cardano staking paths.  [#3242]
-- Turn the screen off when device is locked, to prolong OLED life.  [#3377]
 
 ### Changed
 
@@ -118,20 +161,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [2.6.2] (internal release)
 
 ### Added
-- Integrate Optiga into PIN verification.  [#3296]
 
 
 ## [2.6.1] (internal release)
 
 ### Added
-- Implement UI.  [#2610]
 - QR code display when exporting XPUBs.  [#3047]
 - Added hw model field to all vendor headers.  [#3048]
 - Added firmware update without interaction.  [#3205]
 - Split builds of different parts to use simple util.s assembler, while FW+bootloader use interconnected ones.  [#3205]
 - Add support for address chunkification in Receive and Sign flow.  [#3237]
-- Implement device authentication.  [#3255]
-- Use Optiga as a source of randomness in seed generation.  [#3256]
 
 ### Changed
 - Update to MicroPython 1.19.1.  [#2341]
@@ -856,6 +895,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [#2284]: https://github.com/trezor/trezor-firmware/pull/2284
 [#2289]: https://github.com/trezor/trezor-firmware/pull/2289
 [#2297]: https://github.com/trezor/trezor-firmware/pull/2297
+[#2299]: https://github.com/trezor/trezor-firmware/pull/2299
 [#2300]: https://github.com/trezor/trezor-firmware/pull/2300
 [#2313]: https://github.com/trezor/trezor-firmware/pull/2313
 [#2324]: https://github.com/trezor/trezor-firmware/pull/2324
@@ -916,6 +956,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [#3256]: https://github.com/trezor/trezor-firmware/pull/3256
 [#3296]: https://github.com/trezor/trezor-firmware/pull/3296
 [#3311]: https://github.com/trezor/trezor-firmware/pull/3311
+[#3324]: https://github.com/trezor/trezor-firmware/pull/3324
 [#3359]: https://github.com/trezor/trezor-firmware/pull/3359
 [#3370]: https://github.com/trezor/trezor-firmware/pull/3370
 [#3377]: https://github.com/trezor/trezor-firmware/pull/3377
@@ -929,16 +970,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [#3475]: https://github.com/trezor/trezor-firmware/pull/3475
 [#3477]: https://github.com/trezor/trezor-firmware/pull/3477
 [#3496]: https://github.com/trezor/trezor-firmware/pull/3496
+[#3503]: https://github.com/trezor/trezor-firmware/pull/3503
 [#3517]: https://github.com/trezor/trezor-firmware/pull/3517
 [#3520]: https://github.com/trezor/trezor-firmware/pull/3520
+[#3536]: https://github.com/trezor/trezor-firmware/pull/3536
 [#3539]: https://github.com/trezor/trezor-firmware/pull/3539
+[#3627]: https://github.com/trezor/trezor-firmware/pull/3627
+[#3633]: https://github.com/trezor/trezor-firmware/pull/3633
 [#3636]: https://github.com/trezor/trezor-firmware/pull/3636
 [#3640]: https://github.com/trezor/trezor-firmware/pull/3640
+[#3692]: https://github.com/trezor/trezor-firmware/pull/3692
 [#3728]: https://github.com/trezor/trezor-firmware/pull/3728
+[#3772]: https://github.com/trezor/trezor-firmware/pull/3772
 [#3797]: https://github.com/trezor/trezor-firmware/pull/3797
+[#3813]: https://github.com/trezor/trezor-firmware/pull/3813
 [#3855]: https://github.com/trezor/trezor-firmware/pull/3855
 [#3858]: https://github.com/trezor/trezor-firmware/pull/3858
 [#3859]: https://github.com/trezor/trezor-firmware/pull/3859
+[#3863]: https://github.com/trezor/trezor-firmware/pull/3863
 [#3885]: https://github.com/trezor/trezor-firmware/pull/3885
 [#3895]: https://github.com/trezor/trezor-firmware/pull/3895
 [#3896]: https://github.com/trezor/trezor-firmware/pull/3896
@@ -950,6 +999,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [#3922]: https://github.com/trezor/trezor-firmware/pull/3922
 [#3925]: https://github.com/trezor/trezor-firmware/pull/3925
 [#3940]: https://github.com/trezor/trezor-firmware/pull/3940
+[#3947]: https://github.com/trezor/trezor-firmware/pull/3947
 [#3965]: https://github.com/trezor/trezor-firmware/pull/3965
 [#3969]: https://github.com/trezor/trezor-firmware/pull/3969
 [#3972]: https://github.com/trezor/trezor-firmware/pull/3972
@@ -959,13 +1009,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [#3992]: https://github.com/trezor/trezor-firmware/pull/3992
 [#4000]: https://github.com/trezor/trezor-firmware/pull/4000
 [#4006]: https://github.com/trezor/trezor-firmware/pull/4006
+[#4019]: https://github.com/trezor/trezor-firmware/pull/4019
 [#4023]: https://github.com/trezor/trezor-firmware/pull/4023
 [#4030]: https://github.com/trezor/trezor-firmware/pull/4030
+[#4041]: https://github.com/trezor/trezor-firmware/pull/4041
+[#4047]: https://github.com/trezor/trezor-firmware/pull/4047
 [#4054]: https://github.com/trezor/trezor-firmware/pull/4054
 [#4060]: https://github.com/trezor/trezor-firmware/pull/4060
 [#4063]: https://github.com/trezor/trezor-firmware/pull/4063
 [#4093]: https://github.com/trezor/trezor-firmware/pull/4093
 [#4099]: https://github.com/trezor/trezor-firmware/pull/4099
+[#4101]: https://github.com/trezor/trezor-firmware/pull/4101
 [#4119]: https://github.com/trezor/trezor-firmware/pull/4119
 [#4142]: https://github.com/trezor/trezor-firmware/pull/4142
 [#4151]: https://github.com/trezor/trezor-firmware/pull/4151
+[#4155]: https://github.com/trezor/trezor-firmware/pull/4155
+[#4161]: https://github.com/trezor/trezor-firmware/pull/4161
+[#4165]: https://github.com/trezor/trezor-firmware/pull/4165
+[#4167]: https://github.com/trezor/trezor-firmware/pull/4167
+[#4176]: https://github.com/trezor/trezor-firmware/pull/4176
+[#4251]: https://github.com/trezor/trezor-firmware/pull/4251
+[#4261]: https://github.com/trezor/trezor-firmware/pull/4261
+[#4271]: https://github.com/trezor/trezor-firmware/pull/4271
+[#4284]: https://github.com/trezor/trezor-firmware/pull/4284
+[#4294]: https://github.com/trezor/trezor-firmware/pull/4294
+[#4295]: https://github.com/trezor/trezor-firmware/pull/4295
+[#4302]: https://github.com/trezor/trezor-firmware/pull/4302
+[#4309]: https://github.com/trezor/trezor-firmware/pull/4309
+[#4326]: https://github.com/trezor/trezor-firmware/pull/4326
+[#4351]: https://github.com/trezor/trezor-firmware/pull/4351
+[#4402]: https://github.com/trezor/trezor-firmware/pull/4402
+[#4421]: https://github.com/trezor/trezor-firmware/pull/4421
+[#4462]: https://github.com/trezor/trezor-firmware/pull/4462
+[#4491]: https://github.com/trezor/trezor-firmware/pull/4491
+[#4492]: https://github.com/trezor/trezor-firmware/pull/4492
+[#4500]: https://github.com/trezor/trezor-firmware/pull/4500
+[#4537]: https://github.com/trezor/trezor-firmware/pull/4537
+[#4541]: https://github.com/trezor/trezor-firmware/pull/4541
+[#4560]: https://github.com/trezor/trezor-firmware/pull/4560
+[#4571]: https://github.com/trezor/trezor-firmware/pull/4571
+[#1658739]: https://github.com/trezor/trezor-firmware/pull/1658739

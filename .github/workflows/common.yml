@@ -5,6 +5,15 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '14 23 * * *'  # every day @ 23:14
+  push:
+    branches:
+      - 'release/**'
+
+
+# cancel any previous runs on the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   crypto_build:
@@ -115,3 +124,35 @@ jobs:
       - run: unset PYTEST_TIMEOUT
       - run: nix-shell --run "poetry run make -C storage/tests build"
       - run: nix-shell --run "poetry run make -C storage/tests tests_all"
+
+  docker_build:
+    name: Firmware docker build
+    # scheduled, manual runs, push to release branches
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [T1B1, T2T1, T2B1, T3B1, T3T1]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git checkout ${{ github.head_ref || github.ref_name }}
+      - run: ./build-docker.sh --models ${{ matrix.model }} --targets bootloader,firmware,prodtest ${{ github.head_ref || github.ref_name }}
+      - name: Show fingerprints
+        run: |
+          for file in build/*/*/*.fingerprint; do
+            if [ -f "$file" ]; then
+              origfile="${file%.fingerprint}"
+              fingerprint=$(tr -d '\n' < $file)
+              echo "\`$fingerprint\` $origfile" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          cat $GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-${{ matrix.model }}
+          path: |
+            build/*/*/*.bin
+          retention-days: 7

@@ -3,6 +3,7 @@ import sys
 from trezorutils import (  # noqa: F401
     BITCOIN_ONLY,
     EMULATOR,
+    HOMESCREEN_MAXSIZE,
     INTERNAL_MODEL,
     MODEL,
     MODEL_FULL_NAME,
@@ -11,10 +12,14 @@ from trezorutils import (  # noqa: F401
     SCM_REVISION,
     UI_LAYOUT,
     USE_BACKLIGHT,
+    USE_BLE,
+    USE_BUTTON,
     USE_HAPTIC,
     USE_OPTIGA,
     USE_SD_CARD,
     USE_THP,
+    USE_TOUCH,
+    USE_TROPIC,
     VERSION,
     bootloader_locked,
     check_firmware_header,
@@ -31,16 +36,25 @@ from trezorutils import (  # noqa: F401
 )
 from typing import TYPE_CHECKING
 
-DISABLE_ANIMATION = 0
-
 if __debug__:
+    from trezorutils import LOG_STACK_USAGE
+
+    if LOG_STACK_USAGE:
+        from trezorutils import estimate_unused_stack, zero_unused_stack  # noqa: F401
+
     if EMULATOR:
         import uos
 
-        DISABLE_ANIMATION = int(uos.getenv("TREZOR_DISABLE_ANIMATION") or "0")
-        LOG_MEMORY = int(uos.getenv("TREZOR_LOG_MEMORY") or "0")
+        DISABLE_ANIMATION = uos.getenv("TREZOR_DISABLE_ANIMATION") == "1"
+        LOG_MEMORY = uos.getenv("TREZOR_LOG_MEMORY") == "1"
     else:
+        from trezorutils import DISABLE_ANIMATION
+
         LOG_MEMORY = 0
+
+else:
+    DISABLE_ANIMATION = False
+    LOG_STACK_USAGE = False
 
 if TYPE_CHECKING:
     from typing import Any, Iterator, Protocol, Sequence, TypeVar
@@ -109,6 +123,14 @@ def presize_module(modname: str, size: int) -> None:
 
 
 if __debug__:
+    from ubinascii import hexlify
+
+    try:
+        from trezorutils import enable_oom_dump
+
+        enable_oom_dump()
+    except ImportError:
+        pass
 
     def mem_dump(filename: str) -> None:
         from micropython import mem_info
@@ -124,6 +146,10 @@ if __debug__:
             mem_info()
         else:
             mem_info(True)
+
+    def get_bytes_as_str(a: bytes) -> str:
+        """Converts the provided bytes to a hexadecimal string (decoded as `utf-8`)."""
+        return hexlify(a).decode("utf-8")
 
 
 def ensure(cond: bool, msg: str | None = None) -> None:

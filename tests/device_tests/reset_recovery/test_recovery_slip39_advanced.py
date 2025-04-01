@@ -51,15 +51,13 @@ def _test_secret(
     with client:
         IF = InputFlowSlip39AdvancedRecovery(client, shares, click_info=click_info)
         client.set_input_flow(IF.get())
-        ret = device.recover(
+        device.recover(
             client,
             pin_protection=False,
             passphrase_protection=False,
             label="label",
         )
 
-    # Workflow succesfully ended
-    assert ret == messages.Success(message="Device recovered")
     assert client.features.initialized is True
     assert client.features.pin_protection is False
     assert client.features.passphrase_protection is False
@@ -75,6 +73,7 @@ def test_secret(client: Client, shares: list[str], secret: str):
 
 @pytest.mark.parametrize("shares, secret", VECTORS)
 @pytest.mark.setup_client(uninitialized=True)
+@pytest.mark.models(skip="safe3", reason="safe3 does not have info button")
 def test_secret_click_info_button(client: Client, shares: list[str], secret: str):
     _test_secret(client, shares, secret, click_info=True)
 

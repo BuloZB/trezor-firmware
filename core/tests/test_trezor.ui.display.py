@@ -1,6 +1,8 @@
+# flake8: noqa: F403,F405
 from common import *  # isort:skip
 
 from trezor.ui import display
+from trezorui_api import backlight_set
 
 
 class TestDisplay(unittest.TestCase):
@@ -16,7 +18,7 @@ class TestDisplay(unittest.TestCase):
 
     def test_backlight(self):
         for b in range(256):
-            display.backlight(b)
+            backlight_set(b)
 
     def test_raw(self):
         pass

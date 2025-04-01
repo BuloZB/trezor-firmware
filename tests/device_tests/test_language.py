@@ -60,16 +60,16 @@ def get_ping_title(lang: str) -> str:
 def client(client: Client) -> Iterator[Client]:
     lang_before = client.features.language or ""
     try:
-        set_language(client, "en")
+        set_language(client, "en", force=True)
         yield client
     finally:
-        set_language(client, lang_before[:2])
+        set_language(client, lang_before[:2], force=True)
 
 
 def _check_ping_screen_texts(client: Client, title: str, right_button: str) -> None:
     def ping_input_flow(client: Client, title: str, right_button: str):
         yield
-        layout = client.debug.wait_layout()
+        layout = client.debug.read_layout()
         assert layout.title().upper() == title.upper()
         assert layout.button_contents()[-1].upper() == right_button.upper()
         client.debug.press_yes()

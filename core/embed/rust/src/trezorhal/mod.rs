@@ -1,4 +1,6 @@
 pub mod bip39;
+#[cfg(feature = "ble")]
+pub mod ble;
 #[macro_use]
 #[allow(unused_macros)]
 pub mod fatal_error;
@@ -6,13 +8,18 @@ pub mod fatal_error;
 pub mod bitblt;
 #[cfg(feature = "ui")]
 pub mod display;
-#[cfg(feature = "dma2d")]
-pub mod dma2d;
 mod ffi;
 #[cfg(feature = "haptic")]
 pub mod haptic;
 
-pub mod io;
+#[cfg(feature = "button")]
+pub mod button;
+
+#[cfg(feature = "touch")]
+pub mod touch;
+
+#[cfg(feature = "hw_jpeg_decoder")]
+pub mod jpegdec;
 pub mod model;
 pub mod random;
 #[cfg(feature = "rgb_led")]
@@ -25,11 +32,6 @@ pub mod usb;
 pub mod uzlib;
 pub mod wordlist;
 
-pub mod buffers;
 pub mod secbool;
 
-#[cfg(not(feature = "micropython"))]
 pub mod time;
-
-#[cfg(feature = "micropython")]
-pub use crate::micropython::time;

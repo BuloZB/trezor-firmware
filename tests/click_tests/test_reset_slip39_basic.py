@@ -20,8 +20,7 @@ import pytest
 
 from trezorlib import device, messages
 
-from .. import buttons
-from ..common import EXTERNAL_ENTROPY, WITH_MOCK_URANDOM, generate_entropy
+from ..common import EXTERNAL_ENTROPY, MOCK_GET_ENTROPY, generate_entropy
 from . import reset
 
 if TYPE_CHECKING:
@@ -39,7 +38,6 @@ pytestmark = pytest.mark.models("core")
     ],
 )
 @pytest.mark.setup_client(uninitialized=True)
-@WITH_MOCK_URANDOM
 def test_reset_slip39_basic(
     device_handler: "BackgroundDeviceHandler", num_of_shares: int, threshold: int
 ):
@@ -49,48 +47,66 @@ def test_reset_slip39_basic(
     assert features.initialized is False
 
     device_handler.run(
-        device.reset,
+        device.setup,
         strength=128,
         backup_type=messages.BackupType.Slip39_Basic,
         pin_protection=False,
+        passphrase_protection=False,
+        entropy_check_count=0,
+        _get_entropy=MOCK_GET_ENTROPY,
     )
 
     # confirm new wallet
     reset.confirm_new_wallet(debug)
 
     # confirm back up
+    # TODO: check also for ["backup__it_should_be_backed_up", "backup__it_should_be_backed_up_now"]
+    # TR.assert_in_multiple(
+    #     debug.read_layout().text_content(),
+    #     ["backup__new_wallet_created", "backup__new_wallet_successfully_created"],
+    # )
     reset.confirm_read(debug)
 
     # confirm backup intro
+    # TR.assert_in(debug.read_layout().text_content(), "backup__info_multi_share_backup")
     reset.confirm_read(debug)
 
     # confirm checklist
+    # TR.assert_in(
+    #     debug.read_layout().text_content(), "reset__slip39_checklist_num_shares"
+    # )
     reset.confirm_read(debug)
 
     # set num of shares - default is 5
-    assert debug.model is not None
-    model_name: str = debug.model.internal_name
-    if num_of_shares < 5:
-        reset.set_selection(debug, buttons.reset_minus(model_name), 5 - num_of_shares)
-    else:
-        reset.set_selection(debug, buttons.reset_plus(model_name), num_of_shares - 5)
+    reset.set_selection(debug, num_of_shares - 5)
 
     # confirm checklist
+    # TR.assert_in(
+    #     debug.read_layout().text_content(), "reset__slip39_checklist_set_threshold"
+    # )
     reset.confirm_read(debug)
 
     # set threshold
     # TODO: could make it general as well
     if num_of_shares == 1 and threshold == 1:
-        reset.set_selection(debug, buttons.reset_plus(model_name), 0)
+        reset.set_selection(debug, 0)
     elif num_of_shares == 16 and threshold == 16:
-        reset.set_selection(debug, buttons.reset_plus(model_name), 11)
+        reset.set_selection(debug, 11)
     else:
         raise RuntimeError("not a supported combination")
 
     # confirm checklist
+    # TR.assert_in_multiple(
+    #     debug.read_layout().text_content(),
+    #     [
+    #         "reset__slip39_checklist_write_down",
+    #         "reset__slip39_checklist_write_down_recovery",
+    #     ],
+    # )
     reset.confirm_read(debug)
 
     # confirm backup warning
+    # TR.assert_in(debug.read_layout().text_content(), "reset__never_make_digital_copy")
     reset.confirm_read(debug, middle_r=True)
 
     all_words: list[str] = []
@@ -117,7 +133,9 @@ def test_reset_slip39_basic(
     # validate that all combinations will result in the correct master secret
     reset.validate_mnemonics(all_words, secret)
 
-    assert device_handler.result() == "Initialized"
+    # retrieve the result to check that it's not a TrezorFailure exception
+    device_handler.result()
+
     features = device_handler.features()
     assert features.initialized is True
     assert features.backup_availability == messages.BackupAvailability.NotAvailable

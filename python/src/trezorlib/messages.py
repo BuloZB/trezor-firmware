@@ -28,6 +28,378 @@ class BinanceTimeInForce(IntEnum):
     IOC = 3
 
 
+class FailureType(IntEnum):
+    UnexpectedMessage = 1
+    ButtonExpected = 2
+    DataError = 3
+    ActionCancelled = 4
+    PinExpected = 5
+    PinCancelled = 6
+    PinInvalid = 7
+    InvalidSignature = 8
+    ProcessError = 9
+    NotEnoughFunds = 10
+    NotInitialized = 11
+    PinMismatch = 12
+    WipeCodeMismatch = 13
+    InvalidSession = 14
+    FirmwareError = 99
+
+
+class ButtonRequestType(IntEnum):
+    Other = 1
+    FeeOverThreshold = 2
+    ConfirmOutput = 3
+    ResetDevice = 4
+    ConfirmWord = 5
+    WipeDevice = 6
+    ProtectCall = 7
+    SignTx = 8
+    FirmwareCheck = 9
+    Address = 10
+    PublicKey = 11
+    MnemonicWordCount = 12
+    MnemonicInput = 13
+    _Deprecated_ButtonRequest_PassphraseType = 14
+    UnknownDerivationPath = 15
+    RecoveryHomepage = 16
+    Success = 17
+    Warning = 18
+    PassphraseEntry = 19
+    PinEntry = 20
+
+
+class PinMatrixRequestType(IntEnum):
+    Current = 1
+    NewFirst = 2
+    NewSecond = 3
+    WipeCodeFirst = 4
+    WipeCodeSecond = 5
+
+
+class InputScriptType(IntEnum):
+    SPENDADDRESS = 0
+    SPENDMULTISIG = 1
+    EXTERNAL = 2
+    SPENDWITNESS = 3
+    SPENDP2SHWITNESS = 4
+    SPENDTAPROOT = 5
+
+
+class OutputScriptType(IntEnum):
+    PAYTOADDRESS = 0
+    PAYTOSCRIPTHASH = 1
+    PAYTOMULTISIG = 2
+    PAYTOOPRETURN = 3
+    PAYTOWITNESS = 4
+    PAYTOP2SHWITNESS = 5
+    PAYTOTAPROOT = 6
+
+
+class DecredStakingSpendType(IntEnum):
+    SSGen = 0
+    SSRTX = 1
+
+
+class AmountUnit(IntEnum):
+    BITCOIN = 0
+    MILLIBITCOIN = 1
+    MICROBITCOIN = 2
+    SATOSHI = 3
+
+
+class MultisigPubkeysOrder(IntEnum):
+    PRESERVED = 0
+    LEXICOGRAPHIC = 1
+
+
+class RequestType(IntEnum):
+    TXINPUT = 0
+    TXOUTPUT = 1
+    TXMETA = 2
+    TXFINISHED = 3
+    TXEXTRADATA = 4
+    TXORIGINPUT = 5
+    TXORIGOUTPUT = 6
+    TXPAYMENTREQ = 7
+
+
+class CardanoDerivationType(IntEnum):
+    LEDGER = 0
+    ICARUS = 1
+    ICARUS_TREZOR = 2
+
+
+class CardanoAddressType(IntEnum):
+    BASE = 0
+    BASE_SCRIPT_KEY = 1
+    BASE_KEY_SCRIPT = 2
+    BASE_SCRIPT_SCRIPT = 3
+    POINTER = 4
+    POINTER_SCRIPT = 5
+    ENTERPRISE = 6
+    ENTERPRISE_SCRIPT = 7
+    BYRON = 8
+    REWARD = 14
+    REWARD_SCRIPT = 15
+
+
+class CardanoNativeScriptType(IntEnum):
+    PUB_KEY = 0
+    ALL = 1
+    ANY = 2
+    N_OF_K = 3
+    INVALID_BEFORE = 4
+    INVALID_HEREAFTER = 5
+
+
+class CardanoNativeScriptHashDisplayFormat(IntEnum):
+    HIDE = 0
+    BECH32 = 1
+    POLICY_ID = 2
+
+
+class CardanoTxOutputSerializationFormat(IntEnum):
+    ARRAY_LEGACY = 0
+    MAP_BABBAGE = 1
+
+
+class CardanoCertificateType(IntEnum):
+    STAKE_REGISTRATION = 0
+    STAKE_DEREGISTRATION = 1
+    STAKE_DELEGATION = 2
+    STAKE_POOL_REGISTRATION = 3
+    STAKE_REGISTRATION_CONWAY = 7
+    STAKE_DEREGISTRATION_CONWAY = 8
+    VOTE_DELEGATION = 9
+
+
+class CardanoDRepType(IntEnum):
+    KEY_HASH = 0
+    SCRIPT_HASH = 1
+    ABSTAIN = 2
+    NO_CONFIDENCE = 3
+
+
+class CardanoPoolRelayType(IntEnum):
+    SINGLE_HOST_IP = 0
+    SINGLE_HOST_NAME = 1
+    MULTIPLE_HOST_NAME = 2
+
+
+class CardanoTxAuxiliaryDataSupplementType(IntEnum):
+    NONE = 0
+    CVOTE_REGISTRATION_SIGNATURE = 1
+
+
+class CardanoCVoteRegistrationFormat(IntEnum):
+    CIP15 = 0
+    CIP36 = 1
+
+
+class CardanoTxSigningMode(IntEnum):
+    ORDINARY_TRANSACTION = 0
+    POOL_REGISTRATION_AS_OWNER = 1
+    MULTISIG_TRANSACTION = 2
+    PLUTUS_TRANSACTION = 3
+
+
+class CardanoTxWitnessType(IntEnum):
+    BYRON_WITNESS = 0
+    SHELLEY_WITNESS = 1
+
+
+class BackupType(IntEnum):
+    Bip39 = 0
+    Slip39_Basic = 1
+    Slip39_Advanced = 2
+    Slip39_Single_Extendable = 3
+    Slip39_Basic_Extendable = 4
+    Slip39_Advanced_Extendable = 5
+
+
+class SafetyCheckLevel(IntEnum):
+    Strict = 0
+    PromptAlways = 1
+    PromptTemporarily = 2
+
+
+class DisplayRotation(IntEnum):
+    North = 0
+    East = 90
+    South = 180
+    West = 270
+
+
+class HomescreenFormat(IntEnum):
+    Toif = 1
+    Jpeg = 2
+    ToiG = 3
+
+
+class RecoveryType(IntEnum):
+    NormalRecovery = 0
+    DryRun = 1
+    UnlockRepeatedBackup = 2
+
+
+class BackupAvailability(IntEnum):
+    NotAvailable = 0
+    Required = 1
+    Available = 2
+
+
+class RecoveryStatus(IntEnum):
+    Nothing = 0
+    Recovery = 1
+    Backup = 2
+
+
+class Capability(IntEnum):
+    Bitcoin = 1
+    Bitcoin_like = 2
+    Binance = 3
+    Cardano = 4
+    Crypto = 5
+    EOS = 6
+    Ethereum = 7
+    Lisk = 8
+    Monero = 9
+    NEM = 10
+    Ripple = 11
+    Stellar = 12
+    Tezos = 13
+    U2F = 14
+    Shamir = 15
+    ShamirGroups = 16
+    PassphraseEntry = 17
+    Solana = 18
+    Translations = 19
+    Brightness = 20
+    Haptic = 21
+
+
+class SdProtectOperationType(IntEnum):
+    DISABLE = 0
+    ENABLE = 1
+    REFRESH = 2
+
+
+class RecoveryDeviceInputMethod(IntEnum):
+    ScrambledWords = 0
+    Matrix = 1
+
+
+class WordRequestType(IntEnum):
+    Plain = 0
+    Matrix9 = 1
+    Matrix6 = 2
+
+
+class BootCommand(IntEnum):
+    STOP_AND_WAIT = 0
+    INSTALL_UPGRADE = 1
+
+
+class DebugSwipeDirection(IntEnum):
+    UP = 0
+    DOWN = 1
+    LEFT = 2
+    RIGHT = 3
+
+
+class DebugButton(IntEnum):
+    NO = 0
+    YES = 1
+    INFO = 2
+
+
+class DebugPhysicalButton(IntEnum):
+    LEFT_BTN = 0
+    MIDDLE_BTN = 1
+    RIGHT_BTN = 2
+
+
+class DebugWaitType(IntEnum):
+    IMMEDIATE = 0
+    NEXT_LAYOUT = 1
+    CURRENT_LAYOUT = 2
+
+
+class EthereumDefinitionType(IntEnum):
+    NETWORK = 0
+    TOKEN = 1
+
+
+class EthereumDataType(IntEnum):
+    UINT = 1
+    INT = 2
+    BYTES = 3
+    STRING = 4
+    BOOL = 5
+    ADDRESS = 6
+    ARRAY = 7
+    STRUCT = 8
+
+
+class MoneroNetworkType(IntEnum):
+    MAINNET = 0
+    TESTNET = 1
+    STAGENET = 2
+    FAKECHAIN = 3
+
+
+class NEMMosaicLevy(IntEnum):
+    MosaicLevy_Absolute = 1
+    MosaicLevy_Percentile = 2
+
+
+class NEMSupplyChangeType(IntEnum):
+    SupplyChange_Increase = 1
+    SupplyChange_Decrease = 2
+
+
+class NEMModificationType(IntEnum):
+    CosignatoryModification_Add = 1
+    CosignatoryModification_Delete = 2
+
+
+class NEMImportanceTransferMode(IntEnum):
+    ImportanceTransfer_Activate = 1
+    ImportanceTransfer_Deactivate = 2
+
+
+class StellarAssetType(IntEnum):
+    NATIVE = 0
+    ALPHANUM4 = 1
+    ALPHANUM12 = 2
+
+
+class StellarMemoType(IntEnum):
+    NONE = 0
+    TEXT = 1
+    ID = 2
+    HASH = 3
+    RETURN = 4
+
+
+class StellarSignerType(IntEnum):
+    ACCOUNT = 0
+    PRE_AUTH = 1
+    HASH = 2
+
+
+class TezosContractType(IntEnum):
+    Implicit = 0
+    Originated = 1
+
+
+class TezosBallotType(IntEnum):
+    Yay = 0
+    Nay = 1
+    Pass = 2
+
+
 class MessageType(IntEnum):
     Initialize = 0
     Ping = 1
@@ -54,6 +426,8 @@ class MessageType(IntEnum):
     BackupDevice = 34
     EntropyRequest = 35
     EntropyAck = 36
+    EntropyCheckReady = 994
+    EntropyCheckContinue = 995
     PassphraseRequest = 41
     PassphraseAck = 42
     RecoveryDevice = 45
@@ -270,364 +644,14 @@ class MessageType(IntEnum):
     SolanaAddress = 903
     SolanaSignTx = 904
     SolanaTxSignature = 905
+    NostrGetPubkey = 2001
+    NostrPubkey = 2002
+    NostrSignEvent = 2003
+    NostrEventSignature = 2004
     BenchmarkListNames = 9100
     BenchmarkNames = 9101
     BenchmarkRun = 9102
     BenchmarkResult = 9103
-
-
-class FailureType(IntEnum):
-    UnexpectedMessage = 1
-    ButtonExpected = 2
-    DataError = 3
-    ActionCancelled = 4
-    PinExpected = 5
-    PinCancelled = 6
-    PinInvalid = 7
-    InvalidSignature = 8
-    ProcessError = 9
-    NotEnoughFunds = 10
-    NotInitialized = 11
-    PinMismatch = 12
-    WipeCodeMismatch = 13
-    InvalidSession = 14
-    FirmwareError = 99
-
-
-class ButtonRequestType(IntEnum):
-    Other = 1
-    FeeOverThreshold = 2
-    ConfirmOutput = 3
-    ResetDevice = 4
-    ConfirmWord = 5
-    WipeDevice = 6
-    ProtectCall = 7
-    SignTx = 8
-    FirmwareCheck = 9
-    Address = 10
-    PublicKey = 11
-    MnemonicWordCount = 12
-    MnemonicInput = 13
-    _Deprecated_ButtonRequest_PassphraseType = 14
-    UnknownDerivationPath = 15
-    RecoveryHomepage = 16
-    Success = 17
-    Warning = 18
-    PassphraseEntry = 19
-    PinEntry = 20
-
-
-class PinMatrixRequestType(IntEnum):
-    Current = 1
-    NewFirst = 2
-    NewSecond = 3
-    WipeCodeFirst = 4
-    WipeCodeSecond = 5
-
-
-class InputScriptType(IntEnum):
-    SPENDADDRESS = 0
-    SPENDMULTISIG = 1
-    EXTERNAL = 2
-    SPENDWITNESS = 3
-    SPENDP2SHWITNESS = 4
-    SPENDTAPROOT = 5
-
-
-class OutputScriptType(IntEnum):
-    PAYTOADDRESS = 0
-    PAYTOSCRIPTHASH = 1
-    PAYTOMULTISIG = 2
-    PAYTOOPRETURN = 3
-    PAYTOWITNESS = 4
-    PAYTOP2SHWITNESS = 5
-    PAYTOTAPROOT = 6
-
-
-class DecredStakingSpendType(IntEnum):
-    SSGen = 0
-    SSRTX = 1
-
-
-class AmountUnit(IntEnum):
-    BITCOIN = 0
-    MILLIBITCOIN = 1
-    MICROBITCOIN = 2
-    SATOSHI = 3
-
-
-class RequestType(IntEnum):
-    TXINPUT = 0
-    TXOUTPUT = 1
-    TXMETA = 2
-    TXFINISHED = 3
-    TXEXTRADATA = 4
-    TXORIGINPUT = 5
-    TXORIGOUTPUT = 6
-    TXPAYMENTREQ = 7
-
-
-class CardanoDerivationType(IntEnum):
-    LEDGER = 0
-    ICARUS = 1
-    ICARUS_TREZOR = 2
-
-
-class CardanoAddressType(IntEnum):
-    BASE = 0
-    BASE_SCRIPT_KEY = 1
-    BASE_KEY_SCRIPT = 2
-    BASE_SCRIPT_SCRIPT = 3
-    POINTER = 4
-    POINTER_SCRIPT = 5
-    ENTERPRISE = 6
-    ENTERPRISE_SCRIPT = 7
-    BYRON = 8
-    REWARD = 14
-    REWARD_SCRIPT = 15
-
-
-class CardanoNativeScriptType(IntEnum):
-    PUB_KEY = 0
-    ALL = 1
-    ANY = 2
-    N_OF_K = 3
-    INVALID_BEFORE = 4
-    INVALID_HEREAFTER = 5
-
-
-class CardanoNativeScriptHashDisplayFormat(IntEnum):
-    HIDE = 0
-    BECH32 = 1
-    POLICY_ID = 2
-
-
-class CardanoTxOutputSerializationFormat(IntEnum):
-    ARRAY_LEGACY = 0
-    MAP_BABBAGE = 1
-
-
-class CardanoCertificateType(IntEnum):
-    STAKE_REGISTRATION = 0
-    STAKE_DEREGISTRATION = 1
-    STAKE_DELEGATION = 2
-    STAKE_POOL_REGISTRATION = 3
-    STAKE_REGISTRATION_CONWAY = 7
-    STAKE_DEREGISTRATION_CONWAY = 8
-    VOTE_DELEGATION = 9
-
-
-class CardanoDRepType(IntEnum):
-    KEY_HASH = 0
-    SCRIPT_HASH = 1
-    ABSTAIN = 2
-    NO_CONFIDENCE = 3
-
-
-class CardanoPoolRelayType(IntEnum):
-    SINGLE_HOST_IP = 0
-    SINGLE_HOST_NAME = 1
-    MULTIPLE_HOST_NAME = 2
-
-
-class CardanoTxAuxiliaryDataSupplementType(IntEnum):
-    NONE = 0
-    CVOTE_REGISTRATION_SIGNATURE = 1
-
-
-class CardanoCVoteRegistrationFormat(IntEnum):
-    CIP15 = 0
-    CIP36 = 1
-
-
-class CardanoTxSigningMode(IntEnum):
-    ORDINARY_TRANSACTION = 0
-    POOL_REGISTRATION_AS_OWNER = 1
-    MULTISIG_TRANSACTION = 2
-    PLUTUS_TRANSACTION = 3
-
-
-class CardanoTxWitnessType(IntEnum):
-    BYRON_WITNESS = 0
-    SHELLEY_WITNESS = 1
-
-
-class BackupType(IntEnum):
-    Bip39 = 0
-    Slip39_Basic = 1
-    Slip39_Advanced = 2
-    Slip39_Single_Extendable = 3
-    Slip39_Basic_Extendable = 4
-    Slip39_Advanced_Extendable = 5
-
-
-class SafetyCheckLevel(IntEnum):
-    Strict = 0
-    PromptAlways = 1
-    PromptTemporarily = 2
-
-
-class HomescreenFormat(IntEnum):
-    Toif = 1
-    Jpeg = 2
-    ToiG = 3
-
-
-class RecoveryType(IntEnum):
-    NormalRecovery = 0
-    DryRun = 1
-    UnlockRepeatedBackup = 2
-
-
-class BackupAvailability(IntEnum):
-    NotAvailable = 0
-    Required = 1
-    Available = 2
-
-
-class RecoveryStatus(IntEnum):
-    Nothing = 0
-    Recovery = 1
-    Backup = 2
-
-
-class Capability(IntEnum):
-    Bitcoin = 1
-    Bitcoin_like = 2
-    Binance = 3
-    Cardano = 4
-    Crypto = 5
-    EOS = 6
-    Ethereum = 7
-    Lisk = 8
-    Monero = 9
-    NEM = 10
-    Ripple = 11
-    Stellar = 12
-    Tezos = 13
-    U2F = 14
-    Shamir = 15
-    ShamirGroups = 16
-    PassphraseEntry = 17
-    Solana = 18
-    Translations = 19
-    Brightness = 20
-    Haptic = 21
-
-
-class SdProtectOperationType(IntEnum):
-    DISABLE = 0
-    ENABLE = 1
-    REFRESH = 2
-
-
-class RecoveryDeviceInputMethod(IntEnum):
-    ScrambledWords = 0
-    Matrix = 1
-
-
-class WordRequestType(IntEnum):
-    Plain = 0
-    Matrix9 = 1
-    Matrix6 = 2
-
-
-class BootCommand(IntEnum):
-    STOP_AND_WAIT = 0
-    INSTALL_UPGRADE = 1
-
-
-class DebugSwipeDirection(IntEnum):
-    UP = 0
-    DOWN = 1
-    LEFT = 2
-    RIGHT = 3
-
-
-class DebugButton(IntEnum):
-    NO = 0
-    YES = 1
-    INFO = 2
-
-
-class DebugPhysicalButton(IntEnum):
-    LEFT_BTN = 0
-    MIDDLE_BTN = 1
-    RIGHT_BTN = 2
-
-
-class EthereumDefinitionType(IntEnum):
-    NETWORK = 0
-    TOKEN = 1
-
-
-class EthereumDataType(IntEnum):
-    UINT = 1
-    INT = 2
-    BYTES = 3
-    STRING = 4
-    BOOL = 5
-    ADDRESS = 6
-    ARRAY = 7
-    STRUCT = 8
-
-
-class MoneroNetworkType(IntEnum):
-    MAINNET = 0
-    TESTNET = 1
-    STAGENET = 2
-    FAKECHAIN = 3
-
-
-class NEMMosaicLevy(IntEnum):
-    MosaicLevy_Absolute = 1
-    MosaicLevy_Percentile = 2
-
-
-class NEMSupplyChangeType(IntEnum):
-    SupplyChange_Increase = 1
-    SupplyChange_Decrease = 2
-
-
-class NEMModificationType(IntEnum):
-    CosignatoryModification_Add = 1
-    CosignatoryModification_Delete = 2
-
-
-class NEMImportanceTransferMode(IntEnum):
-    ImportanceTransfer_Activate = 1
-    ImportanceTransfer_Deactivate = 2
-
-
-class StellarAssetType(IntEnum):
-    NATIVE = 0
-    ALPHANUM4 = 1
-    ALPHANUM12 = 2
-
-
-class StellarMemoType(IntEnum):
-    NONE = 0
-    TEXT = 1
-    ID = 2
-    HASH = 3
-    RETURN = 4
-
-
-class StellarSignerType(IntEnum):
-    ACCOUNT = 0
-    PRE_AUTH = 1
-    HASH = 2
-
-
-class TezosContractType(IntEnum):
-    Implicit = 0
-    Originated = 1
-
-
-class TezosBallotType(IntEnum):
-    Yay = 0
-    Nay = 1
-    Pass = 2
 
 
 class BenchmarkListNames(protobuf.MessageType):
@@ -1081,6 +1105,7 @@ class MultisigRedeemScriptType(protobuf.MessageType):
         3: protobuf.Field("m", "uint32", repeated=False, required=True),
         4: protobuf.Field("nodes", "HDNodeType", repeated=True, required=False, default=None),
         5: protobuf.Field("address_n", "uint32", repeated=True, required=False, default=None),
+        6: protobuf.Field("pubkeys_order", "MultisigPubkeysOrder", repeated=False, required=False, default=MultisigPubkeysOrder.PRESERVED),
     }
 
     def __init__(
@@ -1091,12 +1116,14 @@ class MultisigRedeemScriptType(protobuf.MessageType):
         signatures: Optional[Sequence["bytes"]] = None,
         nodes: Optional[Sequence["HDNodeType"]] = None,
         address_n: Optional[Sequence["int"]] = None,
+        pubkeys_order: Optional["MultisigPubkeysOrder"] = MultisigPubkeysOrder.PRESERVED,
     ) -> None:
         self.pubkeys: Sequence["HDNodePathType"] = pubkeys if pubkeys is not None else []
         self.signatures: Sequence["bytes"] = signatures if signatures is not None else []
         self.nodes: Sequence["HDNodeType"] = nodes if nodes is not None else []
         self.address_n: Sequence["int"] = address_n if address_n is not None else []
         self.m = m
+        self.pubkeys_order = pubkeys_order
 
 
 class GetPublicKey(protobuf.MessageType):
@@ -3251,7 +3278,7 @@ class Features(protobuf.MessageType):
         36: protobuf.Field("passphrase_always_on_device", "bool", repeated=False, required=False, default=None),
         37: protobuf.Field("safety_checks", "SafetyCheckLevel", repeated=False, required=False, default=None),
         38: protobuf.Field("auto_lock_delay_ms", "uint32", repeated=False, required=False, default=None),
-        39: protobuf.Field("display_rotation", "uint32", repeated=False, required=False, default=None),
+        39: protobuf.Field("display_rotation", "DisplayRotation", repeated=False, required=False, default=None),
         40: protobuf.Field("experimental_features", "bool", repeated=False, required=False, default=None),
         41: protobuf.Field("busy", "bool", repeated=False, required=False, default=None),
         42: protobuf.Field("homescreen_format", "HomescreenFormat", repeated=False, required=False, default=None),
@@ -3308,7 +3335,7 @@ class Features(protobuf.MessageType):
         passphrase_always_on_device: Optional["bool"] = None,
         safety_checks: Optional["SafetyCheckLevel"] = None,
         auto_lock_delay_ms: Optional["int"] = None,
-        display_rotation: Optional["int"] = None,
+        display_rotation: Optional["DisplayRotation"] = None,
         experimental_features: Optional["bool"] = None,
         busy: Optional["bool"] = None,
         homescreen_format: Optional["HomescreenFormat"] = None,
@@ -3410,7 +3437,7 @@ class ApplySettings(protobuf.MessageType):
         4: protobuf.Field("homescreen", "bytes", repeated=False, required=False, default=None),
         5: protobuf.Field("_passphrase_source", "uint32", repeated=False, required=False, default=None),
         6: protobuf.Field("auto_lock_delay_ms", "uint32", repeated=False, required=False, default=None),
-        7: protobuf.Field("display_rotation", "uint32", repeated=False, required=False, default=None),
+        7: protobuf.Field("display_rotation", "DisplayRotation", repeated=False, required=False, default=None),
         8: protobuf.Field("passphrase_always_on_device", "bool", repeated=False, required=False, default=None),
         9: protobuf.Field("safety_checks", "SafetyCheckLevel", repeated=False, required=False, default=None),
         10: protobuf.Field("experimental_features", "bool", repeated=False, required=False, default=None),
@@ -3427,7 +3454,7 @@ class ApplySettings(protobuf.MessageType):
         homescreen: Optional["bytes"] = None,
         _passphrase_source: Optional["int"] = None,
         auto_lock_delay_ms: Optional["int"] = None,
-        display_rotation: Optional["int"] = None,
+        display_rotation: Optional["DisplayRotation"] = None,
         passphrase_always_on_device: Optional["bool"] = None,
         safety_checks: Optional["SafetyCheckLevel"] = None,
         experimental_features: Optional["bool"] = None,
@@ -3714,6 +3741,7 @@ class ResetDevice(protobuf.MessageType):
         8: protobuf.Field("skip_backup", "bool", repeated=False, required=False, default=None),
         9: protobuf.Field("no_backup", "bool", repeated=False, required=False, default=None),
         10: protobuf.Field("backup_type", "BackupType", repeated=False, required=False, default=BackupType.Bip39),
+        11: protobuf.Field("entropy_check", "bool", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -3728,6 +3756,7 @@ class ResetDevice(protobuf.MessageType):
         skip_backup: Optional["bool"] = None,
         no_backup: Optional["bool"] = None,
         backup_type: Optional["BackupType"] = BackupType.Bip39,
+        entropy_check: Optional["bool"] = None,
     ) -> None:
         self.strength = strength
         self.passphrase_protection = passphrase_protection
@@ -3738,6 +3767,7 @@ class ResetDevice(protobuf.MessageType):
         self.skip_backup = skip_backup
         self.no_backup = no_backup
         self.backup_type = backup_type
+        self.entropy_check = entropy_check
 
 
 class BackupDevice(protobuf.MessageType):
@@ -3759,6 +3789,19 @@ class BackupDevice(protobuf.MessageType):
 
 class EntropyRequest(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 35
+    FIELDS = {
+        1: protobuf.Field("entropy_commitment", "bytes", repeated=False, required=False, default=None),
+        2: protobuf.Field("prev_entropy", "bytes", repeated=False, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        entropy_commitment: Optional["bytes"] = None,
+        prev_entropy: Optional["bytes"] = None,
+    ) -> None:
+        self.entropy_commitment = entropy_commitment
+        self.prev_entropy = prev_entropy
 
 
 class EntropyAck(protobuf.MessageType):
@@ -3773,6 +3816,24 @@ class EntropyAck(protobuf.MessageType):
         entropy: "bytes",
     ) -> None:
         self.entropy = entropy
+
+
+class EntropyCheckReady(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 994
+
+
+class EntropyCheckContinue(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 995
+    FIELDS = {
+        1: protobuf.Field("finish", "bool", repeated=False, required=False, default=False),
+    }
+
+    def __init__(
+        self,
+        *,
+        finish: Optional["bool"] = False,
+    ) -> None:
+        self.finish = finish
 
 
 class RecoveryDevice(protobuf.MessageType):
@@ -3943,13 +4004,13 @@ class UnlockPath(protobuf.MessageType):
 class UnlockedPathRequest(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 94
     FIELDS = {
-        1: protobuf.Field("mac", "bytes", repeated=False, required=False, default=None),
+        1: protobuf.Field("mac", "bytes", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        mac: Optional["bytes"] = None,
+        mac: "bytes",
     ) -> None:
         self.mac = mac
 
@@ -4078,7 +4139,8 @@ class DebugLinkGetState(protobuf.MessageType):
     FIELDS = {
         1: protobuf.Field("wait_word_list", "bool", repeated=False, required=False, default=None),
         2: protobuf.Field("wait_word_pos", "bool", repeated=False, required=False, default=None),
-        3: protobuf.Field("wait_layout", "bool", repeated=False, required=False, default=None),
+        3: protobuf.Field("wait_layout", "DebugWaitType", repeated=False, required=False, default=DebugWaitType.IMMEDIATE),
+        4: protobuf.Field("return_empty_state", "bool", repeated=False, required=False, default=False),
     }
 
     def __init__(
@@ -4086,11 +4148,13 @@ class DebugLinkGetState(protobuf.MessageType):
         *,
         wait_word_list: Optional["bool"] = None,
         wait_word_pos: Optional["bool"] = None,
-        wait_layout: Optional["bool"] = None,
+        wait_layout: Optional["DebugWaitType"] = DebugWaitType.IMMEDIATE,
+        return_empty_state: Optional["bool"] = False,
     ) -> None:
         self.wait_word_list = wait_word_list
         self.wait_word_pos = wait_word_pos
         self.wait_layout = wait_layout
+        self.return_empty_state = return_empty_state
 
 
 class DebugLinkState(protobuf.MessageType):
@@ -5511,13 +5575,13 @@ class MoneroGetAddress(protobuf.MessageType):
 class MoneroAddress(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 541
     FIELDS = {
-        1: protobuf.Field("address", "bytes", repeated=False, required=False, default=None),
+        1: protobuf.Field("address", "bytes", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        address: Optional["bytes"] = None,
+        address: "bytes",
     ) -> None:
         self.address = address
 
@@ -5542,15 +5606,15 @@ class MoneroGetWatchKey(protobuf.MessageType):
 class MoneroWatchKey(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 543
     FIELDS = {
-        1: protobuf.Field("watch_key", "bytes", repeated=False, required=False, default=None),
-        2: protobuf.Field("address", "bytes", repeated=False, required=False, default=None),
+        1: protobuf.Field("watch_key", "bytes", repeated=False, required=True),
+        2: protobuf.Field("address", "bytes", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        watch_key: Optional["bytes"] = None,
-        address: Optional["bytes"] = None,
+        watch_key: "bytes",
+        address: "bytes",
     ) -> None:
         self.watch_key = watch_key
         self.address = address
@@ -6713,6 +6777,100 @@ class NEMCosignatoryModification(protobuf.MessageType):
     ) -> None:
         self.type = type
         self.public_key = public_key
+
+
+class NostrGetPubkey(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2001
+    FIELDS = {
+        1: protobuf.Field("address_n", "uint32", repeated=True, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        address_n: Optional[Sequence["int"]] = None,
+    ) -> None:
+        self.address_n: Sequence["int"] = address_n if address_n is not None else []
+
+
+class NostrPubkey(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2002
+    FIELDS = {
+        1: protobuf.Field("pubkey", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        pubkey: "bytes",
+    ) -> None:
+        self.pubkey = pubkey
+
+
+class NostrTag(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = None
+    FIELDS = {
+        1: protobuf.Field("key", "string", repeated=False, required=True),
+        2: protobuf.Field("value", "string", repeated=False, required=False, default=None),
+        3: protobuf.Field("extra", "string", repeated=True, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        key: "str",
+        extra: Optional[Sequence["str"]] = None,
+        value: Optional["str"] = None,
+    ) -> None:
+        self.extra: Sequence["str"] = extra if extra is not None else []
+        self.key = key
+        self.value = value
+
+
+class NostrSignEvent(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2003
+    FIELDS = {
+        1: protobuf.Field("address_n", "uint32", repeated=True, required=False, default=None),
+        2: protobuf.Field("created_at", "uint32", repeated=False, required=True),
+        3: protobuf.Field("kind", "uint32", repeated=False, required=True),
+        4: protobuf.Field("tags", "NostrTag", repeated=True, required=False, default=None),
+        5: protobuf.Field("content", "string", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        created_at: "int",
+        kind: "int",
+        content: "str",
+        address_n: Optional[Sequence["int"]] = None,
+        tags: Optional[Sequence["NostrTag"]] = None,
+    ) -> None:
+        self.address_n: Sequence["int"] = address_n if address_n is not None else []
+        self.tags: Sequence["NostrTag"] = tags if tags is not None else []
+        self.created_at = created_at
+        self.kind = kind
+        self.content = content
+
+
+class NostrEventSignature(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2004
+    FIELDS = {
+        1: protobuf.Field("pubkey", "bytes", repeated=False, required=True),
+        2: protobuf.Field("id", "bytes", repeated=False, required=True),
+        3: protobuf.Field("signature", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        pubkey: "bytes",
+        id: "bytes",
+        signature: "bytes",
+    ) -> None:
+        self.pubkey = pubkey
+        self.id = id
+        self.signature = signature
 
 
 class RippleGetAddress(protobuf.MessageType):

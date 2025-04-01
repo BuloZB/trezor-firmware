@@ -1,8 +1,6 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from trezorio import WireInterface
-
     from trezor.wire import Handler, Msg
 
 
@@ -30,6 +28,12 @@ def _find_message_handler_module(msg_type: int) -> str:
     # debug
     if __debug__ and msg_type == MessageType.LoadDevice:
         return "apps.debug.load_device"
+
+    # benchmark
+    if __debug__ and msg_type == MessageType.BenchmarkListNames:
+        return "apps.benchmark.list_names"
+    if __debug__ and msg_type == MessageType.BenchmarkRun:
+        return "apps.benchmark.run"
 
     # management
     if msg_type == MessageType.ResetDevice:
@@ -103,6 +107,16 @@ def _find_message_handler_module(msg_type: int) -> str:
         return "apps.misc.get_firmware_hash"
 
     if not utils.BITCOIN_ONLY:
+        # When promoting the Nostr app to production-level
+        # and removing the "if" guard don't forget to also remove
+        # the corresponding guards (PYOPT == '0') in Sconscript.*
+        if __debug__:
+            # nostr
+            if msg_type == MessageType.NostrGetPubkey:
+                return "apps.nostr.get_pubkey"
+            if msg_type == MessageType.NostrSignEvent:
+                return "apps.nostr.sign_event"
+
         if msg_type == MessageType.SetU2FCounter:
             return "apps.management.set_u2f_counter"
         if msg_type == MessageType.GetNextU2FCounter:
@@ -206,16 +220,10 @@ def _find_message_handler_module(msg_type: int) -> str:
         if msg_type == MessageType.SolanaSignTx:
             return "apps.solana.sign_tx"
 
-        # benchmark
-        if __debug__ and msg_type == MessageType.BenchmarkListNames:
-            return "apps.benchmark.list_names"
-        if __debug__ and msg_type == MessageType.BenchmarkRun:
-            return "apps.benchmark.run"
-
     raise ValueError
 
 
-def find_registered_handler(iface: WireInterface, msg_type: int) -> Handler | None:
+def find_registered_handler(msg_type: int) -> Handler | None:
     if msg_type in workflow_handlers:
         # Message has a handler available, return it directly.
         return workflow_handlers[msg_type]

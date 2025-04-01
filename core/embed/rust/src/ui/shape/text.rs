@@ -28,13 +28,13 @@ pub struct Text<'a> {
 impl<'a> Text<'a> {
     /// Creates a `shape::Text` structure with a specified
     /// text (`str`) and the bottom-left corner (`pos`).
-    pub fn new(pos: Point, text: &'a str) -> Self {
+    pub fn new(pos: Point, text: &'a str, font: Font) -> Self {
         Self {
             pos,
             text,
             color: Color::white(),
             alpha: 255,
-            font: Font::NORMAL,
+            font,
             align: Alignment::Start,
             bounds: Rect::zero(),
         }
@@ -42,10 +42,6 @@ impl<'a> Text<'a> {
 
     pub fn with_fg(self, color: Color) -> Self {
         Self { color, ..self }
-    }
-
-    pub fn with_font(self, font: Font) -> Self {
-        Self { font, ..self }
     }
 
     pub fn with_align(self, align: Alignment) -> Self {
@@ -97,24 +93,26 @@ impl<'a> Shape<'_> for Text<'a> {
 
         // TODO: optimize  text clipping, use canvas.viewport()
 
-        for ch in self.text.chars() {
-            if r.x0 >= r.x1 {
-                break;
+        self.font.with_glyph_data(|glyph_data| {
+            for ch in self.text.chars() {
+                if r.x0 >= r.x1 {
+                    break;
+                }
+
+                let glyph = glyph_data.get_glyph(ch);
+                let glyph_bitmap = glyph.bitmap();
+                let glyph_view = BitmapView::new(&glyph_bitmap)
+                    .with_alpha(self.alpha)
+                    .with_fg(self.color)
+                    .with_offset(Offset::new(
+                        -glyph.bearing_x,
+                        -(max_ascent - glyph.bearing_y),
+                    ));
+
+                canvas.blend_bitmap(r, glyph_view);
+                r.x0 += glyph.adv;
             }
-
-            let glyph = self.font.get_glyph(ch);
-            let glyph_bitmap = glyph.bitmap();
-            let glyph_view = BitmapView::new(&glyph_bitmap)
-                .with_alpha(self.alpha)
-                .with_fg(self.color)
-                .with_offset(Offset::new(
-                    -glyph.bearing_x,
-                    -(max_ascent - glyph.bearing_y),
-                ));
-
-            canvas.blend_bitmap(r, glyph_view);
-            r.x0 += glyph.adv;
-        }
+        });
     }
 }
 

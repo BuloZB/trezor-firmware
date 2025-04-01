@@ -33,13 +33,17 @@ pytestmark = [
 
 def show_details_input_flow(client: Client):
     yield
-    client.debug.wait_layout()
-    # Touch screen click vs pressing right for T2B1
-    if client.layout_type in (LayoutType.TT, LayoutType.Mercury):
+    client.debug.read_layout()
+    if client.layout_type is LayoutType.Bolt:
         SHOW_ALL_BUTTON_POSITION = (143, 167)
         client.debug.click(SHOW_ALL_BUTTON_POSITION)
-    elif client.layout_type is LayoutType.TR:
+    elif client.layout_type is LayoutType.Caesar:
+        # Caesar - right button for "Show all"
         client.debug.press_yes()
+    elif client.layout_type is LayoutType.Delizia:
+        # Delizia - "Show all" button from context menu
+        client.debug.click(client.debug.screen_buttons.menu())
+        client.debug.click(client.debug.screen_buttons.vertical_menu_items()[0])
     else:
         raise NotImplementedError
     # reset ui flow to continue "automatically"
@@ -63,7 +67,6 @@ def test_cardano_sign_tx(client: Client, parameters, result):
     assert response == _transform_expected_result(result)
 
 
-@pytest.mark.models(skip="mercury", reason="Not yet implemented in new UI")
 @parametrize_using_common_fixtures("cardano/sign_tx.show_details.json")
 def test_cardano_sign_tx_show_details(client: Client, parameters, result):
     response = call_sign_tx(client, parameters, show_details_input_flow, chunkify=True)

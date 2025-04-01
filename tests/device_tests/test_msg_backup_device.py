@@ -27,6 +27,7 @@ from ..common import (
     MNEMONIC12,
     MNEMONIC_SLIP39_ADVANCED_20,
     MNEMONIC_SLIP39_CUSTOM_SECRET,
+    MNEMONIC_SLIP39_SINGLE_EXT_20,
     MNEMONIC_SLIP39_BASIC_20_3of6,
     MNEMONIC_SLIP39_CUSTOM_1of1,
 )
@@ -65,7 +66,7 @@ def test_backup_bip39(client: Client):
     "click_info", [True, False], ids=["click_info", "no_click_info"]
 )
 def test_backup_slip39_basic(client: Client, click_info: bool):
-    if click_info and client.layout_type is LayoutType.TR:
+    if click_info and client.layout_type is LayoutType.Caesar:
         pytest.skip("click_info not implemented on T2B1")
 
     assert client.features.backup_availability == messages.BackupAvailability.Required
@@ -90,12 +91,38 @@ def test_backup_slip39_basic(client: Client, click_info: bool):
 
 
 @pytest.mark.models("core")
+@pytest.mark.setup_client(needs_backup=True, mnemonic=MNEMONIC_SLIP39_SINGLE_EXT_20)
+def test_backup_slip39_single(client: Client):
+    assert client.features.backup_availability == messages.BackupAvailability.Required
+
+    with client:
+        IF = InputFlowBip39Backup(
+            client, confirm_success=(client.layout_type is not LayoutType.Delizia)
+        )
+        client.set_input_flow(IF.get())
+        device.backup(client)
+
+    client.init_device()
+    assert client.features.initialized is True
+    assert (
+        client.features.backup_availability == messages.BackupAvailability.NotAvailable
+    )
+
+    assert client.features.unfinished_backup is False
+    assert client.features.no_backup is False
+    assert client.features.backup_type is messages.BackupType.Slip39_Single_Extendable
+    assert shamir.combine_mnemonics([IF.mnemonic]) == shamir.combine_mnemonics(
+        MNEMONIC_SLIP39_SINGLE_EXT_20
+    )
+
+
+@pytest.mark.models("core")
 @pytest.mark.setup_client(needs_backup=True, mnemonic=MNEMONIC_SLIP39_ADVANCED_20)
 @pytest.mark.parametrize(
     "click_info", [True, False], ids=["click_info", "no_click_info"]
 )
 def test_backup_slip39_advanced(client: Client, click_info: bool):
-    if click_info and client.layout_type is LayoutType.TR:
+    if click_info and client.layout_type is LayoutType.Caesar:
         pytest.skip("click_info not implemented on T2B1")
 
     assert client.features.backup_availability == messages.BackupAvailability.Required

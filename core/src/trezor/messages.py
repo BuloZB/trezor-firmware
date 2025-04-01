@@ -40,7 +40,9 @@ if TYPE_CHECKING:
     from trezor.enums import DebugButton  # noqa: F401
     from trezor.enums import DebugPhysicalButton  # noqa: F401
     from trezor.enums import DebugSwipeDirection  # noqa: F401
+    from trezor.enums import DebugWaitType  # noqa: F401
     from trezor.enums import DecredStakingSpendType  # noqa: F401
+    from trezor.enums import DisplayRotation  # noqa: F401
     from trezor.enums import EthereumDataType  # noqa: F401
     from trezor.enums import EthereumDefinitionType  # noqa: F401
     from trezor.enums import FailureType  # noqa: F401
@@ -48,6 +50,7 @@ if TYPE_CHECKING:
     from trezor.enums import InputScriptType  # noqa: F401
     from trezor.enums import MessageType  # noqa: F401
     from trezor.enums import MoneroNetworkType  # noqa: F401
+    from trezor.enums import MultisigPubkeysOrder  # noqa: F401
     from trezor.enums import NEMImportanceTransferMode  # noqa: F401
     from trezor.enums import NEMModificationType  # noqa: F401
     from trezor.enums import NEMMosaicLevy  # noqa: F401
@@ -459,6 +462,7 @@ if TYPE_CHECKING:
         m: "int"
         nodes: "list[HDNodeType]"
         address_n: "list[int]"
+        pubkeys_order: "MultisigPubkeysOrder"
 
         def __init__(
             self,
@@ -468,6 +472,7 @@ if TYPE_CHECKING:
             signatures: "list[bytes] | None" = None,
             nodes: "list[HDNodeType] | None" = None,
             address_n: "list[int] | None" = None,
+            pubkeys_order: "MultisigPubkeysOrder | None" = None,
         ) -> None:
             pass
 
@@ -2141,7 +2146,7 @@ if TYPE_CHECKING:
         passphrase_always_on_device: "bool | None"
         safety_checks: "SafetyCheckLevel | None"
         auto_lock_delay_ms: "int | None"
-        display_rotation: "int | None"
+        display_rotation: "DisplayRotation | None"
         experimental_features: "bool | None"
         busy: "bool | None"
         homescreen_format: "HomescreenFormat | None"
@@ -2196,7 +2201,7 @@ if TYPE_CHECKING:
             passphrase_always_on_device: "bool | None" = None,
             safety_checks: "SafetyCheckLevel | None" = None,
             auto_lock_delay_ms: "int | None" = None,
-            display_rotation: "int | None" = None,
+            display_rotation: "DisplayRotation | None" = None,
             experimental_features: "bool | None" = None,
             busy: "bool | None" = None,
             homescreen_format: "HomescreenFormat | None" = None,
@@ -2250,7 +2255,7 @@ if TYPE_CHECKING:
         use_passphrase: "bool | None"
         homescreen: "bytes | None"
         auto_lock_delay_ms: "int | None"
-        display_rotation: "int | None"
+        display_rotation: "DisplayRotation | None"
         passphrase_always_on_device: "bool | None"
         safety_checks: "SafetyCheckLevel | None"
         experimental_features: "bool | None"
@@ -2264,7 +2269,7 @@ if TYPE_CHECKING:
             use_passphrase: "bool | None" = None,
             homescreen: "bytes | None" = None,
             auto_lock_delay_ms: "int | None" = None,
-            display_rotation: "int | None" = None,
+            display_rotation: "DisplayRotation | None" = None,
             passphrase_always_on_device: "bool | None" = None,
             safety_checks: "SafetyCheckLevel | None" = None,
             experimental_features: "bool | None" = None,
@@ -2530,6 +2535,7 @@ if TYPE_CHECKING:
         skip_backup: "bool | None"
         no_backup: "bool | None"
         backup_type: "BackupType"
+        entropy_check: "bool | None"
 
         def __init__(
             self,
@@ -2542,6 +2548,7 @@ if TYPE_CHECKING:
             skip_backup: "bool | None" = None,
             no_backup: "bool | None" = None,
             backup_type: "BackupType | None" = None,
+            entropy_check: "bool | None" = None,
         ) -> None:
             pass
 
@@ -2566,6 +2573,16 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class EntropyRequest(protobuf.MessageType):
+        entropy_commitment: "bytes | None"
+        prev_entropy: "bytes | None"
+
+        def __init__(
+            self,
+            *,
+            entropy_commitment: "bytes | None" = None,
+            prev_entropy: "bytes | None" = None,
+        ) -> None:
+            pass
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["EntropyRequest"]:
@@ -2583,6 +2600,26 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["EntropyAck"]:
+            return isinstance(msg, cls)
+
+    class EntropyCheckReady(protobuf.MessageType):
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EntropyCheckReady"]:
+            return isinstance(msg, cls)
+
+    class EntropyCheckContinue(protobuf.MessageType):
+        finish: "bool"
+
+        def __init__(
+            self,
+            *,
+            finish: "bool | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EntropyCheckContinue"]:
             return isinstance(msg, cls)
 
     class RecoveryDevice(protobuf.MessageType):
@@ -2748,12 +2785,12 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class UnlockedPathRequest(protobuf.MessageType):
-        mac: "bytes | None"
+        mac: "bytes"
 
         def __init__(
             self,
             *,
-            mac: "bytes | None" = None,
+            mac: "bytes",
         ) -> None:
             pass
 
@@ -2809,7 +2846,6 @@ if TYPE_CHECKING:
         input: "str | None"
         x: "int | None"
         y: "int | None"
-        wait: "bool | None"
         hold_ms: "int | None"
         physical_button: "DebugPhysicalButton | None"
 
@@ -2821,7 +2857,6 @@ if TYPE_CHECKING:
             input: "str | None" = None,
             x: "int | None" = None,
             y: "int | None" = None,
-            wait: "bool | None" = None,
             hold_ms: "int | None" = None,
             physical_button: "DebugPhysicalButton | None" = None,
         ) -> None:
@@ -2829,20 +2864,6 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkDecision"]:
-            return isinstance(msg, cls)
-
-    class DebugLinkLayout(protobuf.MessageType):
-        tokens: "list[str]"
-
-        def __init__(
-            self,
-            *,
-            tokens: "list[str] | None" = None,
-        ) -> None:
-            pass
-
-        @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkLayout"]:
             return isinstance(msg, cls)
 
     class DebugLinkReseedRandom(protobuf.MessageType):
@@ -2876,16 +2897,14 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class DebugLinkGetState(protobuf.MessageType):
-        wait_word_list: "bool | None"
-        wait_word_pos: "bool | None"
-        wait_layout: "bool | None"
+        wait_layout: "DebugWaitType"
+        return_empty_state: "bool"
 
         def __init__(
             self,
             *,
-            wait_word_list: "bool | None" = None,
-            wait_word_pos: "bool | None" = None,
-            wait_layout: "bool | None" = None,
+            wait_layout: "DebugWaitType | None" = None,
+            return_empty_state: "bool | None" = None,
         ) -> None:
             pass
 
@@ -3029,26 +3048,6 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkEraseSdCard"]:
-            return isinstance(msg, cls)
-
-    class DebugLinkWatchLayout(protobuf.MessageType):
-        watch: "bool | None"
-
-        def __init__(
-            self,
-            *,
-            watch: "bool | None" = None,
-        ) -> None:
-            pass
-
-        @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkWatchLayout"]:
-            return isinstance(msg, cls)
-
-    class DebugLinkResetDebugEvents(protobuf.MessageType):
-
-        @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkResetDebugEvents"]:
             return isinstance(msg, cls)
 
     class DebugLinkOptigaSetSecMax(protobuf.MessageType):
@@ -4144,12 +4143,12 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class MoneroAddress(protobuf.MessageType):
-        address: "bytes | None"
+        address: "bytes"
 
         def __init__(
             self,
             *,
-            address: "bytes | None" = None,
+            address: "bytes",
         ) -> None:
             pass
 
@@ -4174,14 +4173,14 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class MoneroWatchKey(protobuf.MessageType):
-        watch_key: "bytes | None"
-        address: "bytes | None"
+        watch_key: "bytes"
+        address: "bytes"
 
         def __init__(
             self,
             *,
-            watch_key: "bytes | None" = None,
-            address: "bytes | None" = None,
+            watch_key: "bytes",
+            address: "bytes",
         ) -> None:
             pass
 
@@ -5215,6 +5214,92 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["NEMCosignatoryModification"]:
+            return isinstance(msg, cls)
+
+    class NostrGetPubkey(protobuf.MessageType):
+        address_n: "list[int]"
+
+        def __init__(
+            self,
+            *,
+            address_n: "list[int] | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["NostrGetPubkey"]:
+            return isinstance(msg, cls)
+
+    class NostrPubkey(protobuf.MessageType):
+        pubkey: "bytes"
+
+        def __init__(
+            self,
+            *,
+            pubkey: "bytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["NostrPubkey"]:
+            return isinstance(msg, cls)
+
+    class NostrTag(protobuf.MessageType):
+        key: "str"
+        value: "str | None"
+        extra: "list[str]"
+
+        def __init__(
+            self,
+            *,
+            key: "str",
+            extra: "list[str] | None" = None,
+            value: "str | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["NostrTag"]:
+            return isinstance(msg, cls)
+
+    class NostrSignEvent(protobuf.MessageType):
+        address_n: "list[int]"
+        created_at: "int"
+        kind: "int"
+        tags: "list[NostrTag]"
+        content: "str"
+
+        def __init__(
+            self,
+            *,
+            created_at: "int",
+            kind: "int",
+            content: "str",
+            address_n: "list[int] | None" = None,
+            tags: "list[NostrTag] | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["NostrSignEvent"]:
+            return isinstance(msg, cls)
+
+    class NostrEventSignature(protobuf.MessageType):
+        pubkey: "bytes"
+        id: "bytes"
+        signature: "bytes"
+
+        def __init__(
+            self,
+            *,
+            pubkey: "bytes",
+            id: "bytes",
+            signature: "bytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["NostrEventSignature"]:
             return isinstance(msg, cls)
 
     class RippleGetAddress(protobuf.MessageType):
