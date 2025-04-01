@@ -50,27 +50,25 @@ function help_and_die() {
   echo "Options:"
   echo "  --skip-bitcoinonly - do not build bitcoin-only firmwares"
   echo "  --skip-normal - do not build regular firmwares"
-  echo "  --skip-core - do not build core"
-  echo "  --skip-legacy - do not build legacy"
-  echo "  --prodtest - build core prodtest"
   echo "  --repository path/to/repo - checkout the repository from the given path/url"
   echo "  --no-init - do not recreate docker environments"
-  echo "  --models - comma-separated list of models. default: --models R,T"
+  echo "  --models - comma-separated list of models. default: --models T1B1,T2B1,T2T1,T3T1"
+  echo "  --targets - comma-separated list of targets for core build. default: --targets boardloader,bootloader,firmware"
   echo "  --help"
   echo
+  echo "Option --prodtest is deprecated. Use "--targets prodtest" to build prodtest."
   echo "Set PRODUCTION=0 to run non-production builds."
+  echo "Set VENDOR_HEADER=vendorheader_prodtest_unsigned.bin to use the specified vendor header for prodtest."
   exit 0
 }
 
-OPT_BUILD_CORE=1
-OPT_BUILD_LEGACY=1
 OPT_BUILD_NORMAL=1
 OPT_BUILD_BITCOINONLY=1
-OPT_BUILD_PRODTEST=0
 INIT=1
-MODELS=(R T)
+MODELS=(T1B1 T2B1 T2T1 T3T1)
+CORE_TARGETS=(boardloader bootloader firmware)
 
-REPOSITORY="/local"
+REPOSITORY="file:///local"
 
 while true; do
   case "$1" in
@@ -85,18 +83,6 @@ while true; do
       OPT_BUILD_NORMAL=0
       shift
       ;;
-    --skip-core)
-      OPT_BUILD_CORE=0
-      shift
-      ;;
-    --skip-legacy)
-      OPT_BUILD_LEGACY=0
-      shift
-      ;;
-    --prodtest)
-      OPT_BUILD_PRODTEST=1
-      shift
-      ;;
     --repository)
       REPOSITORY="$2"
       shift 2
@@ -108,6 +94,11 @@ while true; do
     --models)
       # take comma-separated next argument and turn it into an array
       IFS=',' read -r -a MODELS <<< "$2"
+      shift 2
+      ;;
+    --targets)
+      # take comma-separated next argument and turn it into an array
+      IFS=',' read -r -a CORE_TARGETS <<< "$2"
       shift 2
       ;;
     *)
@@ -130,15 +121,7 @@ if [ "$OPT_BUILD_BITCOINONLY" -eq 1 ]; then
   variants+=(1)
 fi
 
-VARIANTS_core=()
-VARIANTS_legacy=()
-
-if [ "$OPT_BUILD_CORE" -eq 1 ]; then
-  VARIANTS_core=("${variants[@]}")
-fi
-if [ "$OPT_BUILD_LEGACY" -eq 1 ]; then
-  VARIANTS_legacy=("${variants[@]}")
-fi
+VARIANTS=("${variants[@]}")
 
 TAG="$1"
 COMMIT_HASH="$(git rev-parse "$TAG")"
@@ -153,10 +136,10 @@ else
 fi
 
 # check alpine checksum
-if command -v sha256sum &> /dev/null ; then
-    echo "${ALPINE_CHECKSUM}  ci/${ALPINE_TARBALL}" | sha256sum -c
-else
+if command -v shasum &> /dev/null ; then
     echo "${ALPINE_CHECKSUM}  ci/${ALPINE_TARBALL}" | shasum -a 256 -c
+else
+    echo "${ALPINE_CHECKSUM}  ci/${ALPINE_TARBALL}" | sha256sum -c
 fi
 
 tag_clean="${TAG//[^a-zA-Z0-9]/_}"
@@ -182,6 +165,11 @@ if [ $INIT -eq 1 ]; then
   echo ">>> DOCKER BUILD ALPINE_VERSION=$ALPINE_VERSION ALPINE_ARCH=$ALPINE_ARCH NIX_VERSION=$NIX_VERSION -t $CONTAINER_NAME"
   echo
 
+  # some Nix installations have problem with shell.nix -> ci/shell.nix symlink
+  # docker can't handle ci/shell.nix -> shell.nix
+  # let's copy the file and try to fix paths ...
+  sed "s|./ci/|./|" < shell.nix > ci/shell.nix
+
   $DOCKER build \
     --network=host \
     --build-arg ALPINE_VERSION="$ALPINE_VERSION" \
@@ -196,7 +184,7 @@ if [ $INIT -eq 1 ]; then
 
     mkdir -p /reproducible-build
     cd /reproducible-build
-    git clone "$REPOSITORY" trezor-firmware
+    git clone --branch="$TAG" --depth=1 "$REPOSITORY" trezor-firmware
     cd trezor-firmware
 EOF
 
@@ -216,10 +204,8 @@ fi  # init
 # append common part to script
 cat <<EOF >> "$SCRIPT_NAME"
   $GIT_CLEAN_REPO
-  git fetch origin "$COMMIT_HASH"
-  git checkout "$COMMIT_HASH"
   git submodule update --init --recursive
-  poetry install
+  poetry install -v --no-ansi --no-interaction
   cd core/embed/rust
   cargo fetch
 
@@ -260,11 +246,19 @@ DIR=$(pwd)
 # build core
 
 for TREZOR_MODEL in ${MODELS[@]}; do
-  for BITCOIN_ONLY in ${VARIANTS_core[@]}; do
+  if [ "$TREZOR_MODEL" = "T1B1" ]; then
+    continue
+  fi
+  for BITCOIN_ONLY in ${VARIANTS[@]}; do
 
     DIRSUFFIX=${BITCOIN_ONLY/1/-bitcoinonly}
     DIRSUFFIX=${DIRSUFFIX/0/}
     DIRSUFFIX="-${TREZOR_MODEL}${DIRSUFFIX}"
+
+    MAKE_TARGETS=""
+    for TARGET in ${CORE_TARGETS[@]}; do
+      MAKE_TARGETS="$MAKE_TARGETS build_$TARGET"
+    done
 
     SCRIPT_NAME=".build_core_${TREZOR_MODEL}_${BITCOIN_ONLY}.sh"
     cat <<EOF > "build/$SCRIPT_NAME"
@@ -274,11 +268,13 @@ for TREZOR_MODEL in ${MODELS[@]}; do
       set -e -o pipefail
       cd /reproducible-build/trezor-firmware/core
       $GIT_CLEAN_REPO
-      poetry run make clean vendor build_boardloader build_bootloader build_firmware
-      for item in bootloader firmware; do
-        poetry run ../python/tools/firmware-fingerprint.py \
-                    -o build/\$item/\$item.bin.fingerprint \
-                    build/\$item/\$item.bin
+      poetry run make clean vendor $MAKE_TARGETS QUIET_MODE=1
+      for item in bootloader firmware prodtest; do
+        if [ -f build/\$item/\$item.bin ]; then
+          poetry run ../python/tools/firmware-fingerprint.py \
+                      -o build/\$item/\$item.bin.fingerprint \
+                      build/\$item/\$item.bin
+        fi
       done
       rm -rf /build/*
       cp -r build/* /build
@@ -287,17 +283,18 @@ EOF
 
     echo
     echo ">>> DOCKER RUN core BITCOIN_ONLY=$BITCOIN_ONLY TREZOR_MODEL=$TREZOR_MODEL PRODUCTION=$PRODUCTION"
+    echo "    (targets: ${CORE_TARGETS[@]})"
     echo
 
     $DOCKER run \
       --network=host \
-      -it \
       --rm \
       -v "$DIR:/local" \
       -v "$DIR/build/core$DIRSUFFIX":/build:z \
       --env BITCOIN_ONLY="$BITCOIN_ONLY" \
       --env TREZOR_MODEL="$TREZOR_MODEL" \
       --env PRODUCTION="$PRODUCTION" \
+      --env VENDOR_HEADER="$VENDOR_HEADER" \
       --init \
       "$SNAPSHOT_NAME" \
       /nix/var/nix/profiles/default/bin/nix-shell --run "bash /local/build/$SCRIPT_NAME"
@@ -306,88 +303,51 @@ done
 
 # build legacy
 
-for BITCOIN_ONLY in ${VARIANTS_legacy[@]}; do
+if echo "${MODELS[@]}" | grep -q T1B1 ; then
+  for BITCOIN_ONLY in ${VARIANTS[@]}; do
 
-  DIRSUFFIX=${BITCOIN_ONLY/1/-bitcoinonly}
-  DIRSUFFIX=${DIRSUFFIX/0/}
+    DIRSUFFIX=${BITCOIN_ONLY/1/-bitcoinonly}
+    DIRSUFFIX=${DIRSUFFIX/0/}
+    DIRSUFFIX="-T1B1${DIRSUFFIX}"
 
-  SCRIPT_NAME=".build_legacy_$BITCOIN_ONLY.sh"
-  cat <<EOF > "build/$SCRIPT_NAME"
-    # DO NOT MODIFY!
-    # this file was generated by ${BASH_SOURCE[0]}
-    # variant: legacy build BITCOIN_ONLY=$BITCOIN_ONLY
-    set -e -o pipefail
-    cd /reproducible-build/trezor-firmware/legacy
-    $GIT_CLEAN_REPO
-    ln -s /build build
-    poetry run script/cibuild
-    mkdir -p build/bootloader build/firmware build/intermediate_fw
-    cp bootloader/bootloader.bin build/bootloader/bootloader.bin
-    cp intermediate_fw/trezor.bin build/intermediate_fw/inter.bin
-    cp firmware/trezor.bin build/firmware/firmware.bin
-    cp firmware/firmware*.bin build/firmware/ || true  # ignore missing file as it will not be present in old tags
-    cp firmware/trezor.elf build/firmware/firmware.elf
-    poetry run ../python/tools/firmware-fingerprint.py \
-               -o build/firmware/firmware.bin.fingerprint \
-               build/firmware/firmware.bin
-    chown -R $USER:$GROUP /build
-EOF
-
-  echo
-  echo ">>> DOCKER RUN legacy BITCOIN_ONLY=$BITCOIN_ONLY PRODUCTION=$PRODUCTION"
-  echo
-
-  $DOCKER run \
-    --network=host \
-    -it \
-    --rm \
-    -v "$DIR:/local" \
-    -v "$DIR/build/legacy$DIRSUFFIX":/build:z \
-    --env BITCOIN_ONLY="$BITCOIN_ONLY" \
-    --env PRODUCTION="$PRODUCTION" \
-    --init \
-    "$SNAPSHOT_NAME" \
-    /nix/var/nix/profiles/default/bin/nix-shell --run "bash /local/build/$SCRIPT_NAME"
-done
-
-if [ "$OPT_BUILD_PRODTEST" -eq "1" ]; then
-  for TREZOR_MODEL in ${MODELS[@]}; do
-    DIRSUFFIX="-${TREZOR_MODEL}-prodtest"
-    SCRIPT_NAME=".build_${TREZOR_MODEL}-prodtest.sh"
+    SCRIPT_NAME=".build_legacy_$BITCOIN_ONLY.sh"
     cat <<EOF > "build/$SCRIPT_NAME"
       # DO NOT MODIFY!
       # this file was generated by ${BASH_SOURCE[0]}
-      # variant: core build prodtest
+      # variant: legacy build BITCOIN_ONLY=$BITCOIN_ONLY
       set -e -o pipefail
-      cd /reproducible-build/trezor-firmware/core
+      cd /reproducible-build/trezor-firmware/legacy
       $GIT_CLEAN_REPO
-      poetry run make clean vendor build_prodtest
+      ln -s /build build
+      poetry run script/cibuild
+      mkdir -p build/bootloader build/firmware build/intermediate_fw
+      cp bootloader/bootloader.bin build/bootloader/bootloader.bin
+      cp intermediate_fw/trezor.bin build/intermediate_fw/inter.bin
+      cp firmware/trezor.bin build/firmware/firmware.bin
+      cp firmware/firmware*.bin build/firmware/ || true  # ignore missing file as it will not be present in old tags
+      cp firmware/trezor.elf build/firmware/firmware.elf
       poetry run ../python/tools/firmware-fingerprint.py \
-                  -o build/prodtest/prodtest.bin.fingerprint \
-                  build/prodtest/prodtest.bin
-      rm -rf /build/*
-      cp -r build/* /build
+                 -o build/firmware/firmware.bin.fingerprint \
+                 build/firmware/firmware.bin
       chown -R $USER:$GROUP /build
 EOF
 
     echo
-    echo ">>> DOCKER RUN core prodtest TREZOR_MODEL=$TREZOR_MODEL PRODUCTION=$PRODUCTION"
+    echo ">>> DOCKER RUN legacy BITCOIN_ONLY=$BITCOIN_ONLY PRODUCTION=$PRODUCTION"
     echo
 
     $DOCKER run \
       --network=host \
-      -it \
       --rm \
       -v "$DIR:/local" \
-      -v "$DIR/build/core$DIRSUFFIX":/build:z \
-      --env TREZOR_MODEL="$TREZOR_MODEL" \
+      -v "$DIR/build/legacy$DIRSUFFIX":/build:z \
+      --env BITCOIN_ONLY="$BITCOIN_ONLY" \
       --env PRODUCTION="$PRODUCTION" \
       --init \
       "$SNAPSHOT_NAME" \
       /nix/var/nix/profiles/default/bin/nix-shell --run "bash /local/build/$SCRIPT_NAME"
   done
 fi
-
 
 echo
 echo "Docker image retained as $SNAPSHOT_NAME"
@@ -401,8 +361,8 @@ echo "Built from commit $COMMIT_HASH"
 echo
 echo "Fingerprints:"
 for VARIANT in core legacy; do
-  for MODEL in "R" "T"; do
-    for DIRSUFFIX in "" "-bitcoinonly" "-prodtest"; do
+  for MODEL in ${MODELS[@]}; do
+    for DIRSUFFIX in "" "-bitcoinonly"; do
       BUILD_DIR=build/${VARIANT}-${MODEL}${DIRSUFFIX}
       for file in $BUILD_DIR/*/*.fingerprint; do
         if [ -f "$file" ]; then

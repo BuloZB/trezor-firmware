@@ -5,9 +5,23 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-import dominate
 import dominate.tags as t
-from dominate.tags import a, div, h1, h2, hr, i, p, span, strong, table, td, th, tr
+from dominate.tags import (
+    a,
+    div,
+    h1,
+    h2,
+    hr,
+    i,
+    p,
+    script,
+    span,
+    strong,
+    table,
+    td,
+    th,
+    tr,
+)
 from dominate.util import text
 
 from ..common import FixturesType, TestCase, TestResult
@@ -16,7 +30,6 @@ from .common import REPORTS_PATH, document, generate_master_diff_report, get_dif
 
 TESTREPORT_PATH = REPORTS_PATH / "test"
 IMAGES_PATH = TESTREPORT_PATH / "images"
-SCREEN_TEXT_FILE = TESTREPORT_PATH / "screen_text.txt"
 
 # These two html files are referencing each other
 ALL_SCREENS = "all_screens.html"
@@ -186,35 +199,6 @@ def all_unique_screens() -> Path:
     return html.write(TESTREPORT_PATH, doc, ALL_UNIQUE_SCREENS)
 
 
-def screen_text_report() -> None:
-    """Generate a report with text representation of all screens."""
-    recent_results = list(TestResult.recent_results())
-
-    # Creating both a text file (suitable for offline usage)
-    # and an HTML file (suitable for online usage).
-
-    with open(SCREEN_TEXT_FILE, "w") as f2:
-        for result in recent_results:
-            if not result.test.screen_text_file.exists():
-                continue
-            f2.write(f"\n{result.test.id}\n")
-            with open(result.test.screen_text_file, "r") as f:
-                for line in f.readlines():
-                    f2.write(f"\t{line}")
-
-    doc = dominate.document(title="Screen text report")
-    with doc:
-        for result in recent_results:
-            if not result.test.screen_text_file.exists():
-                continue
-            with a(href=f"{ALL_SCREENS}#{result.test.id}"):
-                h2(result.test.id)
-            with open(result.test.screen_text_file, "r") as f:
-                for line in f.readlines():
-                    p(line)
-    html.write(TESTREPORT_PATH, doc, "screen_text.html")
-
-
 def differing_screens() -> None:
     """Creating an HTML page showing all the unique screens that got changed."""
     unique_diffs: set[tuple[str | None, str | None]] = set()
@@ -231,11 +215,16 @@ def differing_screens() -> None:
 
     model = recent_ui_failures[0].test.model if recent_ui_failures else None
     doc = document(title="Differing screens", model=model)
+    with doc.head:
+        script(
+            type="text/javascript", src="https://cdn.jsdelivr.net/npm/pixelmatch@5.3.0"
+        )
     with doc:
         with table(border=1, width=600):
             with tr():
                 th("Expected")
                 th("Actual")
+                th("Diff")
                 th("Testcase (link)")
 
             for ui_failure in recent_ui_failures:
@@ -245,6 +234,7 @@ def differing_screens() -> None:
                         with tr(bgcolor="red"):
                             html.image_column(recorded, TESTREPORT_PATH)
                             html.image_column(actual, TESTREPORT_PATH)
+                            html.diff_column()
                             with td():
                                 with a(href=f"failed/{ui_failure.test.id}.html"):
                                     i(ui_failure.test.id)
@@ -295,17 +285,13 @@ def master_index() -> Path:
     return html.write(TESTREPORT_PATH, doc, "master_index.html")
 
 
-def generate_reports(
-    do_screen_text: bool = False, do_master_diff: bool = False
-) -> None:
+def generate_reports(do_master_diff: bool = False) -> None:
     """Generate HTML reports for the test."""
     html.set_image_dir(IMAGES_PATH)
     index()
     all_screens()
     all_unique_screens()
     differing_screens()
-    if do_screen_text:
-        screen_text_report()
     if do_master_diff:
         master_diff()
         master_index()
@@ -338,7 +324,13 @@ def failed(result: TestResult) -> Path:
     doc = document(
         title=result.test.id, actual_hash=result.actual_hash, model=result.test.model
     )
+    with doc.head:
+        script(
+            type="text/javascript", src="https://cdn.jsdelivr.net/npm/pixelmatch@5.3.0"
+        )
+
     with doc:
+
         _header(result.test.id, result.expected_hash, result.actual_hash)
 
         with div(id="markbox", _class="script-hidden"):
@@ -357,6 +349,7 @@ def failed(result: TestResult) -> Path:
             with tr():
                 th("Expected")
                 th("Actual")
+                th("Diff")
 
             html.diff_table(result.diff_lines(), TESTREPORT_PATH / "failed")
 

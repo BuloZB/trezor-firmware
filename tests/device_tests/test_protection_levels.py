@@ -16,12 +16,13 @@
 
 import pytest
 
-from trezorlib import btc, device, messages, misc
+from trezorlib import btc, device, messages, misc, models
+from trezorlib.debuglink import LayoutType
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import TrezorFailure
 from trezorlib.tools import parse_path
 
-from ..common import MNEMONIC12, WITH_MOCK_URANDOM, get_test_address
+from ..common import MNEMONIC12, MOCK_GET_ENTROPY, get_test_address, is_core
 from ..tx_cache import TxCache
 from .bitcoin.signtx import (
     request_finished,
@@ -44,7 +45,7 @@ pytestmark = pytest.mark.setup_client(pin=PIN4, passphrase=True)
 
 def _pin_request(client: Client):
     """Get appropriate PIN request for each model"""
-    if client.features.model == "1":
+    if client.model is models.T1B1:
         return messages.PinMatrixRequest
     else:
         return messages.ButtonRequest(code=B.PinEntry)
@@ -69,7 +70,7 @@ def test_initialize(client: Client):
         client.init_device()
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 @pytest.mark.setup_client(pin=PIN4)
 @pytest.mark.parametrize("passphrase", (True, False))
 def test_passphrase_reporting(client: Client, passphrase):
@@ -110,8 +111,7 @@ def test_apply_settings(client: Client):
         device.apply_settings(client, label="nazdar")
 
 
-@pytest.mark.skip_t2
-@pytest.mark.skip_tr
+@pytest.mark.models("legacy")
 def test_change_pin_t1(client: Client):
     _assert_protection(client)
     with client:
@@ -129,7 +129,7 @@ def test_change_pin_t1(client: Client):
         device.change_pin(client)
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 def test_change_pin_t2(client: Client):
     _assert_protection(client)
     with client:
@@ -140,7 +140,7 @@ def test_change_pin_t2(client: Client):
                 messages.ButtonRequest,
                 _pin_request(client),
                 _pin_request(client),
-                (client.debug.model == "Safe 3", messages.ButtonRequest),
+                (client.layout_type is LayoutType.Caesar, messages.ButtonRequest),
                 _pin_request(client),
                 messages.ButtonRequest,
                 messages.Success,
@@ -210,38 +210,42 @@ def test_wipe_device(client: Client):
 
 
 @pytest.mark.setup_client(uninitialized=True)
-@pytest.mark.skip_t2
-@pytest.mark.skip_tr
+@pytest.mark.models("legacy")
 def test_reset_device(client: Client):
     assert client.features.pin_protection is False
     assert client.features.passphrase_protection is False
-    with WITH_MOCK_URANDOM, client:
+    with client:
         client.set_expected_responses(
             [messages.ButtonRequest]
             + [messages.EntropyRequest]
             + [messages.ButtonRequest] * 24
             + [messages.Success, messages.Features]
         )
-        device.reset(client, False, 128, True, False, "label", "en-US")
+        device.setup(
+            client,
+            strength=128,
+            passphrase_protection=True,
+            pin_protection=False,
+            label="label",
+            entropy_check_count=0,
+            _get_entropy=MOCK_GET_ENTROPY,
+        )
 
     with pytest.raises(TrezorFailure):
         # This must fail, because device is already initialized
-        # Using direct call because `device.reset` has its own check
+        # Using direct call because `device.setup` has its own check
         client.call(
             messages.ResetDevice(
-                display_random=False,
                 strength=128,
                 passphrase_protection=True,
                 pin_protection=False,
                 label="label",
-                language="en-US",
             )
         )
 
 
 @pytest.mark.setup_client(uninitialized=True)
-@pytest.mark.skip_t2
-@pytest.mark.skip_tr
+@pytest.mark.models("legacy")
 def test_recovery_device(client: Client):
     assert client.features.pin_protection is False
     assert client.features.passphrase_protection is False
@@ -259,8 +263,7 @@ def test_recovery_device(client: Client):
             False,
             False,
             "label",
-            "en-US",
-            client.mnemonic_callback,
+            input_callback=client.mnemonic_callback,
         )
 
     with pytest.raises(TrezorFailure):
@@ -272,7 +275,6 @@ def test_recovery_device(client: Client):
                 passphrase_protection=False,
                 pin_protection=False,
                 label="label",
-                language="en-US",
             )
         )
 
@@ -295,8 +297,7 @@ def test_sign_message(client: Client):
         )
 
 
-@pytest.mark.skip_t2
-@pytest.mark.skip_tr
+@pytest.mark.models("legacy")
 def test_verify_message_t1(client: Client):
     _assert_protection(client)
     with client:
@@ -319,7 +320,7 @@ def test_verify_message_t1(client: Client):
         )
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 def test_verify_message_t2(client: Client):
     _assert_protection(client)
     with client:
@@ -362,7 +363,6 @@ def test_signtx(client: Client):
 
     _assert_protection(client)
     with client:
-        is_core = client.features.model in ("T", "Safe 3")
         client.use_pin_sequence([PIN4])
         client.set_expected_responses(
             [
@@ -371,7 +371,7 @@ def test_signtx(client: Client):
                 request_input(0),
                 request_output(0),
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 messages.ButtonRequest(code=B.SignTx),
                 request_input(0),
                 request_meta(TXHASH_50f6f1),

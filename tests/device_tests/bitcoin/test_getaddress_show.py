@@ -20,7 +20,9 @@ from trezorlib import btc, messages, tools
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import Cancelled, TrezorFailure
 
+from ...common import is_core
 from ...input_flows import (
+    InputFlowConfirmAllWarnings,
     InputFlowShowAddressQRCode,
     InputFlowShowAddressQRCodeCancel,
     InputFlowShowMultisigXPUBs,
@@ -50,8 +52,7 @@ VECTORS = (  # path, script_type, address
 )
 
 
-@pytest.mark.skip_t2
-@pytest.mark.skip_tr
+@pytest.mark.models("legacy")
 @pytest.mark.parametrize("path, script_type, address", VECTORS)
 def test_show_t1(
     client: Client, path: str, script_type: messages.InputScriptType, address: str
@@ -77,7 +78,7 @@ def test_show_t1(
         )
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 @pytest.mark.parametrize("chunkify", (True, False))
 @pytest.mark.parametrize("path, script_type, address", VECTORS)
 def test_show_tt(
@@ -103,7 +104,7 @@ def test_show_tt(
         )
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 @pytest.mark.parametrize("path, script_type, address", VECTORS)
 def test_show_cancel(
     client: Client, path: str, script_type: messages.InputScriptType, address: str
@@ -133,31 +134,44 @@ def test_show_unrecognized_path(client: Client):
 
 @pytest.mark.multisig
 def test_show_multisig_3(client: Client):
-    node = btc.get_public_node(
-        client, tools.parse_path("m/45h/0/0"), coin_name="Bitcoin"
-    ).node
-    multisig = messages.MultisigRedeemScriptType(
+    nodes = [
+        btc.get_public_node(
+            client, tools.parse_path(f"m/45h/{i}"), coin_name="Bitcoin"
+        ).node
+        for i in [1, 2, 3]
+    ]
+
+    # Multisig with global suffix specification.
+    multisig1 = messages.MultisigRedeemScriptType(
+        nodes=nodes, signatures=[b"", b"", b""], m=2, address_n=[0, 0]
+    )
+
+    # Multisig with per-node suffix specification.
+    multisig2 = messages.MultisigRedeemScriptType(
         pubkeys=[
-            messages.HDNodePathType(node=node, address_n=[1]),
-            messages.HDNodePathType(node=node, address_n=[2]),
-            messages.HDNodePathType(node=node, address_n=[3]),
+            messages.HDNodePathType(node=node, address_n=[0, 0]) for node in nodes
         ],
         signatures=[b"", b"", b""],
         m=2,
     )
 
-    for i in [1, 2, 3]:
-        assert (
-            btc.get_address(
-                client,
-                "Bitcoin",
-                tools.parse_path(f"m/45h/0/0/{i}"),
-                show_display=True,
-                multisig=multisig,
-                script_type=messages.InputScriptType.SPENDMULTISIG,
-            )
-            == "35Q3tgZZfr9GhVpaqz7fbDK8WXV1V1KxfD"
-        )
+    for multisig in (multisig1, multisig2):
+        for i in [1, 2, 3]:
+            with client:
+                if is_core(client):
+                    IF = InputFlowConfirmAllWarnings(client)
+                    client.set_input_flow(IF.get())
+                assert (
+                    btc.get_address(
+                        client,
+                        "Bitcoin",
+                        tools.parse_path(f"m/45h/{i}/0/0"),
+                        show_display=True,
+                        multisig=multisig,
+                        script_type=messages.InputScriptType.SPENDMULTISIG,
+                    )
+                    == "3FQJAFhGpgryDeYh5trpFJTCvN3H5aX2Cg"
+                )
 
 
 VECTORS_MULTISIG = (  # script_type, bip48_type, address, xpubs, ignore_xpub_magic
@@ -230,7 +244,7 @@ VECTORS_MULTISIG = (  # script_type, bip48_type, address, xpubs, ignore_xpub_mag
 )
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 @pytest.mark.multisig
 @pytest.mark.parametrize(
     "script_type, bip48_type, address, xpubs, ignore_xpub_magic", VECTORS_MULTISIG
@@ -277,25 +291,41 @@ def test_show_multisig_xpubs(
 
 @pytest.mark.multisig
 def test_show_multisig_15(client: Client):
-    node = btc.get_public_node(
-        client, tools.parse_path("m/45h/0/0"), coin_name="Bitcoin"
-    ).node
+    nodes = [
+        btc.get_public_node(
+            client, tools.parse_path(f"m/45h/{i}"), coin_name="Bitcoin"
+        ).node
+        for i in range(15)
+    ]
 
-    pubs = [messages.HDNodePathType(node=node, address_n=[x]) for x in range(15)]
-
-    multisig = messages.MultisigRedeemScriptType(
-        pubkeys=pubs, signatures=[b""] * 15, m=15
+    # Multisig with global suffix specification.
+    multisig1 = messages.MultisigRedeemScriptType(
+        nodes=nodes, signatures=[b"", b"", b""], m=2, address_n=[0, 0]
     )
 
-    for i in range(15):
-        assert (
-            btc.get_address(
-                client,
-                "Bitcoin",
-                tools.parse_path(f"m/45h/0/0/{i}"),
-                show_display=True,
-                multisig=multisig,
-                script_type=messages.InputScriptType.SPENDMULTISIG,
-            )
-            == "3GG78bp1hA3mu9xv1vZLXiENmeabmi7WKQ"
-        )
+    # Multisig with per-node suffix specification.
+    multisig2 = messages.MultisigRedeemScriptType(
+        pubkeys=[
+            messages.HDNodePathType(node=node, address_n=[0, 0]) for node in nodes
+        ],
+        signatures=[b"", b"", b""],
+        m=2,
+    )
+
+    for multisig in [multisig1, multisig2]:
+        for i in range(15):
+            with client:
+                if is_core(client):
+                    IF = InputFlowConfirmAllWarnings(client)
+                    client.set_input_flow(IF.get())
+                assert (
+                    btc.get_address(
+                        client,
+                        "Bitcoin",
+                        tools.parse_path(f"m/45h/{i}/0/0"),
+                        show_display=True,
+                        multisig=multisig,
+                        script_type=messages.InputScriptType.SPENDMULTISIG,
+                    )
+                    == "3A8zs8W98A7n1zCWSvVzodiBsaHBYzAhzb"
+                )

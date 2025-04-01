@@ -20,12 +20,12 @@ from trezorlib import messages, nem
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.tools import parse_path
 
-from ...common import MNEMONIC12
+from ...common import MNEMONIC12, is_core
 
 pytestmark = [
     pytest.mark.altcoin,
     pytest.mark.nem,
-    pytest.mark.skip_tr,  # coin not supported,
+    pytest.mark.models("t1b1", "t2t1"),
     pytest.mark.setup_client(mnemonic=MNEMONIC12),
 ]
 
@@ -33,7 +33,6 @@ pytestmark = [
 # assertion data from T1
 @pytest.mark.parametrize("chunkify", (True, False))
 def test_nem_signtx_simple(client: Client, chunkify: bool):
-    is_core = client.features.model in ("T", "Safe 3")
     with client:
         client.set_expected_responses(
             [
@@ -42,7 +41,7 @@ def test_nem_signtx_simple(client: Client, chunkify: bool):
                 # Unencrypted message
                 messages.ButtonRequest(code=messages.ButtonRequestType.ConfirmOutput),
                 (
-                    is_core,
+                    is_core(client),
                     messages.ButtonRequest(
                         code=messages.ButtonRequestType.ConfirmOutput
                     ),
@@ -85,7 +84,6 @@ def test_nem_signtx_simple(client: Client, chunkify: bool):
 @pytest.mark.setup_client(mnemonic=MNEMONIC12)
 def test_nem_signtx_encrypted_payload(client: Client):
     with client:
-        is_core = client.features.model in ("T", "Safe 3")
         client.set_expected_responses(
             [
                 # Confirm transfer and network fee
@@ -93,7 +91,7 @@ def test_nem_signtx_encrypted_payload(client: Client):
                 # Ask for encryption
                 messages.ButtonRequest(code=messages.ButtonRequestType.ConfirmOutput),
                 (
-                    is_core,
+                    is_core(client),
                     messages.ButtonRequest(
                         code=messages.ButtonRequestType.ConfirmOutput
                     ),

@@ -18,6 +18,7 @@ import pytest
 
 from trezorlib import btc, device, messages
 from trezorlib.client import MAX_PIN_LENGTH, PASSPHRASE_TEST_PATH
+from trezorlib.debuglink import LayoutType
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import Cancelled, TrezorFailure
 
@@ -31,7 +32,7 @@ PIN4 = "1234"
 PIN60 = "789456" * 10
 PIN_MAX = "".join(chr((i % 10) + ord("0")) for i in range(MAX_PIN_LENGTH))
 
-pytestmark = pytest.mark.skip_t1
+pytestmark = pytest.mark.models("core")
 
 
 def _check_pin(client: Client, pin: str):
@@ -62,10 +63,13 @@ def test_set_pin(client: Client):
 
     # Let's set new PIN
     with client:
-        br_amount = 4 if client.debug.model == "T" else 6
+        if client.layout_type is LayoutType.Caesar:
+            br_count = 6
+        else:
+            br_count = 4
         client.use_pin_sequence([PIN_MAX, PIN_MAX])
         client.set_expected_responses(
-            [messages.ButtonRequest] * br_amount + [messages.Success, messages.Features]
+            [messages.ButtonRequest] * br_count + [messages.Success, messages.Features]
         )
         device.change_pin(client)
 
@@ -84,9 +88,12 @@ def test_change_pin(client: Client):
     # Let's change PIN
     with client:
         client.use_pin_sequence([PIN4, PIN_MAX, PIN_MAX])
-        br_amount = 5 if client.debug.model == "T" else 6
+        if client.layout_type is LayoutType.Caesar:
+            br_count = 6
+        else:
+            br_count = 5
         client.set_expected_responses(
-            [messages.ButtonRequest] * br_amount + [messages.Success, messages.Features]
+            [messages.ButtonRequest] * br_count + [messages.Success, messages.Features]
         )
         device.change_pin(client)
 
@@ -125,7 +132,7 @@ def test_set_failed(client: Client):
     _check_no_pin(client)
 
     with client, pytest.raises(TrezorFailure):
-        IF = InputFlowNewCodeMismatch(client, PIN4, PIN60)
+        IF = InputFlowNewCodeMismatch(client, PIN4, PIN60, what="pin")
         client.set_input_flow(IF.get())
 
         device.change_pin(client)
@@ -172,3 +179,26 @@ def test_change_invalid_current(client: Client):
     client.init_device()
     assert client.features.pin_protection is True
     _check_pin(client, PIN4)
+
+
+@pytest.mark.models("delizia")
+@pytest.mark.setup_client(pin=None)
+def test_pin_menu_cancel_setup(client: Client):
+    def cancel_pin_setup_input_flow():
+        yield
+        # enter context menu
+        client.debug.click(client.debug.screen_buttons.menu())
+        client.debug.synchronize_at("VerticalMenu")
+        # click "Cancel PIN setup"
+        client.debug.click(client.debug.screen_buttons.vertical_menu_items()[0])
+        client.debug.synchronize_at("Paragraphs")
+        # swipe through info screen
+        client.debug.swipe_up()
+        client.debug.synchronize_at("PromptScreen")
+        # tap to confirm
+        client.debug.click(client.debug.screen_buttons.tap_to_confirm())
+
+    with client, pytest.raises(Cancelled):
+        client.set_input_flow(cancel_pin_setup_input_flow)
+        client.call(messages.ChangePin())
+    _check_no_pin(client)

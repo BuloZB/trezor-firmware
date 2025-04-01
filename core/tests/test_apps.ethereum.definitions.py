@@ -1,24 +1,19 @@
-from common import *
-import unittest
+# flake8: noqa: F403,F405
+from common import *  # isort:skip
+
 import typing as t
+import unittest
+
 from trezor import utils, wire
-from ubinascii import hexlify  # noqa: F401
 
 if not utils.BITCOIN_ONLY:
 
-    from apps.ethereum import networks, tokens
-    from apps.ethereum.definitions import decode_definition, Definitions
     from ethereum_common import *
-    from trezor import protobuf
     from trezor.enums import EthereumDefinitionType
-    from trezor.messages import (
-        EthereumDefinitions,
-        EthereumNetworkInfo,
-        EthereumTokenInfo,
-        EthereumSignTx,
-        EthereumSignTxEIP1559,
-        EthereumSignTypedData,
-    )
+    from trezor.messages import EthereumNetworkInfo, EthereumTokenInfo
+
+    from apps.ethereum import networks, tokens
+    from apps.ethereum.definitions import Definitions, decode_definition
 
     TETHER_ADDRESS = b"\xda\xc1\x7f\x95\x8d\x2e\xe5\x23\xa2\x20\x62\x06\x99\x45\x97\xc1\x3d\x83\x1e\xc7"
 
@@ -63,7 +58,7 @@ class TestDecodeDefinition(unittest.TestCase):
 
     def test_missing_signature(self):
         payload = make_payload()
-        proof, signature = sign_payload(payload, [])
+        proof, _ = sign_payload(payload, [])
         self.assertFailed(payload + proof)
 
     def test_mangled_payload(self):
@@ -74,7 +69,7 @@ class TestDecodeDefinition(unittest.TestCase):
 
     def test_proof_length_mismatch(self):
         payload = make_payload()
-        proof, signature = sign_payload(payload, [])
+        _, signature = sign_payload(payload, [])
         bad_proof = b"\x01"
         self.assertFailed(payload + bad_proof + signature)
 
@@ -138,13 +133,13 @@ class TestEthereumDefinitions(unittest.TestCase):
             return
         if what is tokens.UNKNOWN_TOKEN:
             return
-        self.fail("Expected UNKNOWN_*, got %r" % what)
+        self.fail(f"Expected UNKNOWN_*, got {what}")
 
     def assertKnown(self, what: t.Any) -> None:
         if not EthereumNetworkInfo.is_type_of(
             what
         ) and not EthereumTokenInfo.is_type_of(what):
-            self.fail("Expected network / token info, got %r" % what)
+            self.fail(f"Expected network / token info, got {what}")
         if what is networks.UNKNOWN_NETWORK:
             self.fail("Expected known network, got UNKNOWN_NETWORK")
         if what is tokens.UNKNOWN_TOKEN:

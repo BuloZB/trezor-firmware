@@ -16,11 +16,12 @@
 
 import pytest
 
-from trezorlib import btc, messages
+from trezorlib import btc, messages, models
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import TrezorFailure
 from trezorlib.tools import H_, parse_path
 
+from ...common import is_core
 from ...tx_cache import TxCache
 from .signtx import (
     assert_tx_matches,
@@ -66,16 +67,15 @@ def test_send_p2sh(client: Client, chunkify: bool):
         amount=123_456_789 - 11_000 - 12_300_000,
     )
     with client:
-        is_core = client.features.model in ("T", "Safe 3")
         client.set_expected_responses(
             [
                 request_input(0),
                 request_output(0),
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 request_output(1),
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 messages.ButtonRequest(code=B.SignTx),
                 request_input(0),
                 request_meta(TXHASH_20912f),
@@ -125,13 +125,12 @@ def test_send_p2sh_change(client: Client):
         amount=123_456_789 - 11_000 - 12_300_000,
     )
     with client:
-        is_core = client.features.model in ("T", "Safe 3")
         client.set_expected_responses(
             [
                 request_input(0),
                 request_output(0),
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 request_output(1),
                 messages.ButtonRequest(code=B.SignTx),
                 request_input(0),
@@ -181,13 +180,12 @@ def test_testnet_segwit_big_amount(client: Client):
         script_type=messages.OutputScriptType.PAYTOADDRESS,
     )
     with client:
-        is_core = client.features.model in ("T", "Safe 3")
         client.set_expected_responses(
             [
                 request_input(0),
                 request_output(0),
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 messages.ButtonRequest(code=B.SignTx),
                 request_input(0),
                 request_meta(prev_hash),
@@ -239,12 +237,11 @@ def test_send_multisig_1(client: Client):
         script_type=messages.OutputScriptType.PAYTOADDRESS,
     )
 
-    is_core = client.features.model in ("T", "Safe 3")
     expected_responses = [
         request_input(0),
         request_output(0),
         messages.ButtonRequest(code=B.ConfirmOutput),
-        (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+        (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
         messages.ButtonRequest(code=B.SignTx),
         request_input(0),
         request_meta(TXHASH_338e2d),
@@ -307,17 +304,16 @@ def test_attack_change_input_address(client: Client):
 
     # Test if the transaction can be signed normally.
     with client:
-        is_core = client.features.model in ("T", "Safe 3")
         client.set_expected_responses(
             [
                 request_input(0),
                 request_output(0),
                 # The user is required to confirm transfer to another account.
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 request_output(1),
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 messages.ButtonRequest(code=B.SignTx),
                 request_input(0),
                 request_meta(TXHASH_20912f),
@@ -387,17 +383,19 @@ def test_attack_mixed_inputs(client: Client):
         script_type=messages.OutputScriptType.PAYTOADDRESS,
     )
 
-    is_core = client.features.model in ("T", "Safe 3")
     expected_responses = [
         request_input(0),
         request_input(1),
         request_output(0),
         messages.ButtonRequest(code=messages.ButtonRequestType.ConfirmOutput),
         (
-            is_core,
+            is_core(client),
             messages.ButtonRequest(code=messages.ButtonRequestType.ConfirmOutput),
         ),
-        (is_core, messages.ButtonRequest(code=messages.ButtonRequestType.SignTx)),
+        (
+            is_core(client),
+            messages.ButtonRequest(code=messages.ButtonRequestType.SignTx),
+        ),
         messages.ButtonRequest(code=messages.ButtonRequestType.FeeOverThreshold),
         messages.ButtonRequest(code=messages.ButtonRequestType.SignTx),
         request_input(0),
@@ -419,7 +417,7 @@ def test_attack_mixed_inputs(client: Client):
         request_finished(),
     ]
 
-    if client.features.model == "1":
+    if client.model is models.T1B1:
         # T1 asks for first input for witness again
         expected_responses.insert(-2, request_input(0))
 
@@ -438,7 +436,7 @@ def test_attack_mixed_inputs(client: Client):
     # In Phase 1 make the user confirm a lower value of the segwit input.
     inp2.amount = FAKE_AMOUNT
 
-    if client.features.model == "1":
+    if client.model is models.T1B1:
         # T1 fails as soon as it encounters the fake amount.
         expected_responses = (
             expected_responses[:4] + expected_responses[5:15] + [messages.Failure()]

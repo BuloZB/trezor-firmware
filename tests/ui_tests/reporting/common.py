@@ -3,11 +3,12 @@ from typing import Any
 
 import dominate
 import dominate.tags as t
-from dominate.tags import a, h1, hr, i, p, table, td, th, tr
+from dominate.tags import a, h1, hr, i, p, script, table, td, th, tr
 
 from ..common import (
     UI_TESTS_DIR,
     FixturesType,
+    TestCase,
     get_screen_path,
     screens_and_hashes,
     screens_diff,
@@ -27,54 +28,64 @@ MASTER_CACHE_DIR = HERE / "master_cache"
 if not MASTER_CACHE_DIR.exists():
     MASTER_CACHE_DIR.mkdir()
 
+LEGACY_MODEL_NAMES = {
+    "T1": "T1B1",
+    "TT": "T2T1",
+    "TR": "T3B1",
+    "T2B1": "T3B1",
+}
+
 
 def generate_master_diff_report(
-    diff_tests: dict[str, tuple[str, str]], base_dir: Path
+    diff_tests: dict[TestCase, tuple[str, str]], base_dir: Path
 ) -> None:
     unique_differing_screens = _get_unique_differing_screens(diff_tests, base_dir)
     _differing_screens_report(unique_differing_screens, base_dir)
 
 
 def get_diff(
-    current: FixturesType, print_to_console: bool = False
-) -> tuple[dict[str, str], dict[str, str], dict[str, tuple[str, str]]]:
-    master = _get_preprocessed_master_fixtures()
+    current: FixturesType,
+    print_to_console: bool = False,
+    models: list[str] | None = None,
+) -> tuple[dict[TestCase, str], dict[TestCase, str], dict[TestCase, tuple[str, str]]]:
+    master = _preprocess_master_compat(download.fetch_fixtures_master())
 
     removed = {}
     added = {}
     diff = {}
 
     for model in master.keys() | current.keys():
+        if models and model not in models:
+            continue
+
         master_groups = master.get(model, {})
         current_groups = current.get(model, {})
         for group in master_groups.keys() | current_groups.keys():
             master_tests = master_groups.get(group, {})
             current_tests = current_groups.get(group, {})
 
-            def testname(test: str) -> str:
-                assert test.startswith(model + "_")
-                test = test[len(model) + 1 :]
-                return f"{model}-{group}-{test}"
+            def testkey(test: str) -> TestCase:
+                return TestCase.from_fixtures(test, group)
 
             # removed items
             removed_here = {
-                testname(test): master_tests[test]
+                testkey(test): master_tests[test]
                 for test in (master_tests.keys() - current_tests.keys())
             }
             # added items
             added_here = {
-                testname(test): current_tests[test]
+                testkey(test): current_tests[test]
                 for test in (current_tests.keys() - master_tests.keys())
             }
             # create the diff from items in both branches
             diff_here = {}
             for master_test, master_hash in master_tests.items():
-                full_test_name = testname(master_test)
-                if full_test_name in removed_here:
+                key = testkey(master_test)
+                if key in removed_here:
                     continue
                 if current_tests.get(master_test) == master_hash:
                     continue
-                diff_here[full_test_name] = (
+                diff_here[key] = (
                     master_tests[master_test],
                     current_tests[master_test],
                 )
@@ -118,31 +129,35 @@ def document(
 
 
 def _preprocess_master_compat(master_fixtures: dict[str, Any]) -> FixturesType:
-    if all(isinstance(v, str) for v in master_fixtures.values()):
-        # old format, convert to new format
-        new_fixtures = {}
-        for key, val in master_fixtures.items():
-            model, _test = key.split("_", maxsplit=1)
-            groups_by_model = new_fixtures.setdefault(model, {})
-            default_group = groups_by_model.setdefault("device_tests", {})
-            default_group[key] = val
-        return FixturesType(new_fixtures)
-    else:
-        return FixturesType(master_fixtures)
+    new_fixtures = {}
+    for model, groups_by_model in master_fixtures.items():
+        if model not in LEGACY_MODEL_NAMES:
+            new_fixtures[model] = groups_by_model
+            continue
 
+        # (a) replace model group name
+        model = LEGACY_MODEL_NAMES.get(model)
+        new_groups_by_model = new_fixtures.setdefault(model, {})
+        for group, tests_by_group in groups_by_model.items():
+            new_tests_by_group = new_groups_by_model.setdefault(group, {})
+            for key, val in tests_by_group.items():
+                case = TestCase.from_fixtures(key, group)
+                # (b) in individual testcases, replace model name prefix
+                new_case = case.replace(model=model)
+                new_tests_by_group[new_case.fixtures_name] = val
 
-def _get_preprocessed_master_fixtures() -> FixturesType:
-    return _preprocess_master_compat(download.fetch_fixtures_master())
+    return FixturesType(new_fixtures)
 
 
 def _create_testcase_html_diff_file(
     zipped_screens: list[tuple[str | None, str | None]],
-    test_name: str,
+    test_case: TestCase,
     master_hash: str,
     current_hash: str,
     base_dir: Path,
 ) -> Path:
-    doc = document(title=test_name, model=test_name[:2])
+    test_name = test_case.id
+    doc = document(title=test_name, model=test_case.model)
     with doc:
         h1(test_name)
         p("This UI test differs from master.", style="color: grey; font-weight: bold;")
@@ -166,41 +181,48 @@ def _create_testcase_html_diff_file(
 
 
 def _differing_screens_report(
-    unique_differing_screens: dict[tuple[str | None, str | None], str], base_dir: Path
+    unique_differing_screens: dict[tuple[str | None, str | None], TestCase],
+    base_dir: Path,
 ) -> None:
     try:
-        model = next(iter(unique_differing_screens.values()))[:2]
+        model = next(iter(unique_differing_screens.values())).model
     except StopIteration:
         model = ""
 
     doc = document(title="Master differing screens", model=model)
+    with doc.head:
+        script(
+            type="text/javascript", src="https://cdn.jsdelivr.net/npm/pixelmatch@5.3.0"
+        )
     with doc:
         with table(border=1, width=600):
             with tr():
                 th("Expected")
                 th("Actual")
+                th("Diff")
                 th("Testcase (link)")
 
             for (master, current), testcase in unique_differing_screens.items():
                 with tr(bgcolor="red"):
                     html.image_column(master, base_dir)
                     html.image_column(current, base_dir)
+                    html.diff_column()
                     with td():
-                        with a(href=f"diff/{testcase}.html"):
-                            i(testcase)
+                        with a(href=f"diff/{testcase.id}.html"):
+                            i(testcase.id)
 
     html.write(base_dir, doc, "master_diff.html")
 
 
 def _get_unique_differing_screens(
-    diff_tests: dict[str, tuple[str, str]], base_dir: Path
-) -> dict[tuple[str | None, str | None], str]:
+    diff_tests: dict[TestCase, tuple[str, str]], base_dir: Path
+) -> dict[tuple[str | None, str | None], TestCase]:
 
     # Holding unique screen differences, connected with a certain testcase
     # Used for diff report
-    unique_differing_screens: dict[tuple[str | None, str | None], str] = {}
+    unique_differing_screens: dict[tuple[str | None, str | None], TestCase] = {}
 
-    for test_name, (master_hash, current_hash) in diff_tests.items():
+    for test_case, (master_hash, current_hash) in diff_tests.items():
         # Downloading master recordings only if we do not have them already
         master_screens_path = MASTER_CACHE_DIR / master_hash
         if not master_screens_path.exists():
@@ -212,10 +234,10 @@ def _get_unique_differing_screens(
                 except RuntimeError as e:
                     print("WARNING:", e)
 
-        current_screens_path = get_screen_path(test_name)
+        current_screens_path = get_screen_path(test_case)
         if not current_screens_path:
             current_screens_path = MASTER_CACHE_DIR / "empty_current_screens"
-            current_screens_path.mkdir()
+            current_screens_path.mkdir(exist_ok=True)
 
         # Saving all the images to a common directory
         # They will be referenced from the HTML files
@@ -233,12 +255,12 @@ def _get_unique_differing_screens(
 
         # Create testcase HTML report
         _create_testcase_html_diff_file(
-            zipped_screens, test_name, master_hash, current_hash, base_dir
+            zipped_screens, test_case, master_hash, current_hash, base_dir
         )
 
         # Save differing screens for differing screens report
         for master, current in zipped_screens:
             if master != current:
-                unique_differing_screens[(master, current)] = test_name
+                unique_differing_screens[(master, current)] = test_case
 
     return unique_differing_screens

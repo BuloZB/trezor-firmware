@@ -26,7 +26,12 @@ LoadDevice.label                        max_size:33
 ResetDevice.language                    max_size:17
 ResetDevice.label                       max_size:33
 
+BackupDevice.groups                     type:FT_IGNORE
+
 Entropy.entropy                         max_size:1024
+
+EntropyRequest.entropy_commitment       type:FT_IGNORE
+EntropyRequest.prev_entropy             type:FT_IGNORE
 
 EntropyAck.entropy                      max_size:128
 

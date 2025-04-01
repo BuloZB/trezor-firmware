@@ -162,5 +162,64 @@ function onLoad() {
     }
 }
 
+var module = {};
+
+function getImageData(image) {
+    // Get original image size
+    const width = image.naturalWidth;
+    const height  = image.naturalHeight;
+
+    // Create 2D canvas
+    let canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    let context = canvas.getContext("2d");
+
+    // Draw the image
+    context.drawImage(image, 0, 0);
+
+    // Return image raw data
+    return context.getImageData(0, 0, width, height);
+}
+
+
+function imageLoaded(img) {
+    let row = img.closest("tr");
+    createRowDiff(row);
+}
+
+function createRowDiff(row) {
+    // Find an element with recorded image
+    recImg = row.querySelector("td:nth-child(1) > img");
+    // Find an element with the current image
+    curImg = row.querySelector("td:nth-child(2) > img");
+    // Skip if we haven't found two images
+    if (recImg == null || curImg == null) {
+        return;
+    }
+
+    // Get images's raw data
+    recData = getImageData(recImg);
+    curData = getImageData(curImg);
+
+    const width = recImg.naturalWidth;
+    const height = recImg.naturalHeight;
+
+    // Create canvas for diff result
+    let difImg = document.createElement('canvas')
+    difImg.width = width;
+    difImg.height = height;
+    let difCtx = difImg.getContext("2d")
+
+    // Process differences
+    const difData = difCtx.createImageData(width, height);
+    options = {threshold: 0.0, includeAA: true, diffColor: [0, 255, 0], diffColorAlt: [255, 0, 0]};
+    pixelmatch(recData.data, curData.data, difData.data, width, height, options);
+    difCtx.putImageData(difData, 0, 0);
+
+    // Put the result into the 3rd column
+    row.querySelector("td:nth-child(3)").replaceChildren(difImg)
+}
+
 
 window.onload = onLoad

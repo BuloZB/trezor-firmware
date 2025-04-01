@@ -17,27 +17,35 @@
 import pytest
 
 from trezorlib import cardano, device, messages
+from trezorlib.debuglink import LayoutType
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import TrezorFailure
 
 from ...common import parametrize_using_common_fixtures
+from ...input_flows import InputFlowConfirmAllWarnings
 
 pytestmark = [
     pytest.mark.altcoin,
     pytest.mark.cardano,
-    pytest.mark.skip_t1,
+    pytest.mark.models("core"),
 ]
 
 
 def show_details_input_flow(client: Client):
     yield
-    client.debug.wait_layout()
-    # Clicking for model T, pressing right for model R
-    if client.features.model == "T":
+    client.debug.read_layout()
+    if client.layout_type is LayoutType.Bolt:
         SHOW_ALL_BUTTON_POSITION = (143, 167)
         client.debug.click(SHOW_ALL_BUTTON_POSITION)
-    elif client.features.model == "Safe 3":
+    elif client.layout_type is LayoutType.Caesar:
+        # Caesar - right button for "Show all"
         client.debug.press_yes()
+    elif client.layout_type is LayoutType.Delizia:
+        # Delizia - "Show all" button from context menu
+        client.debug.click(client.debug.screen_buttons.menu())
+        client.debug.click(client.debug.screen_buttons.vertical_menu_items()[0])
+    else:
+        raise NotImplementedError
     # reset ui flow to continue "automatically"
     client.ui.input_flow = None
     yield
@@ -51,7 +59,11 @@ def show_details_input_flow(client: Client):
     "cardano/sign_tx.slip39.json",
 )
 def test_cardano_sign_tx(client: Client, parameters, result):
-    response = call_sign_tx(client, parameters)
+    response = call_sign_tx(
+        client,
+        parameters,
+        input_flow=lambda client: InputFlowConfirmAllWarnings(client).get(),
+    )
     assert response == _transform_expected_result(result)
 
 
@@ -137,6 +149,7 @@ def call_sign_tx(client: Client, parameters, input_flow=None, chunkify: bool = F
             additional_witness_requests=additional_witness_requests,
             include_network_id=parameters["include_network_id"],
             chunkify=chunkify,
+            tag_cbor_sets=parameters["tag_cbor_sets"],
         )
 
 
@@ -151,9 +164,11 @@ def _transform_expected_result(result):
                 "type": witness["type"],
                 "pub_key": bytes.fromhex(witness["pub_key"]),
                 "signature": bytes.fromhex(witness["signature"]),
-                "chain_code": bytes.fromhex(witness["chain_code"])
-                if witness["chain_code"]
-                else None,
+                "chain_code": (
+                    bytes.fromhex(witness["chain_code"])
+                    if witness["chain_code"]
+                    else None
+                ),
             }
             for witness in result["witnesses"]
         ],

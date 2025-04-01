@@ -25,7 +25,7 @@ from ...common import parametrize_using_common_fixtures
 pytestmark = [
     pytest.mark.altcoin,
     pytest.mark.solana,
-    pytest.mark.skip_t1,
+    pytest.mark.models("core"),
 ]
 
 
@@ -37,4 +37,4 @@ def test_solana_get_public_key(client: Client, parameters, result):
         client, address_n=parse_path(parameters["path"]), show_display=True
     )
 
-    assert actual_result.public_key.hex() == result["expected_public_key"]
+    assert actual_result.hex() == result["expected_public_key"]

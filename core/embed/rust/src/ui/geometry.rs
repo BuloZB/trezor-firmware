@@ -1,5 +1,5 @@
 use crate::ui::lerp::Lerp;
-use core::ops::{Add, Neg, Sub};
+use core::ops::{Add, Mul, Neg, Sub};
 
 const fn min(a: i16, b: i16) -> i16 {
     if a < b {
@@ -128,15 +128,33 @@ impl Sub<Offset> for Offset {
     }
 }
 
+impl Mul<f32> for Offset {
+    type Output = Offset;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Offset::new(
+            (f32::from(self.x) * rhs) as i16,
+            (f32::from(self.y) * rhs) as i16,
+        )
+    }
+}
+
 impl From<Point> for Offset {
     fn from(val: Point) -> Self {
         Offset::new(val.x, val.y)
     }
 }
 
+impl Lerp for Offset {
+    fn lerp(a: Self, b: Self, t: f32) -> Self {
+        Offset::new(i16::lerp(a.x, b.x, t), i16::lerp(a.y, b.y, t))
+    }
+}
+
 /// A point in 2D space defined by the the `x` and `y` coordinate. Relative
 /// coordinates, vectors, and offsets are represented by the `Offset` type.
 #[derive(Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
 pub struct Point {
     pub x: i16,
     pub y: i16,
@@ -185,6 +203,17 @@ impl Sub<Point> for Point {
 
     fn sub(self, rhs: Point) -> Self::Output {
         Point::sub(self, rhs)
+    }
+}
+
+impl core::ops::Neg for Point {
+    type Output = Point;
+
+    fn neg(self) -> Self::Output {
+        Point {
+            x: -self.x,
+            y: -self.y,
+        }
     }
 }
 
@@ -239,6 +268,10 @@ impl Rect {
             x1: p0.x + size.x,
             y1: p0.y + size.y,
         }
+    }
+
+    pub const fn from_size(size: Offset) -> Self {
+        Self::from_top_left_and_size(Point::zero(), size)
     }
 
     pub const fn from_top_right_and_size(p0: Point, size: Offset) -> Self {
@@ -327,6 +360,14 @@ impl Rect {
 
     pub const fn right_center(&self) -> Point {
         self.bottom_right().center(self.top_right())
+    }
+
+    /// Checks if the rectangle is empty.
+    ///
+    /// It is possible to custruct a rectangle with negative width or height.
+    /// All such rectangles are considered as empty.
+    pub const fn is_empty(&self) -> bool {
+        self.x0 >= self.x1 || self.y0 >= self.y1
     }
 
     /// Whether a `Point` is inside the `Rect`.
@@ -425,6 +466,15 @@ impl Rect {
         (left, center, right)
     }
 
+    /// Calculates the intersection of two rectangles.
+    ///
+    /// If the rectangles do not intersect, an "empty" rectangle is returned.
+    ///
+    /// The implementation may yield rectangles with negative width or height
+    /// if there's no intersection. Such rectangles are considered empty,
+    /// and subsequent operations like clamp, union, and translation
+    /// work correctly with them. However, it's important to be aware of this
+    /// behavior.
     pub const fn clamp(self, limit: Rect) -> Self {
         Self {
             x0: max(self.x0, limit.x0),
@@ -513,6 +563,7 @@ pub enum Alignment {
     End,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Alignment2D(pub Alignment, pub Alignment);
 
 impl Alignment2D {
@@ -520,12 +571,15 @@ impl Alignment2D {
     pub const TOP_RIGHT: Alignment2D = Alignment2D(Alignment::End, Alignment::Start);
     pub const TOP_CENTER: Alignment2D = Alignment2D(Alignment::Center, Alignment::Start);
     pub const CENTER: Alignment2D = Alignment2D(Alignment::Center, Alignment::Center);
+    pub const CENTER_LEFT: Alignment2D = Alignment2D(Alignment::Start, Alignment::Center);
+    pub const CENTER_RIGHT: Alignment2D = Alignment2D(Alignment::End, Alignment::Center);
     pub const BOTTOM_LEFT: Alignment2D = Alignment2D(Alignment::Start, Alignment::End);
     pub const BOTTOM_RIGHT: Alignment2D = Alignment2D(Alignment::End, Alignment::End);
     pub const BOTTOM_CENTER: Alignment2D = Alignment2D(Alignment::Center, Alignment::End);
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
 pub enum Axis {
     Horizontal,
     Vertical,
@@ -750,4 +804,56 @@ impl LinearPlacement {
 pub trait Dimensions {
     fn fit(&mut self, bounds: Rect);
     fn area(&self) -> Rect;
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, ToPrimitive, FromPrimitive)]
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl Direction {
+    pub fn as_offset(self, size: Offset) -> Offset {
+        match self {
+            Direction::Up => Offset::y(-size.y),
+            Direction::Down => Offset::y(size.y),
+            Direction::Left => Offset::x(-size.x),
+            Direction::Right => Offset::x(size.x),
+        }
+    }
+
+    pub fn iter() -> DirectionIterator {
+        DirectionIterator::new()
+    }
+}
+
+pub struct DirectionIterator {
+    current: Option<Direction>,
+}
+
+impl DirectionIterator {
+    pub fn new() -> Self {
+        DirectionIterator {
+            current: Some(Direction::Up),
+        }
+    }
+}
+
+impl Iterator for DirectionIterator {
+    type Item = Direction;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_state = match self.current {
+            Some(Direction::Up) => Some(Direction::Down),
+            Some(Direction::Down) => Some(Direction::Left),
+            Some(Direction::Left) => Some(Direction::Right),
+            Some(Direction::Right) => None,
+            None => None,
+        };
+
+        core::mem::replace(&mut self.current, next_state)
+    }
 }

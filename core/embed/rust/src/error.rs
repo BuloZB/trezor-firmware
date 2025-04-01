@@ -1,5 +1,4 @@
-use core::{convert::Infallible, num::TryFromIntError};
-use cstr_core::CStr;
+use core::{convert::Infallible, ffi::CStr, num::TryFromIntError};
 
 #[cfg(feature = "micropython")]
 use {
@@ -14,6 +13,7 @@ pub enum Error {
     OutOfRange,
     MissingKwargs,
     AllocationFailed,
+    EOFError,
     IndexError,
     #[cfg(feature = "micropython")]
     CaughtException(Obj),
@@ -26,12 +26,13 @@ pub enum Error {
     ValueErrorParam(&'static CStr, Obj),
 }
 
-#[macro_export]
 macro_rules! value_error {
     ($msg:expr) => {
-        Error::ValueError(cstr_core::cstr!($msg))
+        $crate::error::Error::ValueError($msg)
     };
 }
+
+pub(crate) use value_error;
 
 #[cfg(feature = "micropython")]
 impl Error {
@@ -71,6 +72,7 @@ impl Error {
                 Error::AttributeError(attr) => {
                     ffi::mp_obj_new_exception_args(&ffi::mp_type_AttributeError, 1, &attr.into())
                 }
+                Error::EOFError => ffi::mp_obj_new_exception(&ffi::mp_type_EOFError),
             }
         }
     }

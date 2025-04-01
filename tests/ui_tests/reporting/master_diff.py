@@ -104,35 +104,37 @@ def create_dirs() -> None:
     IMAGES_PATH.mkdir(exist_ok=True)
 
 
-def create_reports() -> None:
+def create_reports(models: list[str] | None = None) -> None:
     current = get_current_fixtures()
-    removed_tests, added_tests, diff_tests = get_diff(current, print_to_console=True)
+    removed_tests, added_tests, diff_tests = get_diff(
+        current, print_to_console=True, models=models
+    )
 
     @contextmanager
     def tmpdir():
         with tempfile.TemporaryDirectory(prefix="trezor-records-") as temp_dir:
             yield Path(temp_dir)
 
-    for test_name, test_hash in removed_tests.items():
+    for test_case, test_hash in removed_tests.items():
         with tmpdir() as temp_dir:
             try:
                 download.fetch_recorded(test_hash, temp_dir)
             except RuntimeError:
-                print("Could not download recorded files for", test_name)
+                print("Could not download recorded files for", test_case.id)
                 continue
-            removed(temp_dir, test_name)
+            removed(temp_dir, test_case.id)
 
-    for test_name, test_hash in added_tests.items():
-        screen_path = get_screen_path(test_name)
+    for test_case, test_hash in added_tests.items():
+        screen_path = get_screen_path(test_case)
         if not screen_path:
             continue
-        added(screen_path, test_name)
+        added(screen_path, test_case.id)
 
     generate_master_diff_report(diff_tests, MASTERDIFF_PATH)
 
 
-def main() -> None:
+def main(models: list[str] | None = None) -> None:
     create_dirs()
     html.set_image_dir(IMAGES_PATH)
-    create_reports()
+    create_reports(models)
     index()

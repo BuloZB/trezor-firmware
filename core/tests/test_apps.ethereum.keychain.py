@@ -1,35 +1,38 @@
-from common import *
+# flake8: noqa: F403,F405
+from common import *  # isort:skip
 
 import unittest
 
-from storage import cache
-from trezor import wire, utils
+from storage import cache_codec, cache_common
+from trezor import wire
 from trezor.crypto import bip39
+from trezor.wire import context
+from trezor.wire.codec.codec_context import CodecContext
+
 from apps.common.keychain import get_keychain
 from apps.common.paths import HARDENED
 
 if not utils.BITCOIN_ONLY:
+    from ethereum_common import encode_network, make_network
+    from trezor.messages import (
+        EthereumDefinitions,
+        EthereumGetAddress,
+        EthereumSignMessage,
+        EthereumSignTx,
+        EthereumSignTxEIP1559,
+        EthereumSignTypedData,
+    )
+
     from apps.ethereum import CURVE
-    from apps.ethereum.networks import UNKNOWN_NETWORK
     from apps.ethereum.keychain import (
         PATTERNS_ADDRESS,
-        _schemas_from_network,
         _defs_from_message,
+        _schemas_from_network,
         _slip44_from_address_n,
-        with_keychain_from_path,
         with_keychain_from_chain_id,
+        with_keychain_from_path,
     )
-
-    from trezor.messages import (
-        EthereumGetAddress,
-        EthereumSignTx,
-        EthereumDefinitions,
-        EthereumSignMessage,
-        EthereumSignTypedData,
-        EthereumSignTxEIP1559,
-    )
-
-    from ethereum_common import make_network, encode_network
+    from apps.ethereum.networks import UNKNOWN_NETWORK
 
 
 @unittest.skipUnless(not utils.BITCOIN_ONLY, "altcoin")
@@ -71,10 +74,16 @@ class TestEthereumKeychain(unittest.TestCase):
                 addr,
             )
 
+    def setUpClass(self):
+        context.CURRENT_CONTEXT = CodecContext(None, bytearray(64))
+
+    def tearDownClass(self):
+        context.CURRENT_CONTEXT = None
+
     def setUp(self):
-        cache.start_session()
+        cache_codec.start_session()
         seed = bip39.seed(" ".join(["all"] * 12), "")
-        cache.set(cache.APP_COMMON_SEED, seed)
+        cache_codec.get_active_session().set(cache_common.APP_COMMON_SEED, seed)
 
     def from_address_n(self, address_n):
         slip44 = _slip44_from_address_n(address_n)

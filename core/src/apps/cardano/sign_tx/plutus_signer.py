@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from trezor import wire
+from trezortranslate import TR
 
 from .. import layout
 from .signer import Signer
@@ -15,7 +16,7 @@ class PlutusSigner(Signer):
     validation rules are less strict, but more tx items/warnings are shown to the user.
     """
 
-    SIGNING_MODE_TITLE = "Confirming a Plutus transaction."
+    SIGNING_MODE_TITLE = TR.cardano__confirming_a_plutus_transaction
 
     async def _show_tx_init(self) -> None:
         await super()._show_tx_init()
@@ -37,11 +38,11 @@ class PlutusSigner(Signer):
         # computed by a trusted device (in case the tx contains many items which are
         # tedious to check one by one on the Trezor screen).
         is_network_id_verifiable = self._is_network_id_verifiable()
-        await layout.confirm_tx(
-            msg.fee,
+        await layout.confirm_tx_details(
             msg.network_id,
             msg.protocol_magic,
             msg.ttl,
+            msg.fee,
             msg.validity_interval_start,
             msg.total_collateral,
             is_network_id_verifiable,

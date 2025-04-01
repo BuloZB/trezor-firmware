@@ -1,12 +1,13 @@
 # pylint: disable=E0602
 
 import os
-import tools
+import tools, models, ui
 
-TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T')
+TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T2T1')
 CMAKELISTS = int(ARGUMENTS.get('CMAKELISTS', 0))
+HW_REVISION = ARGUMENTS.get('HW_REVISION', None)
 
-if TREZOR_MODEL in ('DISC1', ):
+if TREZOR_MODEL in ('D001', 'D002'):
     # skip reflash build
     env = Environment()
     def build_reflash(target,source,env):
@@ -23,29 +24,22 @@ CCFLAGS_MOD = ''
 CPPPATH_MOD = []
 CPPDEFINES_MOD = []
 SOURCE_MOD = []
+SOURCE_MOD_CRYPTO = []
 CPPDEFINES_HAL = []
 SOURCE_HAL = []
 PATH_HAL = []
+RUST_UI_FEATURES = []
 
-if TREZOR_MODEL in ('1', 'R'):
-    FONT_NORMAL=None
-    FONT_DEMIBOLD=None
-    FONT_BOLD='Font_PixelOperator_Bold_8'
-    FONT_MONO=None
-    FONT_BIG=None
-elif TREZOR_MODEL in ('T', ):
-    FONT_NORMAL=None
-    FONT_DEMIBOLD=None
-    FONT_BOLD='Font_Roboto_Bold_20'
-    FONT_MONO=None
-    FONT_BIG=None
+CPPDEFINES_MOD += [
+    'KERNEL_MODE',
+]
 
 # modtrezorcrypto
 CPPPATH_MOD += [
     'vendor/trezor-crypto',
     'vendor/trezor-storage',
 ]
-SOURCE_MOD += [
+SOURCE_MOD_CRYPTO += [
     'vendor/trezor-crypto/memzero.c',
 ]
 
@@ -54,36 +48,45 @@ CPPPATH_MOD += [
         'vendor/micropython/lib/uzlib',
 ]
 SOURCE_MOD += [
-    'embed/lib/display.c',
-    'embed/lib/colors.c',
-    'embed/lib/fonts/fonts.c',
-    'embed/lib/fonts/font_bitmap.c',
-    'embed/lib/image.c',
-    'embed/lib/mini_printf.c',
+    'embed/gfx/bitblt/gfx_bitblt.c',
+    'embed/gfx/bitblt/gfx_bitblt_mono8.c',
+    'embed/gfx/bitblt/gfx_bitblt_rgb565.c',
+    'embed/gfx/bitblt/gfx_bitblt_rgba8888.c',
+    'embed/gfx/fonts/font_bitmap.c',
+    'embed/gfx/gfx_color.c',
+    'embed/gfx/gfx_draw.c',
+    'embed/gfx/terminal.c',
+    'embed/io/display/display_utils.c',
+    'embed/util/image/image.c',
+    'embed/util/rsod/rsod.c',
+    'embed/util/scm_revision/scm_revision.c',
+    'embed/rtl/error_handling.c',
+    'embed/rtl/mini_printf.c',
     'vendor/micropython/lib/uzlib/adler32.c',
     'vendor/micropython/lib/uzlib/crc32.c',
     'vendor/micropython/lib/uzlib/tinflate.c',
-    'vendor/trezor-storage/flash_common.c',
+    'vendor/trezor-storage/flash_area.c',
 ]
+
+ui.init_ui(TREZOR_MODEL, "prodtest", RUST_UI_FEATURES)
+
+env = Environment(
+    ENV=os.environ,
+    CFLAGS='%s -DPRODUCTION=%s' % (ARGUMENTS.get('CFLAGS', ''), ARGUMENTS.get('PRODUCTION', '0')),
+    CPPDEFINES_IMPLICIT=[],
+    CPPDEFPREFIX="-D'",
+    CPPDEFSUFFIX="'",
+)
+
+FEATURES_AVAILABLE = models.configure_board(TREZOR_MODEL, HW_REVISION, FEATURES_WANTED, env, CPPDEFINES_HAL, SOURCE_HAL, PATH_HAL)
 
 SOURCE_REFLASH = [
-    'embed/reflash/startup.s',
-    'embed/reflash/header.S',
-    'embed/reflash/main.c',
+    'embed/projects/reflash/header.S',
+    'embed/projects/reflash/main.c',
 ]
 
-# fonts
-tools.add_font('NORMAL', FONT_NORMAL, CPPDEFINES_MOD, SOURCE_MOD)
-tools.add_font('BOLD', FONT_BOLD, CPPDEFINES_MOD, SOURCE_MOD)
-tools.add_font('DEMIBOLD', FONT_DEMIBOLD, CPPDEFINES_MOD, SOURCE_MOD)
-tools.add_font('MONO', FONT_MONO, CPPDEFINES_MOD, SOURCE_MOD)
-tools.add_font('BIG', FONT_BIG, CPPDEFINES_MOD, SOURCE_MOD)
-
-env = Environment(ENV=os.environ, CFLAGS='%s -DPRODUCTION=%s' % (ARGUMENTS.get('CFLAGS', ''), ARGUMENTS.get('PRODUCTION', '0')), CONSTRAINTS=["limited_util_s"])
-
-FEATURES_AVAILABLE = tools.configure_board(TREZOR_MODEL, FEATURES_WANTED, env, CPPDEFINES_HAL, SOURCE_HAL, PATH_HAL)
-
 env.Replace(
+    CAT='cat',
     CP='cp',
     AS='arm-none-eabi-as',
     AR='arm-none-eabi-ar',
@@ -109,14 +112,17 @@ env.Replace(
     '-fstack-protector-all '
     +  env.get('ENV')["CPU_CCFLAGS"] + CCFLAGS_MOD,
     CCFLAGS_QSTR='-DNO_QSTR -DN_X64 -DN_X86 -DN_THUMB',
-    LINKFLAGS='-T embed/reflash/memory.ld -Wl,--gc-sections -Wl,-Map=build/reflash/reflash.map -Wl,--warn-common',
+    LINKFLAGS=f'-T build/reflash/memory.ld -Wl,--gc-sections -Wl,-Map=build/reflash/reflash.map -Wl,--warn-common',
     CPPPATH=[
-        'embed/reflash',
-        'embed/lib',
+        'embed/projects/reflash',
+        'embed/rtl/inc',
         'embed/models',
-        'embed/trezorhal',
-        'embed/extmod/modtrezorui',
-        'vendor/micropython/lib/cmsis/inc',
+        'embed/gfx/inc',
+        'embed/sys/bsp/inc',
+        'embed/util/image/inc',
+        'embed/util/rsod/inc',
+        'embed/util/scm_revision/inc',
+        'embed/upymod/modtrezorui',
     ] + CPPPATH_MOD + PATH_HAL,
     CPPDEFINES=[
         'TREZOR_MODEL_'+TREZOR_MODEL,
@@ -127,12 +133,12 @@ env.Replace(
     )
 
 env.Replace(
-    HEADERTOOL='tools/headertool.py',
+    HEADERTOOL='headertool',
 )
 
 env.Replace(
-    ALLSOURCES=SOURCE_MOD + SOURCE_REFLASH + SOURCE_HAL,
-    ALLDEFS=tools.get_defs_for_cmake(env['CPPDEFINES']))
+    ALLSOURCES=SOURCE_MOD + SOURCE_MOD_CRYPTO + SOURCE_REFLASH + SOURCE_HAL,
+    ALLDEFS=tools.get_defs_for_cmake(env['CPPDEFINES'] + env['CPPDEFINES_IMPLICIT']))
 
 cmake_gen = env.Command(
     target='CMakeLists.txt',
@@ -146,20 +152,25 @@ cmake_gen = env.Command(
 
 obj_program = []
 obj_program += env.Object(source=SOURCE_MOD)
+obj_program += env.Object(source=SOURCE_MOD_CRYPTO, CCFLAGS='$CCFLAGS -ftrivial-auto-var-init=zero')
 obj_program += env.Object(source=SOURCE_REFLASH)
 obj_program += env.Object(source=SOURCE_HAL)
 
-MODEL_IDENTIFIER = tools.get_model_identifier(TREZOR_MODEL)
+VENDORHEADER = f'embed/models/{TREZOR_MODEL}/vendorheader/vendorheader_' + ('unsafe_signed_dev.bin' if ARGUMENTS.get('PRODUCTION', '0') == '0' else 'satoshilabs_signed_prod.bin')
 
-VENDORHEADER = f'embed/vendorheader/{MODEL_IDENTIFIER}/vendorheader_' + ('unsafe_signed_dev.bin' if ARGUMENTS.get('PRODUCTION', '0') == '0' else 'satoshilabs_signed_prod.bin')
+tools.embed_raw_binary(
+        obj_program,
+        env,
+        'vendorheader',
+        'embed/projects/firmware/vendorheader.o',
+        VENDORHEADER,
+        )
 
-obj_program.extend(
-    env.Command(
-        target='embed/reflash/vendorheader.o',
-        source=VENDORHEADER,
-        action='$OBJCOPY -I binary -O elf32-littlearm -B arm'
-        ' --rename-section .data=.vendorheader,alloc,load,readonly,contents'
-        ' $SOURCE $TARGET', ))
+linkerscript_gen = env.Command(
+    target='memory.ld',
+    source=[f'embed/models/{TREZOR_MODEL}/memory.ld',  env.get('ENV')['LINKER_SCRIPT'].format(target='prodtest')],
+    action='$CAT $SOURCES > $TARGET',
+)
 
 program_elf = env.Command(
     target='reflash.elf',
@@ -168,8 +179,10 @@ program_elf = env.Command(
     '$LINK -o $TARGET $CCFLAGS $CFLAGS $LINKFLAGS $SOURCES -lc_nano -lgcc',
 )
 
-BINARY_NAME = f"build/reflash/reflash-{tools.get_model_identifier(TREZOR_MODEL)}"
-BINARY_NAME += "-" + tools.get_version('embed/reflash/version.h')
+env.Depends(program_elf, linkerscript_gen)
+
+BINARY_NAME = f"build/reflash/reflash-{TREZOR_MODEL}"
+BINARY_NAME += "-" + tools.get_version('embed/projects/reflash/version.h')
 BINARY_NAME += "-" + tools.get_git_revision_short_hash()
 BINARY_NAME += "-dirty" if tools.get_git_modified() else ""
 BINARY_NAME += ".bin"
@@ -181,7 +194,7 @@ program_bin = env.Command(
     target='reflash.bin',
     source=program_elf,
     action=[
-        '$OBJCOPY -O binary -j .vendorheader -j .header -j .flash -j .data $SOURCE $TARGET',
+        '$OBJCOPY -O binary -j .vendorheader -j .header -j .flash -j .data -j .confidential $SOURCE $TARGET',
         '$HEADERTOOL $TARGET ' + ('-D' if ARGUMENTS.get('PRODUCTION', '0') == '0' else ''),
         '$CP $TARGET ' + BINARY_NAME,
     ], )

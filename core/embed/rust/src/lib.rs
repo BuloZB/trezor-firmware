@@ -2,6 +2,7 @@
 #![deny(clippy::all)]
 #![allow(clippy::new_without_default)]
 #![deny(unsafe_op_in_unsafe_fn)]
+#![allow(internal_features)]
 // Allowing dead code not to cause a lot of warnings when building for a specific target
 // (when building for TR, a lot of code only used in TT would get marked as unused).
 #![allow(dead_code)]
@@ -12,25 +13,33 @@
 extern crate num_derive;
 
 #[macro_use]
+mod macros;
+
+#[cfg(feature = "crypto")]
+mod crypto;
+#[cfg(feature = "debug")]
+mod debug;
 mod error;
-// use trezorhal for its macros early
-#[macro_use]
-mod trezorhal;
+mod io;
 mod maybe_trace;
 #[cfg(feature = "micropython")]
-#[macro_use]
 mod micropython;
 #[cfg(feature = "protobuf")]
 mod protobuf;
 mod storage;
+mod strutil;
 mod time;
 #[cfg(feature = "ui_debug")]
 mod trace;
+#[cfg(feature = "translations")]
+mod translations;
+mod trezorhal;
 
+// mod ui is `pub` because of the re-export pattern in individual models, which
+// would trigger a brickload of "unused symbol" warnings otherwise.
+// TODO: maybe get rid of the re-export pattern :shrugs:
 #[cfg(feature = "ui")]
-#[macro_use]
 pub mod ui;
-pub mod strutil;
 
 #[cfg(feature = "debug")]
 #[cfg(not(test))]
@@ -41,15 +50,10 @@ pub mod strutil;
 fn panic_debug(panic_info: &core::panic::PanicInfo) -> ! {
     // Filling at least the file and line information, if available.
     // TODO: find out how to display message from panic_info.message()
-
     if let Some(location) = panic_info.location() {
-        let file = location.file();
-        print!(file);
-        print!(":");
-        println!(inttostr!(location.line()));
-        trezorhal::fatal_error::__fatal_error("", "rs", file, location.line(), "");
+        trezorhal::fatal_error::__fatal_error("rs", location.file(), location.line());
     } else {
-        trezorhal::fatal_error::__fatal_error("", "rs", "", 0, "");
+        trezorhal::fatal_error::__fatal_error("rs", "", 0);
     }
 }
 
@@ -67,7 +71,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     // raises a Hard Fault on hardware.
     //
     // Otherwise, use `unwrap!` macro from trezorhal.
-    fatal_error!("", "rs");
+    fatal_error!("rs");
 }
 
 #[cfg(not(target_arch = "arm"))]

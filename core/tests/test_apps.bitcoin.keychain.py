@@ -1,17 +1,27 @@
-from common import *
-from storage import cache
+# flake8: noqa: F403,F405
+from common import *  # isort:skip
+
+from storage import cache_codec, cache_common
 from trezor import wire
 from trezor.crypto import bip39
-from apps.common.paths import HARDENED
+from trezor.wire import context
+from trezor.wire.codec.codec_context import CodecContext
 
 from apps.bitcoin.keychain import _get_coin_by_name, _get_keychain_for_coin
 
 
 class TestBitcoinKeychain(unittest.TestCase):
+
+    def setUpClass(self):
+        context.CURRENT_CONTEXT = CodecContext(None, bytearray(64))
+
+    def tearDownClass(self):
+        context.CURRENT_CONTEXT = None
+
     def setUp(self):
-        cache.start_session()
+        cache_codec.start_session()
         seed = bip39.seed(" ".join(["all"] * 12), "")
-        cache.set(cache.APP_COMMON_SEED, seed)
+        cache_codec.get_active_session().set(cache_common.APP_COMMON_SEED, seed)
 
     def test_bitcoin(self):
         coin = _get_coin_by_name("Bitcoin")
@@ -88,10 +98,17 @@ class TestBitcoinKeychain(unittest.TestCase):
 
 @unittest.skipUnless(not utils.BITCOIN_ONLY, "altcoin")
 class TestAltcoinKeychains(unittest.TestCase):
+
+    def setUpClass(self):
+        context.CURRENT_CONTEXT = CodecContext(None, bytearray(64))
+
+    def tearDownClass(self):
+        context.CURRENT_CONTEXT = None
+
     def setUp(self):
-        cache.start_session()
+        cache_codec.start_session()
         seed = bip39.seed(" ".join(["all"] * 12), "")
-        cache.set(cache.APP_COMMON_SEED, seed)
+        cache_codec.get_active_session().set(cache_common.APP_COMMON_SEED, seed)
 
     def test_bcash(self):
         coin = _get_coin_by_name("Bcash")
@@ -149,7 +166,6 @@ class TestAltcoinKeychains(unittest.TestCase):
             [H_(45), 99, 1, 1000],
             [H_(49), H_(0), H_(0), 0, 0],
             [H_(84), H_(0), H_(0), 0, 0],
-
             [44, 2, 0, 0, 0],
             [H_(44), H_(2), H_(0)],
             [H_(44), H_(2), H_(0), 0, 0, 0],

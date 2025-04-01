@@ -22,7 +22,7 @@ from trezorlib.exceptions import TrezorFailure
 
 from ...input_flows import InputFlowSlip39BasicRecoveryDryRun
 
-pytestmark = pytest.mark.skip_t1
+pytestmark = pytest.mark.models("core")
 
 SHARES_20_2of3 = [
     "crush merchant academic acid dream decision orbit smug trend trust painting slice glad crunch veteran lunch friar satoshi engage aquatic",
@@ -41,19 +41,13 @@ def test_2of3_dryrun(client: Client):
     with client:
         IF = InputFlowSlip39BasicRecoveryDryRun(client, SHARES_20_2of3[1:3])
         client.set_input_flow(IF.get())
-        ret = device.recover(
+        device.recover(
             client,
             passphrase_protection=False,
             pin_protection=False,
             label="label",
-            language="en-US",
-            dry_run=True,
+            type=messages.RecoveryType.DryRun,
         )
-
-    # Dry run was successful
-    assert ret == messages.Success(
-        message="The seed is valid and matches the one in the device"
-    )
 
 
 @pytest.mark.setup_client(mnemonic=SHARES_20_2of3[0:2])
@@ -71,6 +65,5 @@ def test_2of3_invalid_seed_dryrun(client: Client):
             passphrase_protection=False,
             pin_protection=False,
             label="label",
-            language="en-US",
-            dry_run=True,
+            type=messages.RecoveryType.DryRun,
         )

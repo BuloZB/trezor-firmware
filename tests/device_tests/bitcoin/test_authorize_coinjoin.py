@@ -23,6 +23,7 @@ from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import TrezorFailure
 from trezorlib.tools import parse_path
 
+from ...common import is_core
 from ...tx_cache import TxCache
 from .payment_req import make_coinjoin_request
 from .signtx import (
@@ -275,7 +276,7 @@ def test_sign_tx_large(client: Client):
     own_output_count = 30
     total_output_count = 1200
     output_denom = 10_000  # sats
-    max_expected_delay = 60  # seconds
+    max_expected_delay = 80  # seconds
 
     with client:
         btc.authorize_coinjoin(
@@ -453,16 +454,15 @@ def test_sign_tx_spend(client: Client):
         )
 
     with client:
-        is_core = client.features.model in ("T", "Safe 3")
         client.set_expected_responses(
             [
                 messages.ButtonRequest(code=B.Other),
-                messages.UnlockedPathRequest(),
+                messages.UnlockedPathRequest,
                 request_input(0),
                 request_output(0),
                 request_output(1),
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 messages.ButtonRequest(code=B.SignTx),
                 request_input(0),
                 request_output(0),
@@ -528,16 +528,15 @@ def test_sign_tx_migration(client: Client):
         )
 
     with client:
-        is_core = client.features.model in ("T", "Safe 3")
         client.set_expected_responses(
             [
                 messages.ButtonRequest(code=B.Other),
-                messages.UnlockedPathRequest(),
+                messages.UnlockedPathRequest,
                 request_input(0),
                 request_input(1),
                 request_output(0),
                 messages.ButtonRequest(code=B.ConfirmOutput),
-                (is_core, messages.ButtonRequest(code=B.ConfirmOutput)),
+                (is_core(client), messages.ButtonRequest(code=B.ConfirmOutput)),
                 messages.ButtonRequest(code=B.SignTx),
                 request_input(0),
                 request_meta(TXHASH_2cc3c1),

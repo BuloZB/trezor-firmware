@@ -14,6 +14,8 @@
 # You should have received a copy of the License along with this library.
 # If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
 
+from __future__ import annotations
+
 import hashlib
 import typing as t
 from copy import copy
@@ -47,6 +49,7 @@ def _transform_vendor_trust(data: bytes) -> bytes:
 
 
 class VendorTrust(Struct):
+    _dont_provide_secret: bool
     allow_run_with_secret: bool
     show_vendor_string: bool
     require_user_click: bool
@@ -57,7 +60,9 @@ class VendorTrust(Struct):
 
     SUBCON = c.Transformed(
         c.BitStruct(
-            "_reserved" / c.Default(c.BitsInteger(8), 0),
+            "_reserved" / c.Default(c.BitsInteger(7), 0b1111111),
+            "_dont_provide_secret"
+            / c.Default(c.Flag, lambda this: not this.allow_run_with_secret),
             "allow_run_with_secret" / c.Flag,
             "show_vendor_string" / c.Flag,
             "require_user_click" / c.Flag,
@@ -82,13 +87,13 @@ class VendorTrust(Struct):
 class VendorHeader(Struct):
     header_len: int
     expiry: int
-    version: t.Tuple[int, int]
+    version: tuple[int, int]
     sig_m: int
     # sig_n: int
-    hw_model: t.Union[Model, bytes]
-    pubkeys: t.List[bytes]
+    hw_model: Model | bytes
+    pubkeys: list[bytes]
     text: str
-    image: t.Dict[str, t.Any]
+    image: dict[str, t.Any]
     sigmask: int
     signature: bytes
 
@@ -121,10 +126,11 @@ class VendorHeader(Struct):
     # fmt: on
 
     def digest(self) -> bytes:
+        hash_function = Model.from_hw_model(self.hw_model).hash_params().hash_function
         cpy = copy(self)
         cpy.sigmask = 0
         cpy.signature = b"\x00" * 64
-        return hashlib.blake2s(cpy.build()).digest()
+        return hash_function(cpy.build()).digest()
 
     def vhash(self) -> bytes:
         h = hashlib.blake2s()

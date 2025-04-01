@@ -1,4 +1,4 @@
-// generated from librust_qstr.h.mako
+// generated from ${THIS_FILE.name}
 // (by running `make templates` in `core`)
 // do not edit manually!
 #pragma GCC diagnostic ignored "-Wunused-value"
@@ -11,9 +11,22 @@ import sys
 from pathlib import Path
 from typing import Union, Set
 
-THIS = Path(local.filename).resolve()
-HERE = THIS.parent
-RUST_SRC = HERE / "src"
+RUST_SRC = THIS_FILE.parent / "src"
+
+ALTCOIN_PREFIXES = (
+    "binance",
+    "cardano",
+    "eos",
+    "ethereum",
+    "fido",
+    "monero",
+    "nem",
+    "ripple",
+    "solana",
+    "stellar",
+    "tezos",
+    "u2f",
+)
 
 def find_unique_patterns_in_dir(directory: Union[str, Path], pattern: str) -> Set[str]:
     command = f"grep -ro '{pattern}' {directory}"
@@ -23,10 +36,28 @@ def find_unique_patterns_in_dir(directory: Union[str, Path], pattern: str) -> Se
 
 pattern = r"\bMP_QSTR_\w*"
 qstrings = find_unique_patterns_in_dir(RUST_SRC, pattern)
+
+qstrings_universal = set()
+for prefix in ALTCOIN_PREFIXES:
+    mp_prefix = f"MP_QSTR_{prefix}__"
+    qstrings_universal |= {qstr for qstr in qstrings if qstr.startswith(mp_prefix)}
+
+qstrings_btconly = qstrings - qstrings_universal
+
 # sort result alphabetically
-qstrings_sorted = sorted(qstrings)
+digits = range(10)
+qstrings_btconly_sorted = sorted(qstrings_btconly)
+qstrings_universal_sorted = sorted(qstrings_universal)
 %>\
-% for qstr in qstrings_sorted:
+% for digit in digits:
+  MP_QSTR_${digit};
+% endfor
+% for qstr in qstrings_btconly_sorted:
   ${qstr};
 % endfor
+#if !BITCOIN_ONLY
+% for qstr in qstrings_universal_sorted:
+  ${qstr};
+% endfor
+#endif
 }

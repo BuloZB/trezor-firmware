@@ -33,15 +33,15 @@ PREV_HASH, PREV_TX = forge_prevtx([(INPUT_ADDRESS, 12_300_000)], network="testne
 PREV_TXES = {PREV_HASH: PREV_TX}
 
 
-pytestmark = [pytest.mark.skip_t1, pytest.mark.experimental]
+pytestmark = [pytest.mark.models("core"), pytest.mark.experimental]
 
 
-def case(id, *args, altcoin: bool = False, skip_tr: bool = False):
+def case(id, *args, altcoin: bool = False, models: str | None = None):
     marks = []
     if altcoin:
         marks.append(pytest.mark.altcoin)
-    if skip_tr:
-        marks.append(pytest.mark.skip_tr)
+    if models:
+        marks.append(pytest.mark.models(models))
     return pytest.param(*args, id=id, marks=marks)
 
 
@@ -114,13 +114,13 @@ SERIALIZED_TX = "01000000000101e29305e85821ea86f2bca1fcfe45e7cb0c8de87b612479ee6
             "out0",
             (PaymentRequestParams([0], memos1, get_nonce=True),),
             altcoin=True,
-            skip_tr=True,
+            models="t2t1",
         ),
         case(
             "out1",
             (PaymentRequestParams([1], memos2, get_nonce=True),),
             altcoin=True,
-            skip_tr=True,
+            models="t2t1",
         ),
         case("out2", (PaymentRequestParams([2], [], get_nonce=True),)),
         case(
@@ -183,10 +183,8 @@ def test_payment_request(client: Client, payment_request_params):
         )
 
 
+@pytest.mark.models(skip="safe3")
 def test_payment_request_details(client: Client):
-    if client.features.model == "Safe 3":
-        pytest.skip("Details not implemented on TR")
-
     # Test that payment request details are shown when requested.
     outputs[0].payment_req_index = 0
     outputs[1].payment_req_index = 0
@@ -275,7 +273,7 @@ def test_payment_req_wrong_mac_refund(client: Client):
 
 
 @pytest.mark.altcoin
-@pytest.mark.skip_tr
+@pytest.mark.models("t2t1", reason="Dash not supported on Safe family")
 def test_payment_req_wrong_mac_purchase(client: Client):
     # Test wrong MAC in payment request memo.
     memo = CoinPurchaseMemo(

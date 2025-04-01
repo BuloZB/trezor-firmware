@@ -5,13 +5,13 @@ help: ## show this help
 
 ## style commands:
 
-PY_FILES = $(shell find . -type f -name '*.py'   | sed 'sO^\./OO' | grep -f ./tools/style.py.include | grep -v -f ./tools/style.py.exclude )
+PY_FILES = $(shell find . -type f -name '*.py'   | sed 'sO^\./OO' | grep -f ./tools/style.py.include | grep -v -f ./tools/style.py.exclude ) common/protob/pb2py
 C_FILES =  $(shell find . -type f -name '*.[ch]' | grep -f ./tools/style.c.include  | grep -v -f ./tools/style.c.exclude )
 
 
-style_check: pystyle_check ruststyle_check cstyle_check changelog_check yaml_check editor_check ## run all style checks
+style_check: pystyle_check ruststyle_check cstyle_check changelog_check yaml_check docs_summary_check editor_check ## run all style checks
 
-style: pystyle ruststyle cstyle ## apply all code styles (C+Rust+Py)
+style: pystyle ruststyle cstyle changelog_style ## apply all code styles (C+Rust+Py+Changelog)
 
 pystyle_check: ## run code style check on application sources and tests
 	flake8 --version
@@ -52,20 +52,16 @@ pystyle: ## apply code style on application sources and tests
 	make -C python style
 
 changelog_check: ## check changelog format
-	./tools/generate-changelog.py --check core
-	./tools/generate-changelog.py --check core/embed/boardloader
-	./tools/generate-changelog.py --check core/embed/bootloader
-	./tools/generate-changelog.py --check core/embed/bootloader_ci
-	./tools/generate-changelog.py --check legacy/bootloader
-	./tools/generate-changelog.py --check legacy/firmware
-	./tools/generate-changelog.py --check legacy/intermediate_fw
-	./tools/generate-changelog.py --check python
+	./tools/changelog.py check
+
+changelog_style: ## fix changelog format
+	./tools/changelog.py style
 
 yaml_check: ## check yaml formatting
 	yamllint .
 
 editor_check: ## check editorconfig formatting
-	editorconfig-checker -exclude '.*\.(so|dat|toif|der)'
+	editorconfig-checker -exclude '.*\.(so|dat|toif|der)|^crypto/aes/'
 
 cstyle_check: ## run code style check on low-level C code
 	clang-format --version
@@ -107,16 +103,16 @@ mocks_check: ## check validity of mock python headers
 	flake8 core/mocks/generated
 
 templates: icons ## rebuild coin lists from definitions in common
-	./core/tools/build_templates
+	make -C core templates
 
 templates_check: ## check that coin lists are up to date
-	./core/tools/build_templates --check
+	make -C core templates_check
 
 solana_templates: ## rebuild Solana instruction template file
-	./core/tools/build_solana_templates
+	python tools/build_solana_templates.py
 
 solana_templates_check: ## check that Solana instruction template file is up to date
-	./core/tools/build_solana_templates --check
+	python tools/build_solana_templates.py --check
 
 icons: ## generate FIDO service icons
 	python3 core/tools/build_icons.py
@@ -138,12 +134,28 @@ ci_docs: ## generate CI documentation
 ci_docs_check: ## check that generated CI documentation is up to date
 	./tools/generate_ci_docs.py --check
 
+docs_summary_check: ## check if there are unlinked documentation files
+	@echo [DOCS-SUMMARY-MARKDOWN-CHECK]
+	python3 tools/check_docs_summary.py
+
 vendorheader: ## generate vendor header
-	./core/embed/vendorheader/generate.sh --quiet
+	./core/tools/generate_vendorheader.sh --quiet
 
 vendorheader_check: ## check that vendor header is up to date
-	./core/embed/vendorheader/generate.sh --quiet --check
+	./core/tools/generate_vendorheader.sh --quiet --check
 
-gen:  mocks icons templates protobuf ci_docs vendorheader solana_templates ## regenerate auto-generated files from sources
+bootloader_hashes: ## generate bootloader hashes
+	./core/tools/bootloader_hashes.py
 
-gen_check: mocks_check icons_check templates_check protobuf_check ci_docs_check vendorheader_check solana_templates_check ## check validity of auto-generated files
+bootloader_hashes_check: ## check generated bootloader hashes
+	./core/tools/bootloader_hashes.py --check
+
+lsgen: ## generate linker scripts hashes
+	lsgen
+
+lsgen_check: ## check generated linker scripts
+	lsgen --check
+
+gen:  templates mocks icons protobuf ci_docs vendorheader solana_templates bootloader_hashes lsgen ## regenerate auto-generated files from sources
+
+gen_check: templates_check mocks_check icons_check protobuf_check ci_docs_check vendorheader_check solana_templates_check bootloader_hashes_check lsgen_check ## check validity of auto-generated files

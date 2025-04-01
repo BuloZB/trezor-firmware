@@ -8,6 +8,7 @@ ignore-paths=
     crypto,
     legacy,
     storage,
+    nordic,
 fail-under=10.0
 jobs=0
 load-plugins=trezor_pylint_plugin
@@ -35,3 +36,4 @@ enable=
     useless-else-on-loop,
     useless-object-inheritance,
     async-awaitable-return,
+    internal-model-tuple-comparison,

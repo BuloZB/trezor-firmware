@@ -1,94 +1,71 @@
 mod ffi {
     extern "C" {
-        // trezorhal/common.c
-        pub fn trezor_shutdown() -> !;
+        // system.h
+        pub fn system_exit_error_ex(
+            title: *const cty::c_char,
+            title_len: usize,
+            message: *const cty::c_char,
+            message_len: usize,
+            footer: *const cty::c_char,
+            footer_len: usize,
+        ) -> !;
     }
 }
 
-use crate::ui::screens::screen_fatal_error;
-
-fn shutdown() -> ! {
-    unsafe { ffi::trezor_shutdown() }
+pub fn error_shutdown(msg: &str) -> ! {
+    unsafe {
+        // SAFETY: we pass a valid string to the C function
+        // and the function does not return.
+        ffi::system_exit_error_ex(
+            core::ptr::null(),
+            0,
+            msg.as_ptr() as *const cty::c_char,
+            msg.len(),
+            core::ptr::null(),
+            0,
+        );
+    }
 }
 
-#[cfg(feature = "bootloader")]
-pub fn __fatal_error(_expr: &str, _msg: &str, _file: &str, _line: u32, _func: &str) -> ! {
-    screen_fatal_error("BL.rs", "BL.rs", "PLEASE VISIT\nTREZOR.IO/RSOD");
-    shutdown()
-}
+/// Shows an error message on the screen and shuts down the device.
+/// In debug mode, also prints the error message to the console.
+#[inline(never)] // saves few kilobytes of flash
+pub fn __fatal_error(msg: &str, _file: &str, _line: u32) -> ! {
+    #[cfg(feature = "debug")]
+    {
+        dbg_println!("=== FATAL ERROR");
 
-#[cfg(not(feature = "bootloader"))]
-pub fn __fatal_error(_expr: &str, msg: &str, _file: &str, _line: u32, _func: &str) -> ! {
-    screen_fatal_error("INTERNAL_ERROR", msg, "PLEASE VISIT\nTREZOR.IO/RSOD");
-    shutdown()
+        if _line != 0 {
+            dbg_println!("Location: {}:{}", _file, _line);
+        }
+        if !msg.is_empty() {
+            dbg_println!("Message: {}", msg);
+        }
+
+        dbg_println!("===");
+    }
+
+    error_shutdown(msg);
 }
 
 pub trait UnwrapOrFatalError<T> {
-    fn unwrap_or_fatal_error(self, expr: &str, msg: &str, file: &str, line: u32, func: &str) -> T;
+    fn unwrap_or_fatal_error(self, msg: &str, file: &str, line: u32) -> T;
 }
 
 impl<T> UnwrapOrFatalError<T> for Option<T> {
-    fn unwrap_or_fatal_error(self, expr: &str, msg: &str, file: &str, line: u32, func: &str) -> T {
+    fn unwrap_or_fatal_error(self, msg: &str, file: &str, line: u32) -> T {
         match self {
             Some(x) => x,
-            None => __fatal_error(expr, msg, file, line, func),
+            None => __fatal_error(msg, file, line),
         }
     }
 }
 
 impl<T, E> UnwrapOrFatalError<T> for Result<T, E> {
-    fn unwrap_or_fatal_error(self, expr: &str, msg: &str, file: &str, line: u32, func: &str) -> T {
+    fn unwrap_or_fatal_error(self, msg: &str, file: &str, line: u32) -> T {
         match self {
             Ok(x) => x,
-            Err(_) => __fatal_error(expr, msg, file, line, func),
+            Err(_) => __fatal_error(msg, file, line),
         }
     }
-}
-
-macro_rules! function_name {
-    () => {{
-        #[cfg(not(feature = "bootloader"))]
-        {
-            fn f() {}
-            fn type_name_of<T>(_: T) -> &'static str {
-                core::any::type_name::<T>()
-            }
-            let name = type_name_of(f);
-            name.get(..name.len() - 3).unwrap_or("")
-        }
-        #[cfg(feature = "bootloader")]
-        {
-            ""
-        }
-    }};
-}
-
-macro_rules! unwrap {
-    ($e:expr, $msg:expr) => {{
-        use crate::trezorhal::fatal_error::UnwrapOrFatalError;
-        $e.unwrap_or_fatal_error(stringify!($e), $msg, file!(), line!(), function_name!())
-    }};
-    ($expr:expr) => {
-        unwrap!($expr, "unwrap failed")
-    };
-}
-
-macro_rules! ensure {
-    ($what:expr, $error:expr) => {
-        if !($what) {
-            fatal_error!(stringify!($what), $error);
-        }
-    };
-}
-
-macro_rules! fatal_error {
-    ($expr:expr, $msg:expr) => {{
-        crate::trezorhal::fatal_error::__fatal_error(
-            stringify!($expr),
-            $msg,
-            file!(),
-            line!(),
-            function_name!(),
-        );
-    }};
 }

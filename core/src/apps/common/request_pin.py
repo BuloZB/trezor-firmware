@@ -1,9 +1,10 @@
 import utime
 from typing import Any, NoReturn
 
-import storage.cache as storage_cache
-from trezor import config, utils, wire
+from storage.cache_common import APP_COMMON_REQUEST_PIN_LAST_UNLOCK
+from trezor import TR, config, utils, wire
 from trezor.ui.layouts import show_error_and_raise
+from trezor.wire import context
 
 
 async def _request_sd_salt(
@@ -53,9 +54,9 @@ async def request_pin_confirm(*args: Any, **kwargs: Any) -> str:
     from trezor.ui.layouts import confirm_reenter_pin, pin_mismatch_popup
 
     while True:
-        pin1 = await request_pin("Enter new PIN", *args, **kwargs)
+        pin1 = await request_pin(TR.pin__enter_new, *args, **kwargs)
         await confirm_reenter_pin()
-        pin2 = await request_pin("Re-enter new PIN", *args, **kwargs)
+        pin2 = await request_pin(TR.pin__reenter_new, *args, **kwargs)
         if pin1 == pin2:
             return pin1
         await pin_mismatch_popup()
@@ -77,24 +78,27 @@ async def request_pin_and_sd_salt(
 
 def _set_last_unlock_time() -> None:
     now = utime.ticks_ms()
-    storage_cache.set_int(storage_cache.APP_COMMON_REQUEST_PIN_LAST_UNLOCK, now)
+    context.cache_set_int(APP_COMMON_REQUEST_PIN_LAST_UNLOCK, now)
+
+
+_DEF_ARG_PIN_ENTER: str = TR.pin__enter
 
 
 async def verify_user_pin(
-    prompt: str = "Enter PIN",
+    prompt: str = _DEF_ARG_PIN_ENTER,
     allow_cancel: bool = True,
     retry: bool = True,
     cache_time_ms: int = 0,
 ) -> None:
     # _get_last_unlock_time
     last_unlock = int.from_bytes(
-        storage_cache.get(storage_cache.APP_COMMON_REQUEST_PIN_LAST_UNLOCK, b""), "big"
+        context.cache_get(APP_COMMON_REQUEST_PIN_LAST_UNLOCK, b""), "big"
     )
 
     if (
         cache_time_ms
         and last_unlock
-        and utime.ticks_ms() - last_unlock <= cache_time_ms
+        and utime.ticks_diff(utime.ticks_ms(), last_unlock) <= cache_time_ms
         and config.is_unlocked()
     ):
         return
@@ -115,8 +119,8 @@ async def verify_user_pin(
         raise RuntimeError
 
     while retry:
-        pin = await request_pin_on_device(  # type: ignore ["request_pin_on_device" is possibly unbound]
-            "Enter PIN", config.get_pin_rem(), allow_cancel, wrong_pin=True
+        pin = await request_pin_on_device(
+            TR.pin__enter, config.get_pin_rem(), allow_cancel, wrong_pin=True
         )
         if config.unlock(pin, salt):
             _set_last_unlock_time()
@@ -128,8 +132,8 @@ async def verify_user_pin(
 async def error_pin_invalid() -> NoReturn:
     await show_error_and_raise(
         "warning_wrong_pin",
-        "The PIN you have entered is not valid.",
-        "Wrong PIN",  # header
+        TR.pin__entered_not_valid,
+        TR.pin__wrong_pin,  # header
         exc=wire.PinInvalid,
     )
     assert False
@@ -138,8 +142,8 @@ async def error_pin_invalid() -> NoReturn:
 async def error_pin_matches_wipe_code() -> NoReturn:
     await show_error_and_raise(
         "warning_invalid_new_pin",
-        "The new PIN must be different from your wipe code.",
-        "Invalid PIN",  # header
+        TR.pin__diff_from_wipe_code,
+        TR.pin__invalid_pin,  # header
         exc=wire.PinInvalid,
     )
     assert False

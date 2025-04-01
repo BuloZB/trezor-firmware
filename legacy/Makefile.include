@@ -101,6 +101,8 @@ CPUFLAGS   += -DHW_MODEL=$(HW_MODEL)
 CPUFLAGS   += -DHW_REVISION=0
 CFLAGS   += -DHW_MODEL=$(HW_MODEL)
 CFLAGS   += -DHW_REVISION=0
+CFLAGS   += -DFLASH_BLOCK_WORDS=1
+CFLAGS   += -DFLASH_BIT_ACCESS=1
 
 ifeq ($(EMULATOR),1)
 CFLAGS   += -DEMULATOR=1
@@ -186,6 +188,8 @@ CFLAGS += -DDEBUG_T1_SIGNATURES=1
 else
 CFLAGS += -DDEBUG_T1_SIGNATURES=0
 endif
+
+../vendor/trezor-crypto/%.o: CFLAGS += -ftrivial-auto-var-init=zero
 
 all: $(NAME).bin
 

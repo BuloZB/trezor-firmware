@@ -26,36 +26,14 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFS_DIR = ROOT / "defs"
 
 
-class SupportItemBool(TypedDict):
-    supported: dict[str, bool]
-    unsupported: dict[str, bool]
-
-
 class SupportItemVersion(TypedDict):
     supported: dict[str, str]
     unsupported: dict[str, str]
 
 
-class SupportData(TypedDict):
-    connect: SupportItemBool
-    suite: SupportItemBool
-    t1b1: SupportItemVersion
-    t2t1: SupportItemVersion
-    t2b1: SupportItemVersion
-
-
-class SupportInfoItem(TypedDict):
-    connect: bool
-    suite: bool
-    t1b1: Literal[False] | str
-    t2t1: Literal[False] | str
-    t2b1: Literal[False] | str
-
-
+SupportData = Dict[str, SupportItemVersion]
+SupportInfoItem = Dict[str, Literal[False] | str]
 SupportInfo = Dict[str, SupportInfoItem]
-
-WalletItems = Dict[str, str]
-WalletInfo = Dict[str, WalletItems]
 
 
 class Coin(TypedDict):
@@ -93,7 +71,6 @@ class Coin(TypedDict):
 
     # Other fields optionally coming from JSON
     links: dict[str, str]
-    wallet: WalletItems
     curve: str
     decimals: int
 
@@ -255,7 +232,10 @@ def check_key(
 BTC_CHECKS = [
     check_key("coin_name", str, regex=r"^[A-Z]"),
     check_key("coin_shortcut", str, regex=r"^t?[A-Z]{3,}$"),
-    check_key("coin_label", str, regex=r"^x?[A-Z]"),
+    # coin_label expects an uppercase first letter. This doesn't
+    # work for eCash and xRhodium, so an exception is added for the lowercase
+    # 'e' and 'x' only.
+    check_key("coin_label", str, regex=r"^[ex]?[A-Z]"),
     check_key("website", str, regex=r"^https://.*[^/]$"),
     check_key("github", str, regex=r"^https://git(hu|la)b.com/.*[^/]$"),
     check_key("maintainer", str),
@@ -453,13 +433,16 @@ def _load_fido_apps() -> FidoApps:
 # ====== support info ======
 
 RELEASES_URL = "https://data.trezor.io/firmware/{}/releases.json"
-MISSING_SUPPORT_MEANS_NO = ("connect", "suite")
-VERSIONED_SUPPORT_INFO = ("T1B1", "T2T1", "T2B1")
 
 
 def get_support_data() -> SupportData:
     """Get raw support data from `support.json`."""
     return load_json("support.json")
+
+
+def get_models() -> list[str]:
+    """Get all models from `support.json`."""
+    return list(get_support_data().keys())
 
 
 def latest_releases() -> dict[str, Any]:
@@ -468,8 +451,7 @@ def latest_releases() -> dict[str, Any]:
         raise RuntimeError("requests library is required for getting release info")
 
     latest: dict[str, Any] = {}
-    for model in VERSIONED_SUPPORT_INFO:
-        # TODO: support new UPPERCASE model names in RELEASES_URL
+    for model in get_models():
         url_model = model.lower()  # need to be e.g. t1b1 for now
         releases = requests.get(RELEASES_URL.format(url_model)).json()
         latest[model] = max(tuple(r["version"]) for r in releases)
@@ -496,8 +478,6 @@ def support_info_single(support_data: SupportData, coin: Coin) -> SupportInfoIte
             support_value: Any = False
         elif key in values["supported"]:
             support_value = values["supported"][key]
-        elif device in MISSING_SUPPORT_MEANS_NO:
-            support_value = False
         else:
             support_value = None
         support_info_item[device] = support_value
@@ -527,92 +507,6 @@ def support_info(coins: Iterable[Coin] | CoinsInfo | dict[str, Coin]) -> Support
         support[coin["key"]] = support_info_single(support_data, coin)
 
     return support
-
-
-# ====== wallet info ======
-
-WALLET_SUITE = {"Trezor Suite": "https://suite.trezor.io"}
-WALLET_NEM = {"Nano Wallet": "https://nemplatform.com/wallets/#desktop"}
-
-
-def get_wallet_data() -> WalletInfo:
-    """Get wallet data from `wallets.json`."""
-    return load_json("wallets.json")
-
-
-def _suite_support(coin: Coin, support: SupportInfoItem) -> bool:
-    """Check the "suite" support property.
-    If set, check that at least one of the backends run on trezor.io.
-    If yes, assume we support the coin in our wallet.
-    Otherwise it's probably working with a custom backend, which means don't
-    link to our wallet.
-    """
-    if not support["suite"]:
-        return False
-    return any(".trezor.io" in url for url in coin["blockbook"])
-
-
-def wallet_info_single(
-    support_data: SupportInfo,
-    wallet_data: WalletInfo,
-    coin: Coin,
-) -> WalletItems:
-    """Adds together a dict of all wallets for a coin."""
-    wallets: WalletItems = {}
-
-    key = coin["key"]
-
-    # Add wallets from the coin itself
-    # (usually not there, only for the `misc` category)
-    wallets.update(coin.get("wallet", {}))
-
-    # Each coin category has different further logic
-    if key.startswith("bitcoin:"):
-        if _suite_support(coin, support_data[key]):
-            wallets.update(WALLET_SUITE)
-    elif key.startswith("nem:"):
-        wallets.update(WALLET_NEM)
-    elif key.startswith(("eth:", "erc20:", "misc:")):
-        pass  # no special logic here
-    else:
-        raise ValueError(f"Unknown coin category: {key}")
-
-    # Add wallets from `wallets.json`
-    # This must come last as it offers the ability to override existing wallets
-    # (for example with `"Trezor Suite": null` we delete the "Trezor Suite" from the coin)
-    wallets.update(wallet_data.get(key, {}))
-
-    # Removing potentially disabled wallets from the last step
-    wallets = {name: url for name, url in wallets.items() if url}
-
-    return wallets
-
-
-def wallet_info(coins: Iterable[Coin] | CoinsInfo | dict[str, Coin]) -> WalletInfo:
-    """Generate Trezor wallet information.
-
-    Takes a collection of coins and generates a WalletItems entry for each.
-    The WalletItems is a dict with keys being the names of the wallets and
-    values being the URLs to those - same format as in `wallets.json`.
-
-    The `coins` argument can be a `CoinsInfo` object, a list or a dict of
-    coin items.
-
-    Wallet information is taken from `wallets.json`.
-    """
-    if isinstance(coins, CoinsInfo):
-        coins = coins.as_list()
-    elif isinstance(coins, dict):
-        coins = coins.values()
-
-    support_data = support_info(coins)
-    wallet_data = get_wallet_data()
-
-    wallet: WalletInfo = {}
-    for coin in coins:
-        wallet[coin["key"]] = wallet_info_single(support_data, wallet_data, coin)
-
-    return wallet
 
 
 # ====== data cleanup functions ======
