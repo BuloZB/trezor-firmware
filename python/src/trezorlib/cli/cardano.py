@@ -60,7 +60,8 @@ def cli() -> None:
     default=messages.CardanoDerivationType.ICARUS,
 )
 @click.option("-i", "--include-network-id", is_flag=True)
-@click.option("-C", "chunkify", is_flag=True)
+@click.option("-C", "--chunkify", is_flag=True)
+@click.option("-T", "--tag-cbor-sets", is_flag=True)
 @with_client
 def sign_tx(
     client: "TrezorClient",
@@ -72,6 +73,7 @@ def sign_tx(
     derivation_type: messages.CardanoDerivationType,
     include_network_id: bool,
     chunkify: bool,
+    tag_cbor_sets: bool,
 ) -> cardano.SignTxResponse:
     """Sign Cardano transaction."""
     transaction = json.load(file)
@@ -146,6 +148,7 @@ def sign_tx(
         derivation_type=derivation_type,
         include_network_id=include_network_id,
         chunkify=chunkify,
+        tag_cbor_sets=tag_cbor_sets,
     )
 
     sign_tx_response["tx_hash"] = sign_tx_response["tx_hash"].hex()
@@ -154,9 +157,11 @@ def sign_tx(
             "type": witness["type"],
             "pub_key": witness["pub_key"].hex(),
             "signature": witness["signature"].hex(),
-            "chain_code": witness["chain_code"].hex()
-            if witness["chain_code"] is not None
-            else None,
+            "chain_code": (
+                witness["chain_code"].hex()
+                if witness["chain_code"] is not None
+                else None
+            ),
         }
         for witness in sign_tx_response["witnesses"]
     ]
@@ -169,9 +174,9 @@ def sign_tx(
             "cvote_registration_signature"
         )
         if cvote_registration_signature:
-            auxiliary_data_supplement[
-                "cvote_registration_signature"
-            ] = cvote_registration_signature.hex()
+            auxiliary_data_supplement["cvote_registration_signature"] = (
+                cvote_registration_signature.hex()
+            )
         sign_tx_response["auxiliary_data_supplement"] = auxiliary_data_supplement
     return sign_tx_response
 

@@ -1,14 +1,12 @@
-use crate::{
-    trezorhal::display::ToifFormat,
-    ui::{
-        component::{Component, Event, EventCtx, Never},
-        display,
-        display::{
-            toif::{image, Toif},
-            Color, Icon,
-        },
-        geometry::{Alignment2D, Offset, Point, Rect},
+use crate::ui::{
+    component::{Component, Event, EventCtx, Never},
+    display::{
+        toif::{Toif, ToifFormat},
+        Color, Icon,
     },
+    geometry::{Alignment2D, Offset, Point, Rect},
+    shape,
+    shape::Renderer,
 };
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -26,13 +24,6 @@ impl Image {
             area: Rect::zero(),
         }
     }
-
-    /// Display the icon with baseline Point, aligned according to the
-    /// `alignment` argument.
-    pub fn draw(&self, baseline: Point, alignment: Alignment2D) {
-        let r = Rect::snap(baseline, self.toif.size(), alignment);
-        image(self, r.center());
-    }
 }
 
 impl Component for Image {
@@ -47,16 +38,10 @@ impl Component for Image {
         None
     }
 
-    fn paint(&mut self) {
-        self.draw(self.area.center(), Alignment2D::CENTER);
-    }
-
-    #[cfg(feature = "ui_bounds")]
-    fn bounds(&self, sink: &mut dyn FnMut(Rect)) {
-        sink(Rect::from_center_and_size(
-            self.area.center(),
-            self.toif.size(),
-        ));
+    fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
+        shape::ToifImage::new(self.area.center(), self.toif)
+            .with_align(Alignment2D::CENTER)
+            .render(target);
     }
 }
 
@@ -95,15 +80,6 @@ impl BlendedImage {
     pub fn single(icon: Icon, color: Color, area_color: Color) -> Self {
         Self::new(icon, icon, color, color, area_color)
     }
-
-    fn paint_image(&self) {
-        display::icon_over_icon(
-            None,
-            (self.bg, self.bg_top_left.into(), self.bg_color),
-            (self.fg, self.fg_offset, self.fg_color),
-            self.area_color,
-        );
-    }
 }
 
 impl Component for BlendedImage {
@@ -129,16 +105,13 @@ impl Component for BlendedImage {
         None
     }
 
-    fn paint(&mut self) {
-        self.paint_image();
-    }
-
-    #[cfg(feature = "ui_bounds")]
-    fn bounds(&self, sink: &mut dyn FnMut(Rect)) {
-        sink(Rect::from_top_left_and_size(
-            self.bg_top_left,
-            self.bg.toif.size(),
-        ));
+    fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
+        shape::ToifImage::new(self.bg_top_left, self.bg.toif)
+            .with_fg(self.bg_color)
+            .render(target);
+        shape::ToifImage::new(self.bg_top_left + self.fg_offset, self.fg.toif)
+            .with_fg(self.fg_color)
+            .render(target);
     }
 }
 

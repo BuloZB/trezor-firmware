@@ -12,38 +12,51 @@ from apps.common.authorization import is_set_any_session
 
 
 async def busyscreen() -> None:
-    await Busyscreen(busy_expiry_ms())
+    obj = Busyscreen(busy_expiry_ms())
+    try:
+        await obj.get_result()
+    finally:
+        obj.__del__()
 
 
 async def homescreen() -> None:
+    from trezor import TR
+
     if storage.device.is_initialized():
         label = storage.device.get_label()
     else:
         label = None
 
+    # TODO: add notification that translations are out of date
+
     notification = None
     notification_is_error = False
     if is_set_any_session(MessageType.AuthorizeCoinJoin):
-        notification = "COINJOIN AUTHORIZED"
+        notification = TR.homescreen__title_coinjoin_authorized
     elif storage.device.is_initialized() and storage.device.no_backup():
-        notification = "SEEDLESS"
+        notification = TR.homescreen__title_seedless
         notification_is_error = True
     elif storage.device.is_initialized() and storage.device.unfinished_backup():
-        notification = "BACKUP FAILED"
+        notification = TR.homescreen__title_backup_failed
         notification_is_error = True
     elif storage.device.is_initialized() and storage.device.needs_backup():
-        notification = "BACKUP NEEDED"
+        notification = TR.homescreen__title_backup_needed
     elif storage.device.is_initialized() and not config.has_pin():
-        notification = "PIN NOT SET"
+        notification = TR.homescreen__title_pin_not_set
     elif storage.device.get_experimental_features():
-        notification = "EXPERIMENTAL MODE"
+        notification = TR.homescreen__title_experimental_mode
 
-    await Homescreen(
+    obj = Homescreen(
         label=label,
         notification=notification,
         notification_is_error=notification_is_error,
         hold_to_lock=config.has_pin(),
     )
+    try:
+        await obj.get_result()
+    finally:
+        obj.__del__()
+
     lock_device()
 
 
@@ -54,10 +67,14 @@ async def _lockscreen(screensaver: bool = False) -> None:
     # Only show the lockscreen UI if the device can in fact be locked, or if it is
     # and OLED device (in which case the lockscreen is a screensaver).
     if can_lock_device() or screensaver:
-        await Lockscreen(
+        obj = Lockscreen(
             label=storage.device.get_label(),
             coinjoin_authorized=is_set_any_session(MessageType.AuthorizeCoinJoin),
         )
+        try:
+            await obj.get_result()
+        finally:
+            obj.__del__()
     # Otherwise proceed directly to unlock() call. If the device is already unlocked,
     # it should be a no-op storage-wise, but it resets the internal configuration
     # to an unlocked state.

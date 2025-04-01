@@ -9,20 +9,17 @@ if TYPE_CHECKING:
 
     from typing_extensions import Protocol
 
-    Bip32Path = Sequence[int]
+    Bip32Path = list[int]
     Slip21Path = Sequence[bytes]
     PathType = TypeVar("PathType", Bip32Path, Slip21Path, contravariant=True)
 
     class PathSchemaType(Protocol):
-        def match(self, path: Bip32Path) -> bool:
-            ...
+        def match(self, path: Bip32Path) -> bool: ...
 
     class KeychainValidatorType(Protocol):
-        def is_in_keychain(self, path: Bip32Path) -> bool:
-            ...
+        def is_in_keychain(self, path: Bip32Path) -> bool: ...
 
-        def verify_path(self, path: Bip32Path) -> None:
-            ...
+        def verify_path(self, path: Bip32Path) -> None: ...
 
 
 class Interval:
@@ -293,7 +290,7 @@ class PathSchema:
                     # Which in practice it is, the only non-Collection is Interval.
                     # But we're not going to introduce an additional type requirement
                     # for the sake of __repr__ that doesn't exist in production anyway
-                    collection: Collection[int] = component  # type: ignore [Expression of type "Container[int]" cannot be assigned to declared type "Collection[int]"]
+                    collection: Collection[int] = component  # type: ignore [Expression of type "Container[int]" is incompatible with declared type "Collection[int]"]
                     component_str = ",".join(str(unharden(i)) for i in collection)
                     if len(collection) > 1:
                         component_str = "[" + component_str + "]"

@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
-import trezorui2
-from trezor.enums import ButtonRequestType
+import storage.device as storage_device
+import trezorui_api
+from trezor import TR, utils
+from trezor.enums import ButtonRequestType, DisplayRotation
 from trezor.ui.layouts import confirm_action
 from trezor.wire import DataError
 
@@ -14,21 +16,18 @@ BRT_PROTECT_CALL = ButtonRequestType.ProtectCall  # CACHE
 
 
 def _validate_homescreen(homescreen: bytes) -> None:
-    import storage.device as storage_device
-
     if homescreen == b"":
         return
 
-    if len(homescreen) > storage_device.HOMESCREEN_MAXSIZE:
+    if len(homescreen) > utils.HOMESCREEN_MAXSIZE:
         raise DataError(
-            f"Homescreen is too large, maximum size is {storage_device.HOMESCREEN_MAXSIZE} bytes"
+            f"Homescreen is too large, maximum size is {utils.HOMESCREEN_MAXSIZE} bytes"
         )
-    if not trezorui2.check_homescreen_format(homescreen):
+    if not trezorui_api.check_homescreen_format(homescreen):
         raise DataError("Wrong homescreen format")
 
 
 async def apply_settings(msg: ApplySettings) -> Success:
-    import storage.device as storage_device
     from trezor.messages import Success
     from trezor.wire import NotInitialized, ProcessError
 
@@ -37,6 +36,7 @@ async def apply_settings(msg: ApplySettings) -> Success:
 
     if not storage_device.is_initialized():
         raise NotInitialized("Device is not initialized")
+
     homescreen = msg.homescreen  # local_cache_attribute
     label = msg.label  # local_cache_attribute
     auto_lock_delay_ms = msg.auto_lock_delay_ms  # local_cache_attribute
@@ -48,6 +48,7 @@ async def apply_settings(msg: ApplySettings) -> Success:
     msg_safety_checks = msg.safety_checks  # local_cache_attribute
     experimental_features = msg.experimental_features  # local_cache_attribute
     hide_passphrase_from_host = msg.hide_passphrase_from_host  # local_cache_attribute
+    haptic_feedback = msg.haptic_feedback
 
     if (
         homescreen is None
@@ -59,6 +60,7 @@ async def apply_settings(msg: ApplySettings) -> Success:
         and msg_safety_checks is None
         and experimental_features is None
         and hide_passphrase_from_host is None
+        and (haptic_feedback is None or not utils.USE_HAPTIC)
     ):
         raise ProcessError("No setting provided")
 
@@ -112,6 +114,13 @@ async def apply_settings(msg: ApplySettings) -> Success:
         await _require_confirm_hide_passphrase_from_host(hide_passphrase_from_host)
         storage_device.set_hide_passphrase_from_host(hide_passphrase_from_host)
 
+    if haptic_feedback is not None and utils.USE_HAPTIC:
+        from trezor import io
+
+        await _require_confirm_haptic_feedback(haptic_feedback)
+        io.haptic.haptic_set_enabled(haptic_feedback)
+        storage_device.set_haptic_feedback(haptic_feedback)
+
     reload_settings_from_storage()
 
     return Success(message="Settings applied")
@@ -128,72 +137,74 @@ async def _require_confirm_change_label(label: str) -> None:
 
     await confirm_single(
         "set_label",
-        "Device name",
-        description="Change device name to {}?",
+        TR.device_name__title,
+        description=TR.device_name__change_template,
         description_param=label,
-        verb="Change",
+        verb=TR.buttons__change,
     )
 
 
 async def _require_confirm_change_passphrase(use: bool) -> None:
-    on_or_off = "on" if use else "off"
-    description = f"Turn {on_or_off} passphrase protection?"
-    verb = f"Turn {on_or_off}"
-    await confirm_action(
-        "set_passphrase",
-        "Passphrase settings",
-        description=description,
-        verb=verb,
-        br_code=BRT_PROTECT_CALL,
-    )
+    from trezor.ui.layouts import confirm_change_passphrase
+
+    await confirm_change_passphrase(use)
+
+
+async def _require_confirm_hide_passphrase_from_host(enable: bool) -> None:
+    from trezor.ui.layouts import confirm_hide_passphrase_from_host
+
+    if enable:
+        await confirm_hide_passphrase_from_host()
 
 
 async def _require_confirm_change_passphrase_source(
     passphrase_always_on_device: bool,
 ) -> None:
-    description = (
-        "Do you really want to enter passphrase always on the device?"
-        if passphrase_always_on_device
-        else "Do you want to revoke the passphrase on device setting?"
-    )
-    await confirm_action(
-        "set_passphrase_source",
-        "Passphrase source",
-        description=description,
-        br_code=BRT_PROTECT_CALL,
-    )
+    from trezor.ui.layouts import confirm_change_passphrase_source
+
+    await confirm_change_passphrase_source(passphrase_always_on_device)
 
 
-async def _require_confirm_change_display_rotation(rotation: int) -> None:
-    if rotation == 0:
-        label = "north"
-    elif rotation == 90:
-        label = "east"
-    elif rotation == 180:
-        label = "south"
-    elif rotation == 270:
-        label = "west"
+async def _require_confirm_change_display_rotation(rotation: DisplayRotation) -> None:
+    if rotation == DisplayRotation.North:
+        label = TR.rotation__north
+    elif rotation == DisplayRotation.East:
+        label = TR.rotation__east
+    elif rotation == DisplayRotation.South:
+        label = TR.rotation__south
+    elif rotation == DisplayRotation.West:
+        label = TR.rotation__west
     else:
-        raise DataError("Unsupported display rotation")
+        raise RuntimeError  # Unsupported display rotation
 
     await confirm_action(
         "set_rotation",
-        "Change rotation",
-        description="Do you want to change device rotation to {}?",
+        TR.rotation__title_change,
+        subtitle=TR.words__settings,
+        description=TR.rotation__change_template,
         description_param=label,
         br_code=BRT_PROTECT_CALL,
+        prompt_screen=True,
     )
 
 
 async def _require_confirm_change_autolock_delay(delay_ms: int) -> None:
     from trezor.strings import format_duration_ms
 
+    unit_plurals = {
+        "millisecond": TR.plurals__lock_after_x_milliseconds,
+        "second": TR.plurals__lock_after_x_seconds,
+        "minute": TR.plurals__lock_after_x_minutes,
+        "hour": TR.plurals__lock_after_x_hours,
+    }
+
     await confirm_action(
         "set_autolock_delay",
-        "Auto-lock delay",
-        description="Auto-lock your Trezor after {} of inactivity?",
-        description_param=format_duration_ms(delay_ms),
+        TR.auto_lock__title,
+        description=TR.auto_lock__change_template,
+        description_param=format_duration_ms(delay_ms, unit_plurals),
         br_code=BRT_PROTECT_CALL,
+        prompt_screen=True,
     )
 
 
@@ -203,28 +214,27 @@ async def _require_confirm_safety_checks(level: SafetyCheckLevel) -> None:
     if level == SafetyCheckLevel.Strict:
         await confirm_action(
             "set_safety_checks",
-            "Safety checks",
-            description="Do you really want to enforce strict safety checks (recommended)?",
+            TR.safety_checks__title,
+            description=TR.safety_checks__enforce_strict,
             br_code=BRT_PROTECT_CALL,
+            prompt_screen=True,
         )
     elif level in (SafetyCheckLevel.PromptAlways, SafetyCheckLevel.PromptTemporarily):
-        # Reusing most stuff for both levels
-        template = (
-            "Trezor will{}allow you to approve some actions which might be unsafe."
+        description = (
+            TR.safety_checks__approve_unsafe_temporary
+            if level == SafetyCheckLevel.PromptTemporarily
+            else TR.safety_checks__approve_unsafe_always
         )
-        description = template.format(
-            " temporarily " if level == SafetyCheckLevel.PromptTemporarily else " "
-        )
-
         await confirm_action(
             "set_safety_checks",
-            "Safety override",
-            "Are you sure?",
+            TR.safety_checks__title_safety_override,
+            TR.words__are_you_sure,
             description,
             hold=True,
-            verb="Hold to confirm",
+            verb=TR.buttons__hold_to_confirm,
             reverse=True,
             br_code=BRT_PROTECT_CALL,
+            prompt_screen=True,
         )
     else:
         raise ValueError  # enum value out of range
@@ -234,19 +244,23 @@ async def _require_confirm_experimental_features(enable: bool) -> None:
     if enable:
         await confirm_action(
             "set_experimental_features",
-            "Experimental mode",
-            "Only for development and beta testing!",
-            "Enable experimental features?",
+            TR.experimental_mode__title,
+            TR.experimental_mode__only_for_dev,
+            TR.experimental_mode__enable,
             reverse=True,
             br_code=BRT_PROTECT_CALL,
+            prompt_screen=True,
         )
 
 
-async def _require_confirm_hide_passphrase_from_host(enable: bool) -> None:
-    if enable:
+if utils.USE_HAPTIC:
+
+    async def _require_confirm_haptic_feedback(enable: bool) -> None:
         await confirm_action(
-            "set_hide_passphrase_from_host",
-            "Hide passphrase",
-            description="Hide passphrase coming from host?",
+            "haptic_feedback__settings",
+            TR.haptic_feedback__title,
+            TR.haptic_feedback__enable if enable else TR.haptic_feedback__disable,
+            subtitle=TR.haptic_feedback__subtitle,
             br_code=BRT_PROTECT_CALL,
+            prompt_screen=True,
         )

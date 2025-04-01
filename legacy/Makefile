@@ -15,12 +15,13 @@ OBJS += oled.o
 OBJS += random_delays.o
 OBJS += rng.o
 OBJS += supervise.o
+OBJS += time_estimate.o
 OBJS += usb21_standard.o
 OBJS += usb_standard.o
 OBJS += util.o
 OBJS += webusb.o
 OBJS += winusb.o
-OBJS += vendor/trezor-storage/flash_common.o
+OBJS += vendor/trezor-storage/flash_area.o
 
 libtrezor.a: $(OBJS)
 

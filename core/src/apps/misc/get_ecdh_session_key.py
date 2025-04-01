@@ -31,9 +31,9 @@ async def get_ecdh_session_key(msg: GetECDHSessionKey) -> ECDHSessionKey:
     # require_confirm_ecdh_session_key
     proto = msg_identity.proto.upper() if msg_identity.proto else "identity"
     await confirm_address(
-        f"Decrypt {proto}",
+        f"Decrypt {proto}",  # TODO: translate?
         serialize_identity_without_proto(msg_identity),
-        "",
+        chunkify=False,
     )
     # END require_confirm_ecdh_session_key
 
@@ -54,6 +54,7 @@ async def get_ecdh_session_key(msg: GetECDHSessionKey) -> ECDHSessionKey:
 
         if peer_public_key[0] != 0x40:
             raise DataError("Curve25519 public key should start with 0x40")
+        # The prefix 0x04 doesn't make sense here, and may be changed or removed in the future
         session_key = b"\x04" + curve25519.multiply(
             node.private_key(), peer_public_key[1:]
         )
@@ -61,4 +62,5 @@ async def get_ecdh_session_key(msg: GetECDHSessionKey) -> ECDHSessionKey:
         raise DataError("Unsupported curve for ECDH: " + curve_name)
     # END ecdh
 
+    # For curve25519, the public key has the prefix 0x00, as specified by SLIP-10. However, since this prefix is non-standard, it may be removed in the future.
     return ECDHSessionKey(session_key=session_key, public_key=node.public_key())

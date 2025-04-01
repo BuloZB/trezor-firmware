@@ -26,8 +26,8 @@ mod constants {
 /// The chunk size for the serial protocol.
 const CHUNK_SIZE: usize = 64;
 
-const READ_TIMEOUT_MS: u64 = 100000;
-const WRITE_TIMEOUT_MS: u64 = 100000;
+const READ_TIMEOUT: Duration = Duration::from_secs(0);
+const WRITE_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// An available transport for connecting with a device.
 #[derive(Debug)]
@@ -51,9 +51,8 @@ pub struct WebUsbLink {
 impl Link for WebUsbLink {
     fn write_chunk(&mut self, chunk: Vec<u8>) -> Result<(), Error> {
         debug_assert_eq!(CHUNK_SIZE, chunk.len());
-        let timeout = Duration::from_millis(WRITE_TIMEOUT_MS);
-        if let Err(e) = self.handle.write_interrupt(self.endpoint, &chunk, timeout) {
-            return Err(e.into())
+        if let Err(e) = self.handle.write_interrupt(self.endpoint, &chunk, WRITE_TIMEOUT) {
+            return Err(e.into());
         }
         Ok(())
     }
@@ -61,9 +60,8 @@ impl Link for WebUsbLink {
     fn read_chunk(&mut self) -> Result<Vec<u8>, Error> {
         let mut chunk = vec![0; CHUNK_SIZE];
         let endpoint = constants::READ_ENDPOINT_MASK | self.endpoint;
-        let timeout = Duration::from_millis(READ_TIMEOUT_MS);
 
-        let n = self.handle.read_interrupt(endpoint, &mut chunk, timeout)?;
+        let n = self.handle.read_interrupt(endpoint, &mut chunk, READ_TIMEOUT)?;
         if n == CHUNK_SIZE {
             Ok(chunk)
         } else {
@@ -101,7 +99,7 @@ impl WebUsbTransport {
                 .ok_or(rusb::Error::Other)?
                 .class_code();
             if class_code != constants::LIBUSB_CLASS_VENDOR_SPEC {
-                continue
+                continue;
             }
 
             devices.push(AvailableDevice {
@@ -137,9 +135,9 @@ impl WebUsbTransport {
         let dev_desc = dev.device_descriptor()?;
         let dev_id = (dev_desc.vendor_id(), dev_desc.product_id());
         if derive_model(dev_id).as_ref() != Some(&device.model) {
-            return Err(Error::DeviceDisconnected)
+            return Err(Error::DeviceDisconnected);
         }
-        let mut handle = dev.open()?;
+        let handle = dev.open()?;
         handle.claim_interface(interface)?;
 
         Ok(Box::new(WebUsbTransport {

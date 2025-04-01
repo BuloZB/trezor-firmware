@@ -24,6 +24,8 @@ trezor_message_impl! {
     BackupDevice => MessageType_BackupDevice,
     EntropyRequest => MessageType_EntropyRequest,
     EntropyAck => MessageType_EntropyAck,
+    EntropyCheckReady => MessageType_EntropyCheckReady,
+    EntropyCheckContinue => MessageType_EntropyCheckContinue,
     PassphraseRequest => MessageType_PassphraseRequest,
     PassphraseAck => MessageType_PassphraseAck,
     RecoveryDevice => MessageType_RecoveryDevice,
@@ -45,6 +47,10 @@ trezor_message_impl! {
     UnlockBootloader => MessageType_UnlockBootloader,
     AuthenticateDevice => MessageType_AuthenticateDevice,
     AuthenticityProof => MessageType_AuthenticityProof,
+    ChangeLanguage => MessageType_ChangeLanguage,
+    TranslationDataRequest => MessageType_TranslationDataRequest,
+    TranslationDataAck => MessageType_TranslationDataAck,
+    SetBrightness => MessageType_SetBrightness,
     SetU2FCounter => MessageType_SetU2FCounter,
     GetNextU2FCounter => MessageType_GetNextU2FCounter,
     NextU2FCounter => MessageType_NextU2FCounter,
@@ -53,17 +59,13 @@ trezor_message_impl! {
     FirmwareErase => MessageType_FirmwareErase,
     FirmwareUpload => MessageType_FirmwareUpload,
     FirmwareRequest => MessageType_FirmwareRequest,
-    SelfTest => MessageType_SelfTest,
+    ProdTestT1 => MessageType_ProdTestT1,
     CipherKeyValue => MessageType_CipherKeyValue,
     CipheredKeyValue => MessageType_CipheredKeyValue,
     SignIdentity => MessageType_SignIdentity,
     SignedIdentity => MessageType_SignedIdentity,
     GetECDHSessionKey => MessageType_GetECDHSessionKey,
     ECDHSessionKey => MessageType_ECDHSessionKey,
-    CosiCommit => MessageType_CosiCommit,
-    CosiCommitment => MessageType_CosiCommitment,
-    CosiSign => MessageType_CosiSign,
-    CosiSignature => MessageType_CosiSignature,
     DebugLinkDecision => MessageType_DebugLinkDecision,
     DebugLinkGetState => MessageType_DebugLinkGetState,
     DebugLinkState => MessageType_DebugLinkState,
@@ -79,6 +81,11 @@ trezor_message_impl! {
     DebugLinkEraseSdCard => MessageType_DebugLinkEraseSdCard,
     DebugLinkWatchLayout => MessageType_DebugLinkWatchLayout,
     DebugLinkResetDebugEvents => MessageType_DebugLinkResetDebugEvents,
+    DebugLinkOptigaSetSecMax => MessageType_DebugLinkOptigaSetSecMax,
+    BenchmarkListNames => MessageType_BenchmarkListNames,
+    BenchmarkNames => MessageType_BenchmarkNames,
+    BenchmarkRun => MessageType_BenchmarkRun,
+    BenchmarkResult => MessageType_BenchmarkResult,
 }
 
 #[cfg(feature = "binance")]
@@ -228,6 +235,14 @@ trezor_message_impl! {
     NEMSignedTx => MessageType_NEMSignedTx,
     NEMDecryptMessage => MessageType_NEMDecryptMessage,
     NEMDecryptedMessage => MessageType_NEMDecryptedMessage,
+}
+
+#[cfg(feature = "nostr")]
+trezor_message_impl! {
+    NostrGetPubkey => MessageType_NostrGetPubkey,
+    NostrPubkey => MessageType_NostrPubkey,
+    NostrSignEvent => MessageType_NostrSignEvent,
+    NostrEventSignature => MessageType_NostrEventSignature,
 }
 
 #[cfg(feature = "ripple")]

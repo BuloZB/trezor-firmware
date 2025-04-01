@@ -14,7 +14,8 @@
 # You should have received a copy of the License along with this library.
 # If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
 
-import typing as t
+from __future__ import annotations
+
 from copy import copy
 from enum import Enum
 
@@ -45,15 +46,15 @@ class FirmwareHeader(Struct):
     header_len: int
     expiry: int
     code_length: int
-    version: t.Tuple[int, int, int, int]
-    fix_version: t.Tuple[int, int, int, int]
-    hw_model: t.Union[Model, bytes]
+    version: tuple[int, int, int, int]
+    fix_version: tuple[int, int, int, int]
+    hw_model: Model | bytes
     hw_revision: int
     monotonic: int
-    hashes: t.List[bytes]
+    hashes: list[bytes]
 
-    v1_signatures: t.List[bytes]
-    v1_key_indexes: t.List[int]
+    v1_signatures: list[bytes]
+    v1_key_indexes: list[int]
 
     sigmask: int
     signature: bytes
@@ -103,23 +104,25 @@ class FirmwareImage(Struct):
 
     Consists of firmware header and code block.
     This is the expected format of firmware binaries for Trezor One, or bootloader images
-    for Trezor T."""
+    for Trezor core models."""
 
     header: FirmwareHeader = subcon(FirmwareHeader)
+    _header_end: int
     _code_offset: int
     code: bytes
 
     SUBCON = c.Struct(
         "header" / FirmwareHeader.SUBCON,
+        "_header_end" / c.Tell,
         "_code_offset" / c.Tell,
         "code" / c.Bytes(c.this.header.code_length),
         c.Terminated,
     )
 
-    def get_hash_params(self) -> "util.FirmwareHashParameters":
+    def get_hash_params(self) -> util.FirmwareHashParameters:
         return Model.from_hw_model(self.header.hw_model).hash_params()
 
-    def code_hashes(self) -> t.List[bytes]:
+    def code_hashes(self) -> list[bytes]:
         """Calculate hashes of chunks of `code`.
 
         Assume that the first `code_offset` bytes of `code` are taken up by the header.
@@ -152,7 +155,6 @@ class FirmwareImage(Struct):
             raise util.FirmwareIntegrityError("Invalid firmware data.")
 
     def digest(self) -> bytes:
-
         hash_params = self.get_hash_params()
 
         header = copy(self.header)
@@ -163,11 +165,16 @@ class FirmwareImage(Struct):
         header.v1_signatures = [b"\x00" * 64] * consts.V1_SIGNATURE_SLOTS
         return hash_params.hash_function(header.build()).digest()
 
+    def model(self) -> Model | None:
+        if isinstance(self.header.hw_model, Model):
+            return self.header.hw_model
+        return None
+
 
 class VendorFirmware(Struct):
     """Firmware image prefixed by a vendor header.
 
-    This is the expected format of firmware binaries for Trezor T."""
+    This is the expected format of firmware binaries for Trezor core models."""
 
     vendor_header: VendorHeader = subcon(VendorHeader)
     firmware: FirmwareImage = subcon(FirmwareImage)
@@ -201,3 +208,6 @@ class VendorFirmware(Struct):
         # now = time.gmtime()
         # if time.gmtime(fw.vendor_header.expiry) < now:
         #     raise ValueError("Vendor header expired.")
+
+    def model(self) -> Model | None:
+        return self.firmware.model()

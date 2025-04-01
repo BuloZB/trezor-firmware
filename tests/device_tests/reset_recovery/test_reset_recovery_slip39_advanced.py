@@ -21,14 +21,15 @@ from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.messages import BackupType
 from trezorlib.tools import parse_path
 
-from ...common import WITH_MOCK_URANDOM
+from ...common import MOCK_GET_ENTROPY
 from ...input_flows import (
     InputFlowSlip39AdvancedRecovery,
     InputFlowSlip39AdvancedResetRecovery,
 )
+from ...translations import set_language
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 @pytest.mark.setup_client(uninitialized=True)
 def test_reset_recovery(client: Client):
     mnemonics = reset(client)
@@ -49,7 +50,10 @@ def test_reset_recovery(client: Client):
         + mnemonics[22:25],
     ]
     for combination in test_combinations:
+        lang = client.features.language or "en"
         device.wipe(client)
+        set_language(client, lang[:2])
+
         recover(client, combination)
         address_after = btc.get_address(
             client, "Bitcoin", parse_path("m/44h/0h/0h/0/0")
@@ -58,27 +62,30 @@ def test_reset_recovery(client: Client):
 
 
 def reset(client: Client, strength: int = 128) -> list[str]:
-    with WITH_MOCK_URANDOM, client:
+    with client:
         IF = InputFlowSlip39AdvancedResetRecovery(client, False)
         client.set_input_flow(IF.get())
 
         # No PIN, no passphrase, don't display random
-        device.reset(
+        device.setup(
             client,
-            display_random=False,
             strength=strength,
             passphrase_protection=False,
             pin_protection=False,
             label="test",
-            language="en-US",
             backup_type=BackupType.Slip39_Advanced,
+            entropy_check_count=0,
+            _get_entropy=MOCK_GET_ENTROPY,
         )
 
     # Check if device is properly initialized
     assert client.features.initialized is True
-    assert client.features.needs_backup is False
+    assert (
+        client.features.backup_availability == messages.BackupAvailability.NotAvailable
+    )
     assert client.features.pin_protection is False
     assert client.features.passphrase_protection is False
+    assert client.features.backup_type is BackupType.Slip39_Advanced_Extendable
 
     return IF.mnemonics
 
@@ -87,9 +94,8 @@ def recover(client: Client, shares: list[str]):
     with client:
         IF = InputFlowSlip39AdvancedRecovery(client, shares, False)
         client.set_input_flow(IF.get())
-        ret = device.recover(client, pin_protection=False, label="label")
+        device.recover(client, pin_protection=False, label="label")
 
-    # Workflow successfully ended
-    assert ret == messages.Success(message="Device recovered")
     assert client.features.pin_protection is False
     assert client.features.passphrase_protection is False
+    assert client.features.backup_type is BackupType.Slip39_Advanced_Extendable

@@ -38,13 +38,13 @@ before_script:
   - . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh || true
   - $NIX_SHELL --run "poetry install --sync"
   - export LEGACY_VERSION=$($NIX_SHELL --run "./tools/version.sh legacy/firmware/version.h")
-  - export CORE_VERSION=$($NIX_SHELL --run "./tools/version.sh core/embed/firmware/version.h")
+  - export CORE_VERSION=$($NIX_SHELL --run "./tools/version.sh core/embed/projects/firmware/version.h")
 
 include:
   - ci/environment.yml
   - ci/prebuild.yml
   - ci/build.yml
   - ci/test.yml
-  - ci/test-hw.yml
+  - ci/test-nonenglish.yml
   - ci/posttest.yml
   - ci/deploy.yml

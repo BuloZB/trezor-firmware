@@ -44,8 +44,7 @@ def test_slip25_disallowed(client: Client):
         ethereum.get_public_node(client, path)
 
 
-@pytest.mark.skip_t2
-@pytest.mark.skip_tr
+@pytest.mark.models("legacy")
 def test_legacy_restrictions(client: Client):
     path = parse_path("m/46'")
     with pytest.raises(TrezorFailure, match="Invalid path for EthereumGetPublicKey"):

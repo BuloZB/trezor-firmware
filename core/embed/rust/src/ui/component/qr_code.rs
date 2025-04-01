@@ -5,11 +5,14 @@ use crate::{
     error::Error,
     ui::{
         component::{Component, Event, EventCtx, Never},
-        constant,
-        display::{pixeldata, pixeldata_dirty, rect_fill_rounded, set_window, Color},
-        geometry::{Insets, Offset, Rect},
+        display::Color,
+        geometry::{Offset, Rect},
+        shape,
+        shape::Renderer,
     },
 };
+
+use super::paginated::SinglePage;
 
 const NVERSIONS: usize = 10; // range of versions (=capacities) that we support
 const THRESHOLDS_BINARY: [usize; NVERSIONS] = [14, 26, 42, 62, 84, 106, 122, 152, 180, 213];
@@ -74,33 +77,6 @@ impl Qr {
         }
         false
     }
-
-    fn draw(qr: &QrCode, area: Rect, border: i16, scale: i16) {
-        if border > 0 {
-            rect_fill_rounded(
-                area.inset(Insets::uniform(-border)),
-                LIGHT,
-                DARK,
-                CORNER_RADIUS,
-            );
-        }
-
-        let window = area.clamp(constant::screen());
-        set_window(window);
-
-        for y in window.y0..window.y1 {
-            for x in window.x0..window.x1 {
-                let rx = (x - window.x0) / scale;
-                let ry = (y - window.y0) / scale;
-                if qr.get_module(rx.into(), ry.into()) {
-                    pixeldata(DARK);
-                } else {
-                    pixeldata(LIGHT);
-                };
-            }
-        }
-        pixeldata_dirty();
-    }
 }
 
 impl Component for Qr {
@@ -115,7 +91,7 @@ impl Component for Qr {
         None
     }
 
-    fn paint(&mut self) {
+    fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
         let mut outbuffer = [0u8; QR_MAX_VERSION.buffer_len()];
         let mut tempbuffer = [0u8; QR_MAX_VERSION.buffer_len()];
 
@@ -130,27 +106,41 @@ impl Component for Qr {
             true,
         );
         let qr = unwrap!(qr);
-        let size = qr.size() as i16;
 
-        let avail_space = self.area.width().min(self.area.height());
-        let avail_space = avail_space - 2 * self.border;
-        let scale = avail_space / size;
-        assert!((1..=10).contains(&scale));
+        let scale = (self.area.width().min(self.area.height()) - self.border) / (qr.size() as i16);
+        let side = scale * qr.size() as i16;
+        let qr_area = Rect::from_center_and_size(self.area.center(), Offset::uniform(side));
 
-        let area = Rect::from_center_and_size(self.area.center(), Offset::uniform(size * scale));
-        Self::draw(&qr, area, self.border, scale);
-    }
+        if self.border > 0 {
+            shape::Bar::new(qr_area.expand(self.border))
+                .with_bg(LIGHT)
+                .with_radius(CORNER_RADIUS as i16 + 1) // !@# + 1 to fix difference on TR
+                .render(target);
+        }
 
-    #[cfg(feature = "ui_bounds")]
-    fn bounds(&self, sink: &mut dyn FnMut(Rect)) {
-        sink(self.area)
+        shape::QrImage::new(qr_area, &qr)
+            .with_fg(LIGHT)
+            .with_bg(DARK)
+            .render(target);
     }
 }
+
+impl SinglePage for Qr {}
 
 #[cfg(feature = "ui_debug")]
 impl crate::trace::Trace for Qr {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("Qr");
-        t.string("text", self.text.as_ref());
+        t.string("text", self.text.as_str().into());
+    }
+}
+
+#[cfg(feature = "micropython")]
+mod micropython {
+    use crate::{error::Error, micropython::obj::Obj, ui::layout::obj::ComponentMsgObj};
+    impl ComponentMsgObj for super::Qr {
+        fn msg_try_into_obj(&self, _msg: Self::Msg) -> Result<Obj, Error> {
+            unreachable!();
+        }
     }
 }

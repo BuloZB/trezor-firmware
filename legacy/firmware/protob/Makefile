@@ -9,7 +9,11 @@ SKIPPED_MESSAGES := Binance Cardano DebugMonero Eos Monero Ontology Ripple SdPro
 	EthereumSignTypedData EthereumTypedDataStructRequest EthereumTypedDataStructAck \
 	EthereumTypedDataValueRequest EthereumTypedDataValueAck ShowDeviceTutorial \
 	UnlockBootloader AuthenticateDevice AuthenticityProof \
-	Solana StellarClaimClaimableBalanceOp
+	Solana StellarClaimClaimableBalanceOp \
+	ChangeLanguage TranslationDataRequest TranslationDataAck \
+	SetBrightness DebugLinkOptigaSetSecMax EntropyCheckReady EntropyCheckContinue \
+	BenchmarkListNames BenchmarkRun BenchmarkNames BenchmarkResult \
+	NostrGetPubkey NostrPubkey NostrSignEvent NostrEventSignature
 
 ifeq ($(BITCOIN_ONLY), 1)
 SKIPPED_MESSAGES += Ethereum NEM Stellar
@@ -17,7 +21,7 @@ endif
 
 PROTO_NAMES = messages messages-bitcoin messages-common messages-crypto messages-debug \
 	messages-ethereum messages-ethereum-definitions messages-management messages-nem \
-	messages-stellar
+	messages-stellar options
 
 PROTO_OPTIONS = $(PROTO_NAMES:=.options)
 PROTO_COMPILED = $(PROTO_NAMES:=.pb)
@@ -44,7 +48,7 @@ messages.pb.h: $(PROTO_COMPILED) $(PROTO_OPTIONS)
 	@printf "  PROTOC  $@\n"
 	$(Q)protoc -I/usr/include -I. $< --python_out=.
 
-messages_map.h messages_map_limits.h: messages_map.py messages_pb2.py
+messages_map.h messages_map_limits.h: messages_map.py messages_pb2.py options_pb2.py
 	$(Q)$(PYTHON) $< ${SKIPPED_MESSAGES}
 
 clean:

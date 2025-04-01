@@ -23,7 +23,7 @@ from trezorlib.exceptions import TrezorFailure
 from ...common import MNEMONIC_SLIP39_ADVANCED_20
 from ...input_flows import InputFlowSlip39AdvancedRecoveryDryRun
 
-pytestmark = pytest.mark.skip_t1
+pytestmark = pytest.mark.models("core")
 
 INVALID_SHARES_SLIP39_ADVANCED_20 = [
     "chest garlic acrobat leaf diploma thank soul predator grant laundry camera license language likely slim twice amount rich total carve",
@@ -45,19 +45,13 @@ def test_2of3_dryrun(client: Client):
             client, EXTRA_GROUP_SHARE + MNEMONIC_SLIP39_ADVANCED_20
         )
         client.set_input_flow(IF.get())
-        ret = device.recover(
+        device.recover(
             client,
             passphrase_protection=False,
             pin_protection=False,
             label="label",
-            language="en-US",
-            dry_run=True,
+            type=messages.RecoveryType.DryRun,
         )
-
-    # Dry run was successful
-    assert ret == messages.Success(
-        message="The seed is valid and matches the one in the device"
-    )
 
 
 @pytest.mark.setup_client(mnemonic=MNEMONIC_SLIP39_ADVANCED_20)
@@ -75,6 +69,5 @@ def test_2of3_invalid_seed_dryrun(client: Client):
             passphrase_protection=False,
             pin_protection=False,
             label="label",
-            language="en-US",
-            dry_run=True,
+            type=messages.RecoveryType.DryRun,
         )

@@ -1,27 +1,33 @@
-use core::mem;
-
 use heapless::Vec;
 
 use crate::{
+    strutil::{ShortString, TString},
     time::Duration,
     ui::{
-        component::{maybe::PaintOverlapping, MsgMap},
-        display::{self, Color},
+        button_request::{ButtonRequest, ButtonRequestCode},
+        component::{MsgMap, PageMap},
         geometry::{Offset, Rect},
+        shape::Renderer,
     },
 };
 
+#[cfg(feature = "ble")]
+use crate::ui::event::BLEEvent;
 #[cfg(feature = "button")]
 use crate::ui::event::ButtonEvent;
-#[cfg(feature = "touch")]
-use crate::ui::event::TouchEvent;
 use crate::ui::event::USBEvent;
+#[cfg(feature = "touch")]
+use crate::ui::{
+    event::{SwipeEvent, TouchEvent},
+    geometry::Direction,
+};
 
 use super::Paginate;
 
 /// Type used by components that do not return any messages.
 ///
 /// Alternative to the yet-unstable `!`-type.
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
 pub enum Never {}
 
 /// User interface is composed of components that can react to `Event`s through
@@ -47,18 +53,15 @@ pub trait Component {
     /// Component can also optionally return a message as a result of the
     /// interaction.
     ///
+    /// For all components to work properly (e.g. react to `ctx.request_paint`),
+    /// it is required to call `event` function to them, even if they never
+    /// return a message.
+    ///
     /// No painting should be done in this phase.
     fn event(&mut self, ctx: &mut EventCtx, event: Event) -> Option<Self::Msg>;
 
     /// Render to screen, based on current internal state.
-    ///
-    /// To prevent unnecessary over-draw, dirty state checking is performed in
-    /// the `Child` wrapper.
-    fn paint(&mut self);
-
-    #[cfg(feature = "ui_bounds")]
-    /// Report current paint bounds of this component. Used for debugging.
-    fn bounds(&self, _sink: &mut dyn FnMut(Rect)) {}
+    fn render<'s>(&'s self, _target: &mut impl Renderer<'s>);
 }
 
 /// Components should always avoid unnecessary overpaint to prevent obvious
@@ -66,13 +69,14 @@ pub trait Component {
 /// dirty flag for it. Any mutation of `T` has to happen through the `mutate`
 /// accessor, `T` can then request a paint call to be scheduled later by calling
 /// `EventCtx::request_paint` in its `event` pass.
+#[derive(Clone)]
 pub struct Child<T> {
     component: T,
     marked_for_paint: bool,
 }
 
 impl<T> Child<T> {
-    pub fn new(component: T) -> Self {
+    pub const fn new(component: T) -> Self {
         Self {
             component,
             marked_for_paint: true,
@@ -93,7 +97,7 @@ impl<T> Child<T> {
     where
         F: FnOnce(&mut EventCtx, &mut T) -> U,
     {
-        let prev_requested = mem::replace(&mut ctx.paint_requested, false);
+        let prev_requested = core::mem::replace(&mut ctx.paint_requested, false);
         let result = component_func(ctx, &mut self.component);
         if ctx.paint_requested {
             // If a paint was requested anywhere in the inner component tree, we need to
@@ -135,49 +139,25 @@ where
             // Handle the internal invalidation event here, so components don't have to. We
             // still pass it inside, so the event propagates correctly to all components in
             // the sub-tree.
-            if let Event::RequestPaint = event {
+            if matches!(event, Event::RequestPaint | Event::Attach(_)) {
                 ctx.request_paint();
             }
             c.event(ctx, event)
         })
     }
 
-    fn paint(&mut self) {
-        if self.marked_for_paint {
-            self.marked_for_paint = false;
-            self.component.paint();
-        }
-    }
-
-    #[cfg(feature = "ui_bounds")]
-    fn bounds(&self, sink: &mut dyn FnMut(Rect)) {
-        self.component.bounds(sink)
+    fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
+        self.component.render(target);
     }
 }
 
 impl<T: Paginate> Paginate for Child<T> {
-    fn page_count(&mut self) -> usize {
+    fn page_count(&self) -> usize {
         self.component.page_count()
     }
 
     fn change_page(&mut self, active_page: usize) {
         self.component.change_page(active_page);
-    }
-}
-
-impl<T> PaintOverlapping for Child<T>
-where
-    T: PaintOverlapping,
-{
-    fn cleared_area(&self) -> Option<(Rect, Color)> {
-        self.component.cleared_area()
-    }
-
-    fn paint_overlapping(&mut self) {
-        if self.marked_for_paint {
-            self.marked_for_paint = false;
-            self.component.paint_overlapping()
-        }
     }
 }
 
@@ -188,80 +168,6 @@ where
 {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         self.component.trace(t)
-    }
-}
-
-/// Same as `Child` but also handles screen clearing when layout is first
-/// painted.
-pub struct Root<T> {
-    inner: Child<T>,
-    marked_for_clear: bool,
-}
-
-impl<T> Root<T> {
-    pub fn new(component: T) -> Self {
-        Self {
-            inner: Child::new(component),
-            marked_for_clear: true,
-        }
-    }
-
-    pub fn inner(&self) -> &Child<T> {
-        &self.inner
-    }
-
-    pub fn skip_paint(&mut self) {
-        self.inner.skip_paint()
-    }
-
-    pub fn clear_screen(&mut self) {
-        self.marked_for_clear = true;
-    }
-}
-
-impl<T> Component for Root<T>
-where
-    T: Component,
-{
-    type Msg = T::Msg;
-
-    fn place(&mut self, bounds: Rect) -> Rect {
-        self.inner.place(bounds)
-    }
-
-    fn event(&mut self, ctx: &mut EventCtx, event: Event) -> Option<Self::Msg> {
-        let msg = self.inner.event(ctx, event);
-        if ctx.needs_repaint_root() {
-            self.marked_for_clear = true;
-            let mut dummy_ctx = EventCtx::new();
-            let paint_msg = self.inner.event(&mut dummy_ctx, Event::RequestPaint);
-            assert!(matches!(paint_msg, None));
-            assert!(dummy_ctx.timers.is_empty());
-        }
-        msg
-    }
-
-    fn paint(&mut self) {
-        if self.marked_for_clear && self.inner.will_paint() {
-            self.marked_for_clear = false;
-            display::clear()
-        }
-        self.inner.paint();
-    }
-
-    #[cfg(feature = "ui_bounds")]
-    fn bounds(&self, sink: &mut dyn FnMut(Rect)) {
-        self.inner.bounds(sink)
-    }
-}
-
-#[cfg(feature = "ui_debug")]
-impl<T> crate::trace::Trace for Root<T>
-where
-    T: crate::trace::Trace,
-{
-    fn trace(&self, t: &mut dyn crate::trace::Tracer) {
-        self.inner.trace(t)
     }
 }
 
@@ -282,15 +188,9 @@ where
             .or_else(|| self.1.event(ctx, event))
     }
 
-    fn paint(&mut self) {
-        self.0.paint();
-        self.1.paint();
-    }
-
-    #[cfg(feature = "ui_bounds")]
-    fn bounds(&self, sink: &mut dyn FnMut(Rect)) {
-        self.0.bounds(sink);
-        self.1.bounds(sink);
+    fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
+        self.0.render(target);
+        self.1.render(target);
     }
 }
 
@@ -330,17 +230,10 @@ where
             .or_else(|| self.2.event(ctx, event))
     }
 
-    fn paint(&mut self) {
-        self.0.paint();
-        self.1.paint();
-        self.2.paint();
-    }
-
-    #[cfg(feature = "ui_bounds")]
-    fn bounds(&self, sink: &mut dyn FnMut(Rect)) {
-        self.0.bounds(sink);
-        self.1.bounds(sink);
-        self.2.bounds(sink);
+    fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
+        self.0.render(target);
+        self.1.render(target);
+        self.2.render(target);
     }
 }
 
@@ -357,9 +250,9 @@ where
         }
     }
 
-    fn paint(&mut self) {
-        if let Some(ref mut c) = self {
-            c.paint()
+    fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
+        if let Some(ref c) = self {
+            c.render(target)
         }
     }
 
@@ -369,17 +262,11 @@ where
             _ => bounds.with_size(Offset::zero()),
         }
     }
-
-    #[cfg(feature = "ui_bounds")]
-    fn bounds(&self, sink: &mut dyn FnMut(Rect)) {
-        if let Some(ref c) = self {
-            c.bounds(sink)
-        }
-    }
 }
 
 pub trait ComponentExt: Sized {
     fn map<F>(self, func: F) -> MsgMap<Self, F>;
+    fn with_pages<F>(self, func: F) -> PageMap<Self, F>;
     fn into_child(self) -> Child<Self>;
     fn request_complete_repaint(&mut self, ctx: &mut EventCtx);
 }
@@ -392,6 +279,10 @@ where
         MsgMap::new(self, func)
     }
 
+    fn with_pages<F>(self, func: F) -> PageMap<Self, F> {
+        PageMap::new(self, func)
+    }
+
     fn into_child(self) -> Child<Self> {
         Child::new(self)
     }
@@ -401,7 +292,7 @@ where
             // Messages raised during a `RequestPaint` dispatch are not propagated, let's
             // make sure we don't do that.
             #[cfg(feature = "ui_debug")]
-            panic!("cannot raise messages during RequestPaint");
+            fatal_error!("Cannot raise messages during RequestPaint");
         }
         // Make sure to at least a propagate the paint flag upwards (in case there are
         // no `Child` instances in `self`, paint would not get automatically requested
@@ -411,31 +302,70 @@ where
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub enum Event<'a> {
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
+pub enum AttachType {
+    /// Initial attach, redraw the whole screen
+    Initial,
+    /// The layout is already rendered on display, resume any animation
+    /// where we left off. The animation state is expected to be stored locally
+    /// in the given component.
+    Resume,
+    #[cfg(feature = "touch")]
+    Swipe(Direction),
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
+pub enum Event {
     #[cfg(feature = "button")]
     Button(ButtonEvent),
     #[cfg(feature = "touch")]
     Touch(TouchEvent),
+    #[cfg(feature = "ble")]
+    BLE(BLEEvent),
     USB(USBEvent),
     /// Previously requested timer was triggered. This invalidates the timer
     /// token (another timer has to be requested).
     Timer(TimerToken),
     /// Advance progress bar. Progress screens only.
-    Progress(u16, &'a str),
-    /// Component has been attached to component tree. This event is sent once
-    /// before any other events.
-    Attach,
+    Progress(u16, TString<'static>),
+    /// Component has been attached to component tree, all children should
+    /// prepare for painting and/or start their timers.
+    /// This event is sent once before any other events.
+    Attach(AttachType),
     /// Internally-handled event to inform all `Child` wrappers in a sub-tree to
     /// get scheduled for painting.
     RequestPaint,
+    /// Swipe and transition events
+    #[cfg(feature = "touch")]
+    Swipe(SwipeEvent),
+}
+
+/// Result of an event processor.
+///
+/// Indicates whether to continue processing the event, propagate it further,
+/// or stop processing it.
+#[derive(Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
+pub enum EventPropagation {
+    /// Event was not consumed by the component, propagate it further.
+    Continue,
+    /// Event was consumed by the component, do not propagate it further.
+    Stop,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
 pub struct TimerToken(u32);
 
 impl TimerToken {
     /// Value of an invalid (or missing) token.
     pub const INVALID: TimerToken = TimerToken(0);
+    /// Reserved value of the animation frame timer.
+    pub const ANIM_FRAME: TimerToken = TimerToken(1);
+
+    /// Starting token value
+    const STARTING_TOKEN: u32 = 2;
 
     pub const fn from_raw(raw: u32) -> Self {
         Self(raw)
@@ -444,16 +374,86 @@ impl TimerToken {
     pub const fn into_raw(self) -> u32 {
         self.0
     }
+
+    pub fn next_token() -> Self {
+        static mut NEXT_TOKEN: TimerToken = Self(TimerToken::STARTING_TOKEN);
+
+        // SAFETY: we are in single-threaded environment
+        let token = unsafe { NEXT_TOKEN };
+        let next = {
+            if token.0 == u32::MAX {
+                TimerToken(Self::STARTING_TOKEN)
+            } else {
+                TimerToken(token.0 + 1)
+            }
+        };
+        // SAFETY: we are in single-threaded environment
+        unsafe { NEXT_TOKEN = next };
+        token
+    }
+}
+
+#[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
+pub struct Timer {
+    token: TimerToken,
+    running: bool,
+}
+
+impl Timer {
+    /// Create a new timer.
+    pub const fn new() -> Self {
+        Self {
+            token: TimerToken::INVALID,
+            running: false,
+        }
+    }
+
+    /// Start this timer for a given duration.
+    ///
+    /// Requests the internal timer token to be scheduled to `duration` from
+    /// now. If the timer was already running, its token is rescheduled.
+    pub fn start(&mut self, ctx: &mut EventCtx, duration: Duration) {
+        if self.token == TimerToken::INVALID {
+            self.token = TimerToken::next_token();
+        }
+        self.running = true;
+        ctx.register_timer(self.token, duration);
+    }
+
+    /// Stop the timer.
+    ///
+    /// Does not affect scheduling, only clears the internal timer token. This
+    /// means that _some_ scheduled task might keep running, but this timer
+    /// will not trigger when that task expires.
+    pub fn stop(&mut self) {
+        self.running = false;
+    }
+
+    /// Check if the timer has expired.
+    ///
+    /// Returns `true` if the given event is a timer event and the token matches
+    /// the internal token of this timer.
+    pub fn expire(&mut self, event: Event) -> bool {
+        if self.running && event == Event::Timer(self.token) {
+            self.running = false;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 pub struct EventCtx {
     timers: Vec<(TimerToken, Duration), { Self::MAX_TIMERS }>,
-    next_token: u32,
     place_requested: bool,
     paint_requested: bool,
     anim_frame_scheduled: bool,
     page_count: Option<usize>,
+    button_request: Option<ButtonRequest>,
     root_repaint_requested: bool,
+    swipe_disable_req: bool,
+    swipe_enable_req: bool,
+    transition_out: Option<AttachType>,
 }
 
 impl EventCtx {
@@ -461,11 +461,7 @@ impl EventCtx {
     pub const ANIM_FRAME_TIMER: TimerToken = TimerToken(1);
 
     /// How long into the future we should schedule the animation frame timer.
-    const ANIM_FRAME_DEADLINE: Duration = Duration::from_millis(18);
-
-    // 0 == `TimerToken::INVALID`,
-    // 1 == `Self::ANIM_FRAME_TIMER`.
-    const STARTING_TIMER_TOKEN: u32 = 2;
+    const ANIM_FRAME_DURATION: Duration = Duration::from_millis(1);
 
     /// Maximum amount of timers requested in one event tick.
     const MAX_TIMERS: usize = 4;
@@ -473,13 +469,15 @@ impl EventCtx {
     pub fn new() -> Self {
         Self {
             timers: Vec::new(),
-            next_token: Self::STARTING_TIMER_TOKEN,
-            place_requested: true, // We need to perform a place pass in the beginning.
-            paint_requested: false, /* We also need to paint, but this is supplemented by
-                                    * `Child::marked_for_paint` being true. */
+            place_requested: false,
+            paint_requested: false,
             anim_frame_scheduled: false,
             page_count: None,
+            button_request: None,
             root_repaint_requested: false,
+            swipe_disable_req: false,
+            swipe_enable_req: false,
+            transition_out: None,
         }
     }
 
@@ -492,7 +490,7 @@ impl EventCtx {
 
     /// Returns `true` if we should first perform a place traversal before
     /// processing events or painting.
-    pub fn needs_place_before_next_event_or_paint(&self) -> bool {
+    pub fn needs_place(&self) -> bool {
         self.place_requested
     }
 
@@ -503,19 +501,16 @@ impl EventCtx {
         self.paint_requested = true;
     }
 
-    /// Request a timer event to be delivered after `deadline` elapses.
-    pub fn request_timer(&mut self, deadline: Duration) -> TimerToken {
-        let token = self.next_timer_token();
-        self.register_timer(token, deadline);
-        token
-    }
-
     /// Request an animation frame timer to fire as soon as possible.
     pub fn request_anim_frame(&mut self) {
         if !self.anim_frame_scheduled {
             self.anim_frame_scheduled = true;
-            self.register_timer(Self::ANIM_FRAME_TIMER, Self::ANIM_FRAME_DEADLINE);
+            self.register_timer(Self::ANIM_FRAME_TIMER, Self::ANIM_FRAME_DURATION);
         }
+    }
+
+    pub fn is_anim_frame(event: Event) -> bool {
+        matches!(event, Event::Timer(token) if token == Self::ANIM_FRAME_TIMER)
     }
 
     pub fn request_repaint_root(&mut self) {
@@ -526,46 +521,105 @@ impl EventCtx {
         self.root_repaint_requested
     }
 
+    pub fn needs_repaint(&self) -> bool {
+        self.paint_requested
+    }
+
     pub fn set_page_count(&mut self, count: usize) {
-        #[cfg(feature = "ui_debug")]
-        assert!(self.page_count.is_none());
+        // #[cfg(feature = "ui_debug")]
+        // assert!(self.page_count.unwrap_or(count) == count);
         self.page_count = Some(count);
+    }
+
+    pub fn map_page_count(&mut self, func: impl Fn(usize) -> usize) {
+        self.page_count = Some(func(self.page_count.unwrap_or(1)));
     }
 
     pub fn page_count(&self) -> Option<usize> {
         self.page_count
     }
 
+    pub fn send_button_request(&mut self, code: ButtonRequestCode, name: TString<'static>) {
+        debug_assert!(self.button_request.is_none());
+        self.button_request = Some(ButtonRequest::new(code, name));
+    }
+
+    pub fn button_request(&mut self) -> Option<ButtonRequest> {
+        self.button_request.take()
+    }
+
     pub fn pop_timer(&mut self) -> Option<(TimerToken, Duration)> {
         self.timers.pop()
     }
 
-    pub fn clear(&mut self) {
-        self.place_requested = false;
-        self.paint_requested = false;
-        self.anim_frame_scheduled = false;
-        self.page_count = None;
-        self.root_repaint_requested = false;
+    pub fn disable_swipe(&mut self) {
+        self.swipe_disable_req = true;
     }
 
-    fn register_timer(&mut self, token: TimerToken, deadline: Duration) {
-        if self.timers.push((token, deadline)).is_err() {
+    pub fn disable_swipe_requested(&self) -> bool {
+        self.swipe_disable_req
+    }
+
+    pub fn enable_swipe(&mut self) {
+        self.swipe_enable_req = true;
+    }
+
+    pub fn enable_swipe_requested(&self) -> bool {
+        self.swipe_enable_req
+    }
+
+    pub fn clear(&mut self) {
+        debug_assert!(self.button_request.is_none());
+        // replace self with a new instance, keeping only the fields we care about
+        *self = Self::new();
+    }
+
+    fn register_timer(&mut self, token: TimerToken, duration: Duration) {
+        if self.timers.push((token, duration)).is_err() {
             // The timer queue is full, this would be a development error in the layout
             // layer. Let's panic in the debug env.
             #[cfg(feature = "ui_debug")]
-            panic!("timer queue is full");
+            fatal_error!("Timer queue is full");
         }
     }
 
-    fn next_timer_token(&mut self) -> TimerToken {
-        let token = TimerToken(self.next_token);
-        // We start again from the beginning if the token counter overflows. This would
-        // probably happen in case of a bug and a long-running session. Let's risk the
-        // collisions in such case.
-        self.next_token = self
-            .next_token
-            .checked_add(1)
-            .unwrap_or(Self::STARTING_TIMER_TOKEN);
-        token
+    pub fn set_transition_out(&mut self, attach_type: AttachType) {
+        self.transition_out = Some(attach_type);
+    }
+
+    pub fn get_transition_out(&self) -> Option<AttachType> {
+        self.transition_out
+    }
+}
+
+/// Component::Msg for component parts of a swipe flow. Converting results of
+/// different screens to a shared type makes things easier to work with.
+///
+/// Also currently the type for message emitted by Flow::event to
+/// micropython. They don't need to be the same.
+#[derive(Clone)]
+pub enum FlowMsg {
+    Confirmed,
+    Cancelled,
+    Info,
+    Next,
+    Choice(usize),
+    Text(ShortString),
+}
+
+#[cfg(feature = "micropython")]
+impl TryFrom<FlowMsg> for crate::micropython::obj::Obj {
+    type Error = crate::error::Error;
+
+    fn try_from(val: FlowMsg) -> Result<crate::micropython::obj::Obj, Self::Error> {
+        use crate::ui::layout::result;
+
+        match val {
+            FlowMsg::Confirmed | FlowMsg::Next => Ok(result::CONFIRMED.as_obj()),
+            FlowMsg::Cancelled => Ok(result::CANCELLED.as_obj()),
+            FlowMsg::Info => Ok(result::INFO.as_obj()),
+            FlowMsg::Choice(i) => i.try_into(),
+            FlowMsg::Text(s) => s.as_str().try_into(),
+        }
     }
 }

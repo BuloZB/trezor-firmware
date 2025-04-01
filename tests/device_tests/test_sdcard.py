@@ -21,7 +21,9 @@ from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import TrezorFailure
 from trezorlib.messages import SdProtectOperationType as Op
 
-pytestmark = [pytest.mark.skip_t1, pytest.mark.skip_tr]
+from .. import translations as TR
+
+pytestmark = pytest.mark.models("core", skip="safe3")
 
 
 @pytest.mark.sd_card(formatted=False)
@@ -49,7 +51,7 @@ def test_sd_no_format(client: Client):
 @pytest.mark.sd_card
 @pytest.mark.setup_client(pin="1234")
 def test_sd_protect_unlock(client: Client):
-    layout = client.debug.wait_layout
+    layout = client.debug.read_layout
 
     def input_flow_enable_sd_protect():
         yield  # Enter PIN to unlock device
@@ -57,7 +59,7 @@ def test_sd_protect_unlock(client: Client):
         client.debug.input("1234")
 
         yield  # do you really want to enable SD protection
-        assert "SD card protection" in layout().text_content()
+        assert TR.sd_card__enable in layout().text_content()
         client.debug.press_yes()
 
         yield  # enter current PIN
@@ -65,7 +67,7 @@ def test_sd_protect_unlock(client: Client):
         client.debug.input("1234")
 
         yield  # you have successfully enabled SD protection
-        assert "You have successfully enabled SD protection." in layout().text_content()
+        assert TR.sd_card__enabled in layout().text_content()
         client.debug.press_yes()
 
     with client:
@@ -75,7 +77,7 @@ def test_sd_protect_unlock(client: Client):
 
     def input_flow_change_pin():
         yield  # do you really want to change PIN?
-        assert "PIN SETTINGS" == layout().title()
+        assert layout().title() == TR.pin__title_settings
         client.debug.press_yes()
 
         yield  # enter current PIN
@@ -91,7 +93,7 @@ def test_sd_protect_unlock(client: Client):
         client.debug.input("1234")
 
         yield  # Pin change successful
-        assert "PIN changed" in layout().text_content()
+        assert TR.pin__changed in layout().text_content()
         client.debug.press_yes()
 
     with client:
@@ -103,7 +105,7 @@ def test_sd_protect_unlock(client: Client):
 
     def input_flow_change_pin_format():
         yield  # do you really want to change PIN?
-        assert "PIN SETTINGS" == layout().title()
+        assert layout().title() == TR.pin__title_settings
         client.debug.press_yes()
 
         yield  # enter current PIN
@@ -111,7 +113,10 @@ def test_sd_protect_unlock(client: Client):
         client.debug.input("1234")
 
         yield  # SD card problem
-        assert "Wrong SD card" in layout().text_content()
+        assert (
+            TR.sd_card__unplug_and_insert_correct in layout().text_content()
+            or TR.sd_card__insert_correct_card in layout().text_content()
+        )
         client.debug.press_no()  # close
 
     with client, pytest.raises(TrezorFailure) as e:

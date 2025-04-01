@@ -20,37 +20,39 @@ import pytest
 from shamir_mnemonic import MnemonicError, shamir
 
 from trezorlib import device
+from trezorlib.btc import get_public_node
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import TrezorFailure
-from trezorlib.messages import BackupType
+from trezorlib.messages import BackupAvailability, BackupType
 
-from ...common import EXTERNAL_ENTROPY, WITH_MOCK_URANDOM, generate_entropy
+from ...common import EXTERNAL_ENTROPY, MOCK_GET_ENTROPY, generate_entropy
 from ...input_flows import InputFlowSlip39BasicResetRecovery
 
-pytestmark = [pytest.mark.skip_t1]
+pytestmark = pytest.mark.models("core")
 
 
 def reset_device(client: Client, strength: int):
     member_threshold = 3
 
-    with WITH_MOCK_URANDOM, client:
+    with client:
         IF = InputFlowSlip39BasicResetRecovery(client)
         client.set_input_flow(IF.get())
 
         # No PIN, no passphrase, don't display random
-        device.reset(
+        device.setup(
             client,
-            display_random=False,
             strength=strength,
             passphrase_protection=False,
             pin_protection=False,
             label="test",
-            language="en-US",
             backup_type=BackupType.Slip39_Basic,
+            entropy_check_count=0,
+            _get_entropy=MOCK_GET_ENTROPY,
         )
 
     # generate secret locally
     internal_entropy = client.debug.state().reset_entropy
+    assert internal_entropy is not None
     secret = generate_entropy(strength, internal_entropy, EXTERNAL_ENTROPY)
 
     # validate that all combinations will result in the correct master secret
@@ -58,10 +60,10 @@ def reset_device(client: Client, strength: int):
 
     # Check if device is properly initialized
     assert client.features.initialized is True
-    assert client.features.needs_backup is False
+    assert client.features.backup_availability == BackupAvailability.NotAvailable
     assert client.features.pin_protection is False
     assert client.features.passphrase_protection is False
-    assert client.features.backup_type is BackupType.Slip39_Basic
+    assert client.features.backup_type is BackupType.Slip39_Basic_Extendable
 
     # backup attempt fails because backup was done in reset
     with pytest.raises(TrezorFailure, match="ProcessError: Seed already backed up"):
@@ -76,6 +78,49 @@ def test_reset_device_slip39_basic(client: Client):
 @pytest.mark.setup_client(uninitialized=True)
 def test_reset_device_slip39_basic_256(client: Client):
     reset_device(client, 256)
+
+
+@pytest.mark.setup_client(uninitialized=True)
+def test_reset_entropy_check(client: Client):
+    member_threshold = 3
+
+    strength = 128  # 20 words
+
+    with client:
+        IF = InputFlowSlip39BasicResetRecovery(client)
+        client.set_input_flow(IF.get())
+
+        # No PIN, no passphrase.
+        path_xpubs = device.setup(
+            client,
+            strength=strength,
+            passphrase_protection=False,
+            pin_protection=False,
+            label="test",
+            backup_type=BackupType.Slip39_Basic,
+            entropy_check_count=3,
+            _get_entropy=MOCK_GET_ENTROPY,
+        )
+
+    # Generate the master secret locally.
+    internal_entropy = client.debug.state().reset_entropy
+    assert internal_entropy is not None
+    secret = generate_entropy(strength, internal_entropy, EXTERNAL_ENTROPY)
+
+    # Check that all combinations will result in the correct master secret.
+    validate_mnemonics(IF.mnemonics, member_threshold, secret)
+
+    # Check that the device is properly initialized.
+    assert client.features.initialized is True
+    assert client.features.backup_availability == BackupAvailability.NotAvailable
+    assert client.features.pin_protection is False
+    assert client.features.passphrase_protection is False
+    assert client.features.backup_type is BackupType.Slip39_Basic_Extendable
+
+    # Check that the XPUBs are the same as those from the entropy check.
+    for path, xpub in path_xpubs:
+        res = get_public_node(client, path)
+        assert res.xpub == xpub
 
 
 def validate_mnemonics(mnemonics, threshold, expected_ems):

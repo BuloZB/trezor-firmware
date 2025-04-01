@@ -4,9 +4,10 @@ RETURN=0
 EXCEPTIONS=()
 EXCEPTIONS+=( "decred" )  # "decred" figures in field names used by the bitcoin app
 EXCEPTIONS+=( "omni" )  # OMNI is part of the bitcoin app
-# BIP39 or SLIP39 words that have "dash" in them
-EXCEPTIONS+=( "dash" )
-EXCEPTIONS+=( "confirm_ethereum_tx" )  # is model-specific, so is in layout/__init__.py instead of ethereum/layout.py
+EXCEPTIONS+=( "derive_cardano" )  # field name in Initialize message
+# BIP39 or SLIP39 words that have "dash" and "ripple" in them
+EXCEPTIONS+=( "dash" "ripple" )
+EXCEPTIONS+=( "base" ) # name EVM chain
 
 GREP_ARGS=()
 for exception in "${EXCEPTIONS[@]}"; do
@@ -14,7 +15,7 @@ for exception in "${EXCEPTIONS[@]}"; do
 done
 
 # dump all coins except the first 3 (Bitcoin, Testnet, Regtest), exclude names with less than 4 characters
-ALTCOINS=$(./common/tools/cointool.py dump -l -p -t -d T1B1 -d T2T1 -d T2B1 | grep '"name"' | cut -d '"' -f 4 | tail -n +4 | awk 'length($0)>3')
+ALTCOINS=$(./common/tools/cointool.py dump -l -p -t | grep '"name"' | cut -d '"' -f 4 | tail -n +4 | awk 'length($0)>3')
 # split on newlines only
 OLDIFS=$IFS
 IFS="

@@ -21,6 +21,7 @@ from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.exceptions import TrezorFailure
 from trezorlib.tools import parse_path
 
+from ...common import is_core
 from ...tx_cache import TxCache
 from .signtx import (
     request_finished,
@@ -115,8 +116,6 @@ def test_p2pkh_fee_bump(client: Client):
         orig_index=1,
     )
 
-    is_core = client.features.model in ("T", "Safe 3")
-
     with client:
         client.set_expected_responses(
             [
@@ -133,7 +132,7 @@ def test_p2pkh_fee_bump(client: Client):
                 request_meta(TXHASH_beafc7),
                 request_input(0, TXHASH_beafc7),
                 request_output(0, TXHASH_beafc7),
-                (is_core, request_orig_input(0, TXHASH_50f6f1)),
+                (is_core(client), request_orig_input(0, TXHASH_50f6f1)),
                 request_orig_input(0, TXHASH_50f6f1),
                 request_orig_output(0, TXHASH_50f6f1),
                 request_orig_output(1, TXHASH_50f6f1),
@@ -355,7 +354,7 @@ def test_p2wpkh_finalize(client: Client):
     )
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 @pytest.mark.parametrize(
     "out1_amount, out2_amount, copayer_witness, fee_confirm, expected_tx",
     (
@@ -649,7 +648,7 @@ def test_p2wpkh_in_p2sh_fee_bump_from_external(client: Client):
     )
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 def test_tx_meld(client: Client):
     # Meld two original transactions into one, joining the change-outputs into a different one.
 
@@ -870,7 +869,7 @@ def test_attack_steal_change(client: Client):
         )
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 def test_attack_false_internal(client: Client):
     # Falsely claim that an external input is internal in the original transaction.
     # If this were possible, it would allow an attacker to make it look like the
@@ -977,7 +976,7 @@ def test_attack_fake_int_input_amount(client: Client):
         )
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 def test_attack_fake_ext_input_amount(client: Client):
     # Give a fake input amount for an original external input while giving the correct
     # amount for the replacement input. If an attacker could decrease the amount of an

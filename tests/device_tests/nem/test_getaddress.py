@@ -25,7 +25,7 @@ from ...common import MNEMONIC12
 
 @pytest.mark.altcoin
 @pytest.mark.nem
-@pytest.mark.skip_tr  # coin not supported,
+@pytest.mark.models("t1b1", "t2t1")
 @pytest.mark.setup_client(mnemonic=MNEMONIC12)
 @pytest.mark.parametrize("chunkify", (True, False))
 def test_nem_getaddress(client: Client, chunkify: bool):

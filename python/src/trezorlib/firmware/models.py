@@ -14,6 +14,8 @@
 # You should have received a copy of the License along with this library.
 # If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
 
+from __future__ import annotations
+
 import hashlib
 import typing as t
 from dataclasses import dataclass
@@ -24,35 +26,46 @@ from .util import FirmwareHashParameters
 if t.TYPE_CHECKING:
     from typing_extensions import Self
 
+    from ..models import TrezorModel
+
 
 class Model(Enum):
     T1B1 = b"T1B1"
-    T2T1 = b"T2T1"
     T2B1 = b"T2B1"
+    T2T1 = b"T2T1"
+    T3B1 = b"T3B1"
+    T3T1 = b"T3T1"
+    T3W1 = b"T3W1"
     D001 = b"D001"
+    D002 = b"D002"
 
     # legacy aliases
-    ONE = T1B1
-    T = T2T1
-    R = T2B1
-    DISC1 = D001
+    ONE = b"T1B1"
+    T = b"T2T1"
+    R = b"T2B1"
+    DISC1 = b"D001"
+    DISC2 = b"D002"
 
     @classmethod
-    def from_hw_model(cls, hw_model: t.Union["Self", bytes]) -> "Self":
+    def from_hw_model(cls, hw_model: Self | bytes) -> Model:
         if isinstance(hw_model, cls):
             return hw_model
         if hw_model == b"\x00\x00\x00\x00":
             return cls.T2T1
         raise ValueError(f"Unknown hardware model: {hw_model}")
 
-    def model_keys(self, dev_keys: bool = False) -> "ModelKeys":
+    @classmethod
+    def from_trezor_model(cls, trezor_model: TrezorModel) -> Self:
+        return cls(trezor_model.internal_name.encode("ascii"))
+
+    def model_keys(self, dev_keys: bool = False) -> ModelKeys:
         if dev_keys:
             model_map = MODEL_MAP_DEV
         else:
             model_map = MODEL_MAP
         return model_map[self]
 
-    def hash_params(self) -> "FirmwareHashParameters":
+    def hash_params(self) -> FirmwareHashParameters:
         return MODEL_HASH_PARAMS_MAP[self]
 
 
@@ -213,6 +226,77 @@ T2B1 = ModelKeys(
     firmware_sigs_needed=-1,
 )
 
+T3T1 = ModelKeys(
+    production=True,
+    boardloader_keys=[
+        bytes.fromhex(key)
+        for key in (
+            "76af426e61406bad7c077b409c66fde39fb817919313ae1e4c02535c80beed96",
+            "619751dc8d2d09d7e5dfb99e41f606debdf419f85a8143e8e5399ea67a3988c7",
+            "abf94b6615a7dde2a871f7d62c38efc7d9d8f6010d8846bee636e4f3e658a38c",
+        )
+    ],
+    boardloader_sigs_needed=2,
+    bootloader_keys=[
+        bytes.fromhex(key)
+        for key in (
+            "338b949b7e3b26470d4fe3696fd6fff28757265d14cca48ebf2db97b4f5bc039",
+            "28682027730b783201b05a8c9d11685447c17297db71b8a60dc693a44610751d",
+            "9fbf31b4e351a4cc81c75995b2257f0a7169268da5a44e94b6a5590d434e32da",
+        )
+    ],
+    bootloader_sigs_needed=2,
+    firmware_keys=(),
+    firmware_sigs_needed=-1,
+)
+
+T3B1 = ModelKeys(
+    production=True,
+    boardloader_keys=[
+        bytes.fromhex(key)
+        for key in (
+            "bbc21adbc1b44d6bfe10c5223de33c28429e52680707d3249007ed42dcc5be13",
+            "22e42a301f3b6ff4f2e6926bce4359e83fc83f0f4a84a7338959c1fd0e29dc13",
+            "7f478f5fb78d8c054b720d8104bf2f6487e452402458979b5525c290dc344d32",
+        )
+    ],
+    boardloader_sigs_needed=2,
+    bootloader_keys=[
+        bytes.fromhex(key)
+        for key in (
+            "41d9884801377cff04b0b459fc9b56af1b51f47343a3a6e4fdc1eacabcad7756",
+            "23ec4ec4674d68ac5431e8ba84d7ac24cb5a66702ec565014d164a72182a66c7",
+            "8a7dac53e1be46607231920b0c71056a27be16b67a2fc0d8644d5f8708a28dd1",
+        )
+    ],
+    bootloader_sigs_needed=2,
+    firmware_keys=(),
+    firmware_sigs_needed=-1,
+)
+
+T3W1 = ModelKeys(
+    production=True,
+    boardloader_keys=[
+        bytes.fromhex(key)
+        for key in (
+            "e8912f81b3e780ee650ed3856db5326e0b9eff10364b339193e7a8f10f7621b9",
+            "bde70a38eee633d26f434eee2f536df457b8deb8bd988294f4a0c8d9054903d2",
+            "a85b601dfbda1d22ccb5dd492d26034d87f67f2a0b8584b7774439461fc471a9",
+        )
+    ],
+    boardloader_sigs_needed=2,
+    bootloader_keys=[
+        bytes.fromhex(key)
+        for key in (
+            "320e111e9dded5fe7f5d41fd372ef0e91b2dfa4c6cdc9fe5221bfb16aaf91775",
+            "2e349f8d06b2334262ecb603ed04cb5a7cc0b660ebe3cd5c2972b5cd1f38ef85",
+            "ab0d3f91a4adf744719dba661783ec549f73a4e45457cb6d02752a40fb63d3bf",
+        )
+    ],
+    bootloader_sigs_needed=2,
+    firmware_keys=(),
+    firmware_sigs_needed=-1,
+)
 
 LEGACY_HASH_PARAMS = FirmwareHashParameters(
     hash_function=hashlib.sha256,
@@ -226,28 +310,64 @@ T2T1_HASH_PARAMS = FirmwareHashParameters(
     padding_byte=None,
 )
 
+T3T1_HASH_PARAMS = FirmwareHashParameters(
+    hash_function=hashlib.sha256,
+    chunk_size=1024 * 128,
+    padding_byte=None,
+)
+
+T3B1_HASH_PARAMS = FirmwareHashParameters(
+    hash_function=hashlib.sha256,
+    chunk_size=1024 * 128,
+    padding_byte=None,
+)
+
+T3W1_HASH_PARAMS = FirmwareHashParameters(
+    hash_function=hashlib.sha256,
+    chunk_size=1024 * 256,
+    padding_byte=None,
+)
+
+D002_HASH_PARAMS = FirmwareHashParameters(
+    hash_function=hashlib.sha256,
+    chunk_size=1024 * 256,
+    padding_byte=None,
+)
+
 MODEL_MAP = {
     Model.T1B1: LEGACY_V3,
     Model.T2T1: T2T1,
     Model.T2B1: T2B1,
+    Model.T3T1: T3T1,
+    Model.T3B1: T3B1,
+    Model.T3W1: T3W1,
     Model.D001: TREZOR_CORE_DEV,
+    Model.D002: TREZOR_CORE_DEV,
 }
 
 MODEL_MAP_DEV = {
     Model.T1B1: LEGACY_V3_DEV,
     Model.T2T1: TREZOR_CORE_DEV,
     Model.T2B1: TREZOR_CORE_DEV,
+    Model.T3T1: TREZOR_CORE_DEV,
+    Model.T3B1: TREZOR_CORE_DEV,
+    Model.T3W1: TREZOR_CORE_DEV,
     Model.D001: TREZOR_CORE_DEV,
+    Model.D002: TREZOR_CORE_DEV,
 }
 
 MODEL_HASH_PARAMS_MAP = {
     Model.T1B1: LEGACY_HASH_PARAMS,
     Model.T2T1: T2T1_HASH_PARAMS,
     Model.T2B1: T2T1_HASH_PARAMS,
+    Model.T3T1: T3T1_HASH_PARAMS,
+    Model.T3B1: T3B1_HASH_PARAMS,
+    Model.T3W1: T3W1_HASH_PARAMS,
     Model.D001: T2T1_HASH_PARAMS,
+    Model.D002: D002_HASH_PARAMS,
 }
 
-# aliases
+# deprecated aliases -- don't add more
 
 TREZOR_ONE_V1V2 = LEGACY_V1V2
 TREZOR_ONE_V1V2_DEV = LEGACY_V1V2_DEV
@@ -256,6 +376,8 @@ TREZOR_ONE_V3_DEV = LEGACY_V3_DEV
 
 TREZOR_T = T2T1
 TREZOR_R = T2B1
+TREZOR_T3T1 = T3T1
+TREZOR_T3B1 = T3B1
 TREZOR_T_DEV = TREZOR_CORE_DEV
 TREZOR_R_DEV = TREZOR_CORE_DEV
 
@@ -263,3 +385,5 @@ DISC1 = TREZOR_CORE_DEV
 DISC1_DEV = TREZOR_CORE_DEV
 D001 = TREZOR_CORE_DEV
 D001_DEV = TREZOR_CORE_DEV
+D002 = TREZOR_CORE_DEV
+D002_DEV = TREZOR_CORE_DEV

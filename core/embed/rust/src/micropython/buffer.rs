@@ -1,10 +1,6 @@
 use core::{convert::TryFrom, ops::Deref, ptr, slice, str};
 
-use crate::{
-    error::Error,
-    micropython::obj::Obj,
-    strutil::{hexlify, SkipPrefix},
-};
+use crate::{error::Error, micropython::obj::Obj, strutil::hexlify};
 
 use super::ffi;
 
@@ -24,7 +20,7 @@ use super::ffi;
 /// The `off` field represents offset from the `ptr` and allows us to do
 /// substring slices while keeping the head pointer as required by GC.
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Copy, Clone)]
 pub struct StrBuffer {
     ptr: *const u8,
     len: u16,
@@ -93,10 +89,8 @@ impl StrBuffer {
             unsafe { slice::from_raw_parts(self.ptr.add(self.off.into()), self.len.into()) }
         }
     }
-}
 
-impl SkipPrefix for StrBuffer {
-    fn skip_prefix(&self, skip_bytes: usize) -> Self {
+    pub fn skip_prefix(&self, skip_bytes: usize) -> Self {
         let off: u16 = unwrap!(skip_bytes.try_into());
         assert!(off <= self.len);
         assert!(self.as_ref().is_char_boundary(skip_bytes));
@@ -171,6 +165,19 @@ impl From<&'static str> for StrBuffer {
     }
 }
 
+#[cfg(feature = "debug")]
+impl ufmt::uDebug for StrBuffer {
+    fn fmt<W>(&self, f: &mut ufmt::Formatter<'_, W>) -> Result<(), W::Error>
+    where
+        W: ufmt::uWrite + ?Sized,
+    {
+        f.write_str("StrBuffer(")?;
+        f.write_str(self.as_ref())?;
+        f.write_str(")")?;
+        Ok(())
+    }
+}
+
 fn get_buffer_info(obj: Obj, flags: u32) -> Result<ffi::mp_buffer_info_t, Error> {
     let mut bufinfo = ffi::mp_buffer_info_t {
         buf: ptr::null_mut(),
@@ -196,6 +203,8 @@ fn get_buffer_info(obj: Obj, flags: u32) -> Result<ffi::mp_buffer_info_t, Error>
 /// (a) no mutable reference to the same buffer is held at the same time,
 /// (b) the buffer is not modified in MicroPython while the reference to it is
 /// being held.
+/// The returned value is NOT guaranteed to be a head pointer, so the
+/// destination might get GC'd. Do not store the reference.
 pub unsafe fn get_buffer<'a>(obj: Obj) -> Result<&'a [u8], Error> {
     let bufinfo = get_buffer_info(obj, ffi::MP_BUFFER_READ)?;
 
@@ -221,6 +230,8 @@ pub unsafe fn get_buffer<'a>(obj: Obj) -> Result<&'a [u8], Error> {
 /// (a) no other reference to the same buffer is held at the same time,
 /// (b) the buffer is not modified in MicroPython while the reference to it is
 /// being held.
+/// The returned value is NOT guaranteed to be a head pointer, so the
+/// destination might get GC'd. Do not store the reference.
 pub unsafe fn get_buffer_mut<'a>(obj: Obj) -> Result<&'a mut [u8], Error> {
     let bufinfo = get_buffer_info(obj, ffi::MP_BUFFER_WRITE)?;
 

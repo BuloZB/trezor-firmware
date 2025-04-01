@@ -5,10 +5,11 @@ from micropython import const
 from typing import TYPE_CHECKING
 
 import storage.device as storage_device
-from trezor import config, io, log, loop, utils, wire, workflow
+from trezor import TR, config, io, log, loop, utils, wire, workflow
 from trezor.crypto import hashlib
 from trezor.crypto.curve import nist256p1
-from trezor.ui.layouts import show_error_popup
+from trezor.ui import Layout
+from trezor.ui.layouts import error_popup
 
 from apps.base import set_homescreen
 from apps.common import cbor
@@ -218,7 +219,7 @@ _last_auth_valid = False
 
 
 class CborError(Exception):
-    def __init__(self, code: int):
+    def __init__(self, code: int) -> None:
         super().__init__()
         self.code = code
 
@@ -374,7 +375,10 @@ async def _read_cmd(iface: HID) -> Cmd | None:
     desc_cont = frame_cont()
     read = loop.wait(iface.iface_num() | io.POLL_READ)
 
-    buf = await read
+    # wait for incoming command indefinitely
+    msg_len = await read
+    buf = bytearray(msg_len)
+    iface.read(buf, 0)
     while True:
         ifrm = overlay_struct(bytearray(buf), desc_init)
         bcnt = ifrm.bcnt
@@ -409,9 +413,14 @@ async def _read_cmd(iface: HID) -> Cmd | None:
         else:
             data = data[:bcnt]
 
+        # set a timeout for subsequent reads
+        read.timeout_ms = _CTAP_HID_TIMEOUT_MS
         while datalen < bcnt:
-            buf = await loop.race(read, loop.sleep(_CTAP_HID_TIMEOUT_MS))
-            if not isinstance(buf, bytes):
+            try:
+                msg_len = await read
+                buf = bytearray(msg_len)
+                iface.read(buf, 0)
+            except loop.Timeout:
                 if __debug__:
                     warning(__name__, "_ERR_MSG_TIMEOUT")
                 await send_cmd(cmd_error(ifrm_cid, _ERR_MSG_TIMEOUT), iface)
@@ -494,7 +503,9 @@ async def send_cmd(cmd: Cmd, iface: HID) -> None:
     if offset < datalen:
         frm = overlay_struct(buf, cont_desc)
 
-    write = loop.wait(iface.iface_num() | io.POLL_WRITE)
+    write = loop.wait(
+        iface.iface_num() | io.POLL_WRITE, timeout_ms=_CTAP_HID_TIMEOUT_MS
+    )
     while offset < datalen:
         frm.seq = seq
         copied = utils.memcpy(frm.data, 0, cmd.data, offset, datalen)
@@ -502,10 +513,7 @@ async def send_cmd(cmd: Cmd, iface: HID) -> None:
         if copied < _FRAME_CONT_SIZE:
             frm.data[copied:] = bytearray(_FRAME_CONT_SIZE - copied)
         while True:
-            ret = await loop.race(write, loop.sleep(_CTAP_HID_TIMEOUT_MS))
-            if ret is not None:
-                raise TimeoutError
-
+            await write
             if iface.write(buf) > 0:
                 break
         seq += 1
@@ -612,19 +620,39 @@ async def _confirm_fido(title: str, credential: Credential) -> bool:
         return False
 
 
+async def _show_error_popup(
+    title: str,
+    description: str,
+    subtitle: str | None = None,
+    description_param: str = "",
+    *,
+    button: str = "",
+    timeout_ms: int = 0,
+) -> None:
+    popup = error_popup(
+        title,
+        description,
+        subtitle,
+        description_param,
+        button=button,
+        timeout_ms=timeout_ms,
+    )
+    await Layout(popup).get_result()
+
+
 async def _confirm_bogus_app(title: str) -> None:
     if _last_auth_valid:
-        await show_error_popup(
+        await _show_error_popup(
             title,
-            "This device is already registered with this application.",
-            "Already registered.",
+            TR.fido__device_already_registered,
+            TR.fido__already_registered,
             timeout_ms=_POPUP_TIMEOUT_MS,
         )
     else:
-        await show_error_popup(
+        await _show_error_popup(
             title,
-            "This device is not registered with this application.",
-            "Not registered.",
+            TR.fido__device_not_registered,
+            TR.fido__not_registered,
             timeout_ms=_POPUP_TIMEOUT_MS,
         )
 
@@ -684,7 +712,7 @@ class U2fConfirmRegister(U2fState):
             await _confirm_bogus_app("U2F")
             return False
         else:
-            return await _confirm_fido("U2F Register", self._cred)
+            return await _confirm_fido(TR.fido__title_u2f_register, self._cred)
 
     def __eq__(self, other: object) -> bool:
         return (
@@ -694,7 +722,7 @@ class U2fConfirmRegister(U2fState):
 
 class U2fConfirmAuthenticate(U2fState):
     async def confirm_dialog(self) -> bool:
-        return await _confirm_fido("U2F Authenticate", self._cred)
+        return await _confirm_fido(TR.fido__title_u2f_auth, self._cred)
 
     def __eq__(self, other: object) -> bool:
         return (
@@ -803,7 +831,7 @@ class Fido2ConfirmMakeCredential(Fido2State):
         if self._cred.rp_id == _BOGUS_RP_ID:
             await _confirm_bogus_app("FIDO2")
             return True
-        if not await _confirm_fido("FIDO2 Register", self._cred):
+        if not await _confirm_fido(TR.fido__title_register, self._cred):
             return False
         if self._user_verification:
             return await verify_user(KeepaliveCallback(self.cid, self.iface))
@@ -838,10 +866,10 @@ class Fido2ConfirmExcluded(Fido2ConfirmMakeCredential):
         await send_cmd(cmd, self.iface)
         self.finished = True
 
-        await show_error_popup(
-            "FIDO2 Register",
-            "This device is already registered with {}.",
-            "Already registered.",
+        await _show_error_popup(
+            TR.fido__title_register,
+            TR.fido__device_already_registered_with_template,
+            TR.fido__already_registered,
             self._cred.rp_id,  # description_param
             timeout_ms=_POPUP_TIMEOUT_MS,
         )
@@ -869,7 +897,7 @@ class Fido2ConfirmGetAssertion(Fido2State):
     async def confirm_dialog(self) -> bool:
         # There is a choice from more than one credential.
         try:
-            index = await _confirm_fido_choose("FIDO2 Authenticate", self._creds)
+            index = await _confirm_fido_choose(TR.fido__title_authenticate, self._creds)
         except wire.ActionCancelled:
             return False
 
@@ -921,10 +949,10 @@ class Fido2ConfirmNoPin(State):
         await send_cmd(cmd, self.iface)
         self.finished = True
 
-        await show_error_popup(
-            "FIDO2 Verify User",
-            "Please enable PIN protection.",
-            "Unable to verify user.",
+        await _show_error_popup(
+            TR.fido__title_verify_user,
+            TR.fido__please_enable_pin_protection,
+            TR.fido__unable_to_verify_user,
             timeout_ms=_POPUP_TIMEOUT_MS,
         )
         return False
@@ -944,10 +972,10 @@ class Fido2ConfirmNoCredentials(Fido2ConfirmGetAssertion):
         await send_cmd(cmd, self.iface)
         self.finished = True
 
-        await show_error_popup(
-            "FIDO2 Authenticate",
-            "This device is not registered with\n{}.",
-            "Not registered.",
+        await _show_error_popup(
+            TR.fido__title_authenticate,
+            TR.fido__not_registered_with_template,
+            TR.fido__not_registered,
             self._creds[0].app_name(),  # description_param
             timeout_ms=_POPUP_TIMEOUT_MS,
         )
@@ -985,7 +1013,7 @@ class DialogManager:
 
     def reset_timeout(self) -> None:
         if self.state is not None:
-            self.deadline = utime.ticks_ms() + self.state.timeout_ms()
+            self.deadline = utime.ticks_add(utime.ticks_ms(), self.state.timeout_ms())
 
     def reset(self) -> None:
         if self.workflow is not None:
@@ -1002,7 +1030,7 @@ class DialogManager:
         )
 
     def is_busy(self) -> bool:
-        if utime.ticks_ms() >= self.deadline:
+        if utime.ticks_diff(utime.ticks_ms(), self.deadline) >= 0:
             self.reset()
 
         if not self._workflow_is_running():
@@ -1015,7 +1043,10 @@ class DialogManager:
         return True
 
     def set_state(self, state: State) -> bool:
-        if self.state == state and utime.ticks_ms() < self.deadline:
+        if (
+            self.state == state
+            and utime.ticks_diff(utime.ticks_ms(), self.deadline) < 0
+        ):
             self.reset_timeout()
             return True
 
@@ -1036,7 +1067,7 @@ class DialogManager:
         try:
             if not state:
                 return
-            while utime.ticks_ms() < self.deadline:
+            while utime.ticks_diff(utime.ticks_ms(), self.deadline) < 0:
                 if state.keepalive_status() != _KEEPALIVE_STATUS_NONE:
                     cmd = cmd_keepalive(state.cid, state.keepalive_status())
                     await send_cmd(cmd, self.iface)
@@ -1053,6 +1084,7 @@ class DialogManager:
 
         try:
             while self.result is _RESULT_NONE:
+                workflow.close_others()
                 result = await self.state.confirm_dialog()
                 if isinstance(result, State):
                     self.state = result

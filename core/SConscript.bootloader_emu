@@ -1,14 +1,14 @@
 # pylint: disable=E0602
 
 import os
-import tools
-import boards
+import shlex
+import tools, models, ui
 
-TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T')
+TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T2T1')
 CMAKELISTS = int(ARGUMENTS.get('CMAKELISTS', 0))
-DMA2D = False
+HW_REVISION = 'emulator'
 
-if TREZOR_MODEL in ('1', 'DISC1'):
+if not models.has_emulator(TREZOR_MODEL):
     # skip bootloader build
     env = Environment()
     def build_bootloader(target,source,env):
@@ -20,25 +20,16 @@ if TREZOR_MODEL in ('1', 'DISC1'):
              )
     Return()
 
-FEATURES_WANTED = ["input", "rgb_led"]
+FEATURES_WANTED = ["input", "rgb_led", "dma2d", "optiga"]
 
 CCFLAGS_MOD = ''
 CPPPATH_MOD = []
+CPPDEFINES_HAL = []
+PATH_HAL = []
 CPPDEFINES_MOD = []
 SOURCE_MOD = []
-
-if TREZOR_MODEL in ('1', 'R'):
-    FONT_NORMAL='Font_PixelOperator_Regular_8'
-    FONT_DEMIBOLD='Font_PixelOperator_Regular_8'
-    FONT_BOLD='Font_PixelOperator_Bold_8'
-    FONT_MONO='Font_PixelOperator_Regular_8'
-    FONT_BIG=None
-elif TREZOR_MODEL in ('T', ):
-    FONT_NORMAL='Font_TTHoves_Regular_21'
-    FONT_DEMIBOLD=None
-    FONT_BOLD='Font_TTHoves_Bold_17'
-    FONT_MONO=None
-    FONT_BIG=None
+SOURCE_MOD_CRYPTO = []
+RUST_UI_FEATURES = []
 
 # modtrezorcrypto
 CCFLAGS_MOD += '-Wno-sequence-point '
@@ -47,14 +38,14 @@ CPPPATH_MOD += [
     'vendor/trezor-storage',
 ]
 CPPDEFINES_MOD += [
+    'KERNEL_MODE',
     'AES_128',
     'AES_192',
     'USE_KECCAK',
     'ED25519_NO_PRECOMP',
-    'TREZOR_UI2',
     'FANCY_FATAL_ERROR'
 ]
-SOURCE_MOD += [
+SOURCE_MOD_CRYPTO += [
     'vendor/trezor-crypto/blake2s.c',
     'vendor/trezor-crypto/chacha_drbg.c',
     'vendor/trezor-crypto/chacha20poly1305/chacha_merged.c',
@@ -77,34 +68,27 @@ CPPPATH_MOD += [
 ]
 
 SOURCE_MOD += [
-    'embed/lib/unit_variant.c',
-    'embed/lib/buffers.c',
-    'embed/lib/colors.c',
-    'embed/lib/display.c',
-    'embed/lib/fonts/fonts.c',
-    'embed/lib/fonts/font_bitmap.c',
-    'embed/lib/image.c',
-    'embed/lib/touch.c',
-    'embed/extmod/modtrezorcrypto/rand.c',
+    'embed/upymod/modtrezorcrypto/rand.c',
+    'embed/gfx/bitblt/gfx_bitblt.c',
+    'embed/gfx/bitblt/gfx_bitblt_mono8.c',
+    'embed/gfx/bitblt/gfx_bitblt_rgb565.c',
+    'embed/gfx/bitblt/gfx_bitblt_rgba8888.c',
+    'embed/gfx/fonts/font_bitmap.c',
+    'embed/gfx/gfx_color.c',
+    'embed/gfx/gfx_draw.c',
+    'embed/gfx/terminal.c',
+    'embed/io/display/display_utils.c',
+    'embed/util/flash/flash_utils.c',
+    'embed/util/image/image.c',
+    'embed/util/rsod/rsod.c',
+    'embed/util/scm_revision/scm_revision.c',
+    'embed/rtl/error_handling.c',
+    'embed/rtl/mini_printf.c',
     'vendor/micropython/lib/uzlib/adler32.c',
     'vendor/micropython/lib/uzlib/crc32.c',
     'vendor/micropython/lib/uzlib/tinflate.c',
-    'vendor/trezor-storage/flash_common.c',
+    'vendor/trezor-storage/flash_area.c',
 ]
-
-if TREZOR_MODEL in ('1', ):
-    SOURCE_MOD += [
-        'embed/models/model_T1B1_layout.c',
-    ]
-elif TREZOR_MODEL in ('T', ):
-    SOURCE_MOD += [
-        'embed/models/model_T2T1_layout.c',
-    ]
-elif TREZOR_MODEL in ('R', ):
-    SOURCE_MOD += [
-        'embed/models/model_T2B1_layout.c',
-    ]
-
 
 SOURCE_NANOPB = [
     'vendor/nanopb/pb_common.c',
@@ -113,41 +97,66 @@ SOURCE_NANOPB = [
 ]
 
 SOURCE_BOOTLOADER = [
-    'embed/bootloader/bootui.c',
-    'embed/bootloader/main.c',
-    'embed/bootloader/messages.c',
-    'embed/bootloader/emulator.c',
-    'embed/bootloader/protob/messages.pb.c',
+    'embed/projects/bootloader/bootui.c',
+    'embed/projects/bootloader/main.c',
+    'embed/projects/bootloader/poll.c',
+    'embed/projects/bootloader/antiglitch.c',
+    'embed/projects/bootloader/workflow/wf_firmware_update.c',
+    'embed/projects/bootloader/workflow/wf_wipe_device.c',
+    'embed/projects/bootloader/workflow/wf_get_features.c',
+    'embed/projects/bootloader/workflow/wf_initialize.c',
+    'embed/projects/bootloader/workflow/wf_ping.c',
+    'embed/projects/bootloader/workflow/wf_bootloader.c',
+    'embed/projects/bootloader/workflow/wf_empty_device.c',
+    'embed/projects/bootloader/workflow/wf_auto_update.c',
+    'embed/projects/bootloader/workflow/wf_host_control.c',
+    'embed/projects/bootloader/wire/codec_v1.c',
+    'embed/projects/bootloader/wire/wire_iface_usb.c',
+    'embed/projects/bootloader/protob/protob.c',
+    'embed/projects/bootloader/protob/pb/messages.pb.c',
+    'embed/projects/bootloader/version_check.c',
+    'embed/projects/bootloader/emulator.c',
 ]
 
 SOURCE_TREZORHAL = [
-    'embed/trezorhal/unix/display-unix.c',
-    'embed/trezorhal/unix/flash.c',
-    'embed/trezorhal/unix/common.c',
-    'embed/trezorhal/unix/touch/touch.c',
-    'embed/trezorhal/unix/rng.c',
-    'embed/trezorhal/unix/usb.c',
-    'embed/trezorhal/unix/random_delays.c',
+    'embed/io/display/unix/display_driver.c',
+    'embed/io/usb/unix/usb.c',
+    'embed/sec/monoctr/unix/monoctr.c',
+    'embed/sec/random_delays/unix/random_delays.c',
+    'embed/sec/rng/unix/rng.c',
+    'embed/sec/secret/unix/secret.c',
+    'embed/sys/mpu/unix/mpu.c',
+    'embed/sys/startup/unix/bootutils.c',
+    'embed/sys/task/sysevent.c',
+    'embed/sys/task/unix/sdl_event.c',
+    'embed/sys/task/unix/system.c',
+    'embed/sys/task/unix/systask.c',
+    'embed/sys/time/unix/systick.c',
+    'embed/sys/time/unix/systimer.c',
+    'embed/util/flash/unix/flash.c',
+    'embed/util/flash/unix/flash_otp.c',
+    'embed/util/unit_properties/unix/unit_properties.c',
 ]
-
-if TREZOR_MODEL in ('R', ):
-    SOURCE_TREZORHAL += [
-        'embed/trezorhal/unix/secret.c',
-        'embed/trezorhal/unix/optiga_hal.c',
-    ]
 
 SOURCE_UNIX = [
-    'embed/unix/profile.c',
+    'embed/projects/unix/profile.c',
 ]
 
-# fonts
-tools.add_font('NORMAL', FONT_NORMAL, CPPDEFINES_MOD, SOURCE_MOD)
-tools.add_font('BOLD', FONT_BOLD, CPPDEFINES_MOD, SOURCE_MOD)
-tools.add_font('DEMIBOLD', FONT_DEMIBOLD, CPPDEFINES_MOD, SOURCE_MOD)
-tools.add_font('MONO', FONT_MONO, CPPDEFINES_MOD, SOURCE_MOD)
-tools.add_font('BIG', FONT_BIG, CPPDEFINES_MOD, SOURCE_MOD)
+ui.init_ui(TREZOR_MODEL, "bootloader", RUST_UI_FEATURES)
 
-env = Environment(ENV=os.environ, CFLAGS='%s -DPRODUCTION=%s' % (ARGUMENTS.get('CFLAGS', ''), ARGUMENTS.get('PRODUCTION', '0')))
+env = Environment(
+    ENV=os.environ,
+    CFLAGS=ARGUMENTS.get('CFLAGS', '') + f" -DCONFIDENTIAL= -DPRODUCTION={ARGUMENTS.get('PRODUCTION', '0')}",
+    CPPDEFPREFIX="-D'",
+    CPPDEFSUFFIX="'",
+)
+
+FEATURES_AVAILABLE = models.configure_board(TREZOR_MODEL, HW_REVISION, FEATURES_WANTED, env, CPPDEFINES_HAL, SOURCE_UNIX, PATH_HAL)
+
+if 'optiga' in FEATURES_AVAILABLE:
+    SOURCE_BOOTLOADER += [
+        'embed/projects/bootloader/workflow/wf_unlock_bootloader.c',
+    ]
 
 env.Replace(
     CP='cp',
@@ -155,26 +164,45 @@ env.Replace(
     AR='ar',
     CC='gcc',
     LINK='ld',
+
     SIZE='size',
     STRIP='strip',
     OBJCOPY='objcopy',
     PYTHON='python',
     MAKECMAKELISTS='$PYTHON tools/make_cmakelists.py', )
 
-env.Replace(
-    TREZOR_MODEL=TREZOR_MODEL, )
+MODEL_AS_NUMBER = str(models.get_hw_model_as_number(TREZOR_MODEL))
 
-if TREZOR_MODEL in ('T', 'R'):
-    CPU_MODEL   = 'STM32F427xx'
-elif TREZOR_MODEL in ('DISC1', ):
-    CPU_MODEL   = 'STM32F429xx'
-elif TREZOR_MODEL in ('1',):
-    CPU_MODEL   = 'STM32F405xx'
-else:
-    raise ValueError('Unknown Trezor model')
-
-MODEL_IDENTIFIER = tools.get_model_identifier(TREZOR_MODEL)
-MODEL_AS_NUMBER = str(boards.get_hw_model_as_number(MODEL_IDENTIFIER))
+ALLPATHS = ['embed/rust',
+           'embed/projects/bootloader',
+           'embed/projects/bootloader/nanopb',
+           'embed/projects/bootloader/protob',
+           'embed/rtl/inc',
+           'embed/models',
+           'embed/projects/unix',
+           'embed/upymod/modtrezorui',
+           'embed/gfx/inc',
+           'embed/io/display/inc',
+           'embed/io/usb/inc',
+           'embed/sec/entropy/inc',
+           'embed/sec/monoctr/inc',
+           'embed/sec/random_delays/inc',
+           'embed/sec/rng/inc',
+           'embed/sec/secret/inc',
+           'embed/sys/bsp/inc',
+           'embed/sys/irq/inc',
+           'embed/sys/mpu/inc',
+           'embed/sys/startup/inc',
+           'embed/sys/task/inc',
+           'embed/sys/time/inc',
+           'embed/util/flash/inc',
+           'embed/util/image/inc',
+           'embed/util/rsod/inc',
+           'embed/util/scm_revision/inc',
+           'embed/util/translations/inc',
+           'embed/util/unit_properties/inc',
+           'vendor/nanopb',
+       ] + CPPPATH_MOD + PATH_HAL
 
 env.Replace(
     COPT=env.get('ENV').get('OPTIMIZE', '-Os'),
@@ -182,36 +210,20 @@ env.Replace(
     '-g3 '
     '-nostdlib '
     '-std=gnu11 -Wall -Werror -Wpointer-arith -Wno-missing-braces -fno-common '
-    '-fsingle-precision-constant -fdata-sections -ffunction-sections '
+    '-fdata-sections -ffunction-sections '
     '-ffreestanding '
     '-fstack-protector-all '
     + CCFLAGS_MOD,
-    CPPPATH=[
-        'embed/rust',
-        'embed/bootloader',
-        'embed/bootloader/nanopb',
-        'embed/bootloader/protob',
-        'embed/lib',
-        'embed/models',
-        'embed/trezorhal',
-        'embed/trezorhal/unix',
-        'embed/unix',
-        'embed/extmod/modtrezorui',
-        'vendor/nanopb',
-    ] + CPPPATH_MOD,
+    LINKFLAGS='',
+    CPPPATH=ALLPATHS,
     CPPDEFINES=[
         'BOOTLOADER',
         'TREZOR_EMULATOR',
-        CPU_MODEL,
-        'HW_MODEL=' + MODEL_AS_NUMBER,
-        'HW_REVISION=' + ('10' if TREZOR_MODEL in ('R',) else '0'),
         'TREZOR_MODEL_'+TREZOR_MODEL,
-        'TREZOR_BOARD=\\"boards/board-unix.h\\"',
-        'MCU_TYPE='+CPU_MODEL,
         'PB_FIELD_16BIT',
         'PB_ENCODE_ARRAYS_UNPACKED',
         'PB_VALIDATE_UTF8',
-    ] + CPPDEFINES_MOD,
+    ] + CPPDEFINES_MOD + CPPDEFINES_HAL,
     ASPPFLAGS='$CFLAGS $CCFLAGS', )
 
 try:
@@ -221,7 +233,7 @@ except OSError:
 
 
 env.Replace(
-    ALLSOURCES=SOURCE_MOD + SOURCE_BOOTLOADER + SOURCE_NANOPB + SOURCE_TREZORHAL + SOURCE_UNIX,
+    ALLSOURCES=SOURCE_MOD + SOURCE_MOD_CRYPTO + SOURCE_BOOTLOADER + SOURCE_NANOPB + SOURCE_TREZORHAL + SOURCE_UNIX,
     ALLDEFS=tools.get_defs_for_cmake(env['CPPDEFINES']))
 
 cmake_gen = env.Command(
@@ -230,59 +242,31 @@ cmake_gen = env.Command(
     action='$MAKECMAKELISTS --sources $ALLSOURCES --dirs $CPPPATH --defs $ALLDEFS',
 )
 
-
 #
 # Rust library
 #
+env.get("ENV")["RUST_TARGET"] = os.popen("rustc -vV | sed -n 's/host: //p'").read().strip()
+features = ['bootloader',] + FEATURES_AVAILABLE + RUST_UI_FEATURES
+if ARGUMENTS.get('TREZOR_EMULATOR_DEBUGGABLE', '0') == '1':
+    profile = 'dev'
+else:
+    profile = 'release'
 
-RUST_TARGET = 'x86_64-unknown-linux-gnu'
-RUST_PROFILE = 'release'
-RUST_LIB = 'trezor_lib'
-RUST_LIBDIR = f'build/bootloader_emu/rust/{RUST_TARGET}/{RUST_PROFILE}'
-RUST_LIBPATH = f'{RUST_LIBDIR}/lib{RUST_LIB}.a'
+rust = tools.add_rust_lib(
+    env=env,
+    build='bootloader_emu',
+    profile=profile,
+    features=features,
+    all_paths=ALLPATHS,
+    build_dir=str(Dir('.').abspath),
+)
 
-def cargo_build():
-    # Determine the profile build flags.
-    if RUST_PROFILE == 'release':
-        profile = '--release'
-    else:
-        profile = ''
-    if TREZOR_MODEL in ("1",):
-        features = ["model_t1"]
-    elif TREZOR_MODEL in ("R",):
-        features = ["model_tr"]
-    else:
-        features = ["model_tt"]
+env.Append(LINKFLAGS=['-lm'])
 
-    if TREZOR_MODEL in ('T',):
-        features.append('touch')
-        features.append('backlight')
-    if TREZOR_MODEL in ('R', '1'):
-        features.append('button')
-
-    features.append("bitcoin_only")
-    features.append("ui")
-    features.append("bootloader")
-
-    cargo_opts = [
-        f'--target={RUST_TARGET}',
-        '--target-dir=../../build/bootloader_emu/rust',
-        '--no-default-features',
-        '--features ' + ','.join(features),
-        '-Z build-std=core',
-        '-Z build-std-features=panic_immediate_abort',
-    ]
-
-    return f'cd embed/rust; cargo build {profile} ' + ' '.join(cargo_opts)
-
-rust = env.Command(
-    target=RUST_LIBPATH,
-    source='',
-    action=cargo_build(), )
-
-env.Append(LINKFLAGS=f'-L{RUST_LIBDIR}')
-env.Append(LINKFLAGS=f'-l{RUST_LIB}')
-env.Append(LINKFLAGS='-lm')
+if env['PLATFORM'] == 'darwin':
+    env.Append(LINKFLAGS=['-Wl,-dead_strip'])
+else:
+    env.Append(LINKFLAGS=['-Wl,--gc-sections'])
 
 #
 # Program objects
@@ -290,6 +274,7 @@ env.Append(LINKFLAGS='-lm')
 
 obj_program = []
 obj_program += env.Object(source=SOURCE_MOD)
+obj_program += env.Object(source=SOURCE_MOD_CRYPTO, CCFLAGS='$CCFLAGS -ftrivial-auto-var-init=zero')
 obj_program += env.Object(source=SOURCE_BOOTLOADER)
 obj_program += env.Object(source=SOURCE_NANOPB)
 obj_program += env.Object(source=SOURCE_TREZORHAL)
@@ -299,7 +284,7 @@ program_elf = env.Command(
     target='bootloader.elf',
     source=obj_program,
     action=
-    '$CC -o $TARGET $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $LINKFLAGS', )
+    '$CC -o $TARGET $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $LINKFLAGS')
 
 env.Depends(program_elf, rust)
 

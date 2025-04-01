@@ -25,6 +25,8 @@
 #include "crypto.h"
 #include "debug.h"
 #include "ecdsa.h"
+#include "fsm.h"
+#include "gettext.h"
 #include "layout2.h"
 #include "memzero.h"
 #include "messages.pb.h"
@@ -366,6 +368,12 @@ uint32_t compile_script_multisig(const CoinInfo *coin,
   const uint32_t n = cryptoMultisigPubkeyCount(multisig);
   if (m < 1 || m > 15) return 0;
   if (n < 1 || n > 15) return 0;
+
+  uint8_t pubkeys[33 * n];
+  if (!cryptoMultisigPubkeys(coin, multisig, pubkeys)) {
+    return 0;
+  }
+
   uint32_t r = 0;
   if (out) {
     out[r] = 0x50 + m;
@@ -373,9 +381,7 @@ uint32_t compile_script_multisig(const CoinInfo *coin,
     for (uint32_t i = 0; i < n; i++) {
       out[r] = 33;
       r++;  // OP_PUSH 33
-      const HDNode *pubnode = cryptoMultisigPubkey(coin, multisig, i);
-      if (!pubnode) return 0;
-      memcpy(out + r, pubnode->public_key, 33);
+      memcpy(out + r, pubkeys + 33 * i, 33);
       r += 33;
     }
     out[r] = 0x50 + n;
@@ -396,6 +402,12 @@ uint32_t compile_script_multisig_hash(const CoinInfo *coin,
   if (m < 1 || m > 15) return 0;
   if (n < 1 || n > 15) return 0;
 
+  // allocate on stack instead of heap
+  uint8_t pubkeys[33 * n];
+  if (!cryptoMultisigPubkeys(coin, multisig, pubkeys)) {
+    return 0;
+  }
+
   Hasher hasher = {0};
   hasher_Init(&hasher, coin->curve->hasher_script);
 
@@ -405,9 +417,7 @@ uint32_t compile_script_multisig_hash(const CoinInfo *coin,
   for (uint32_t i = 0; i < n; i++) {
     d[0] = 33;
     hasher_Update(&hasher, d, 1);  // OP_PUSH 33
-    const HDNode *pubnode = cryptoMultisigPubkey(coin, multisig, i);
-    if (!pubnode) return 0;
-    hasher_Update(&hasher, pubnode->public_key, 33);
+    hasher_Update(&hasher, pubkeys + 33 * i, 33);
   }
   d[0] = 0x50 + n;
   d[1] = 0xAE;

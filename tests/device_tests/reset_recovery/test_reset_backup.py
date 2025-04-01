@@ -20,9 +20,9 @@ from shamir_mnemonic import shamir
 
 from trezorlib import device
 from trezorlib.debuglink import TrezorClientDebugLink as Client
-from trezorlib.messages import BackupType
+from trezorlib.messages import BackupAvailability, BackupType
 
-from ...common import WITH_MOCK_URANDOM
+from ...common import MOCK_GET_ENTROPY
 from ...input_flows import (
     InputFlowBip39Backup,
     InputFlowResetSkipBackup,
@@ -66,26 +66,28 @@ def backup_flow_slip39_advanced(client: Client):
 
 VECTORS = [
     (BackupType.Bip39, backup_flow_bip39),
-    (BackupType.Slip39_Basic, backup_flow_slip39_basic),
-    (BackupType.Slip39_Advanced, backup_flow_slip39_advanced),
+    (BackupType.Slip39_Basic_Extendable, backup_flow_slip39_basic),
+    (BackupType.Slip39_Advanced_Extendable, backup_flow_slip39_advanced),
 ]
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 @pytest.mark.parametrize("backup_type, backup_flow", VECTORS)
 @pytest.mark.setup_client(uninitialized=True)
 def test_skip_backup_msg(client: Client, backup_type, backup_flow):
-    with WITH_MOCK_URANDOM, client:
-        device.reset(
+    with client:
+        device.setup(
             client,
             skip_backup=True,
             passphrase_protection=False,
             pin_protection=False,
             backup_type=backup_type,
+            entropy_check_count=0,
+            _get_entropy=MOCK_GET_ENTROPY,
         )
 
     assert client.features.initialized is True
-    assert client.features.needs_backup is True
+    assert client.features.backup_availability == BackupAvailability.Required
     assert client.features.unfinished_backup is False
     assert client.features.no_backup is False
     assert client.features.backup_type is backup_type
@@ -94,7 +96,7 @@ def test_skip_backup_msg(client: Client, backup_type, backup_flow):
 
     client.init_device()
     assert client.features.initialized is True
-    assert client.features.needs_backup is False
+    assert client.features.backup_availability == BackupAvailability.NotAvailable
     assert client.features.unfinished_backup is False
     assert client.features.backup_type is backup_type
 
@@ -104,22 +106,24 @@ def test_skip_backup_msg(client: Client, backup_type, backup_flow):
     assert state.mnemonic_secret == secret
 
 
-@pytest.mark.skip_t1
+@pytest.mark.models("core")
 @pytest.mark.parametrize("backup_type, backup_flow", VECTORS)
 @pytest.mark.setup_client(uninitialized=True)
 def test_skip_backup_manual(client: Client, backup_type: BackupType, backup_flow):
-    with WITH_MOCK_URANDOM, client:
+    with client:
         IF = InputFlowResetSkipBackup(client)
         client.set_input_flow(IF.get())
-        device.reset(
+        device.setup(
             client,
             pin_protection=False,
             passphrase_protection=False,
             backup_type=backup_type,
+            entropy_check_count=0,
+            _get_entropy=MOCK_GET_ENTROPY,
         )
 
     assert client.features.initialized is True
-    assert client.features.needs_backup is True
+    assert client.features.backup_availability == BackupAvailability.Required
     assert client.features.unfinished_backup is False
     assert client.features.no_backup is False
     assert client.features.backup_type is backup_type
@@ -128,7 +132,7 @@ def test_skip_backup_manual(client: Client, backup_type: BackupType, backup_flow
 
     client.init_device()
     assert client.features.initialized is True
-    assert client.features.needs_backup is False
+    assert client.features.backup_availability == BackupAvailability.NotAvailable
     assert client.features.unfinished_backup is False
     assert client.features.backup_type is backup_type
 

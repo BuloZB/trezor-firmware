@@ -1,6 +1,6 @@
 # generated from instructions.py.mako
 # do not edit manually!
-<%def name="getProgramId(program)">${"_".join(program["name"].upper().split(" ") + ["ID"])}</%def>\
+<%def name="getProgramId(program)">${"_" + "_".join(program["name"].upper().split(" ") + ["ID"])}</%def>\
 <%def name="getInstructionIdText(program, instruction)">${"_".join([getProgramId(program)] + ["INS"] + instruction["name"].upper().split(" "))}</%def>\
 <%def name="getClassName(program, instruction)">${program["name"].replace(" ", "")}${instruction["name"].replace(" ", "")}Instruction</%def>\
 <%def name="getReferenceName(reference)">${"_".join(reference["name"].lower().split(" "))}</%def>\
@@ -27,6 +27,7 @@ str\
 int\
 % endif
 </%def>\
+from micropython import const
 from typing import TYPE_CHECKING
 
 from trezor.wire import DataError
@@ -51,7 +52,7 @@ from .parse import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Type
+    from typing import Any, Type, TypeGuard
 
     from ..types import Account, InstructionId, InstructionData
 
@@ -61,16 +62,24 @@ ${getProgramId(program)} = "${program["id"]}"
 
 % for program in programs["programs"]:
     % for instruction in program["instructions"]:
+      % if isinstance(instruction["id"], int):
+${getInstructionIdText(program, instruction)} = const(${instruction["id"]})
+      % else:
 ${getInstructionIdText(program, instruction)} = ${instruction["id"]}
+      % endif
     % endfor
 % endfor
+
+COMPUTE_BUDGET_PROGRAM_ID = _COMPUTE_BUDGET_PROGRAM_ID
+COMPUTE_BUDGET_PROGRAM_ID_INS_SET_COMPUTE_UNIT_LIMIT = _COMPUTE_BUDGET_PROGRAM_ID_INS_SET_COMPUTE_UNIT_LIMIT
+COMPUTE_BUDGET_PROGRAM_ID_INS_SET_COMPUTE_UNIT_PRICE = _COMPUTE_BUDGET_PROGRAM_ID_INS_SET_COMPUTE_UNIT_PRICE
 
 def __getattr__(name: str) -> Type[Instruction]:
     def get_id(name: str) -> tuple[str, InstructionId]:
     %for program in programs["programs"]:
         %for instruction in program["instructions"]:
         if name == "${getClassName(program, instruction)}":
-            return ("${program["id"]}", ${instruction["id"]})
+            return (${getProgramId(program)}, ${getInstructionIdText(program, instruction)})
         %endfor
     %endfor
         raise AttributeError # Unknown instruction
@@ -79,7 +88,7 @@ def __getattr__(name: str) -> Type[Instruction]:
 
     class FakeClass(Instruction):
         @classmethod
-        def is_type_of(cls, ins: Any):
+        def is_type_of(cls, ins: Any) -> TypeGuard[Instruction]:
             return ins.program_id == id[0] and ins.instruction_id == id[1]
 
     return FakeClass
@@ -130,7 +139,6 @@ def ${type["format"]}(_: Instruction, value: int) -> str:
 None\
 % endif
 </%def>\
-
 <%
     # Make sure that all required parameters are present in the instruction.
     for program in programs["programs"]:
@@ -190,6 +198,7 @@ def get_instruction(
                 "${program["name"]}: ${instruction["name"]}",
                 True,
                 True,
+                ${instruction.get("is_ui_hidden", False)},
                 ${instruction["is_multisig"]},
                 ${getOptionalString(instruction, "is_deprecated_warning")},
             )
@@ -205,6 +214,7 @@ def get_instruction(
             "${program["name"]}",
             True,
             False,
+            False,
             False
         )
 % endif
@@ -218,6 +228,7 @@ def get_instruction(
         [],
         [],
         "Unsupported program",
+        False,
         False,
         False,
         False

@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 
 async def cipher_key_value(msg: CipherKeyValue) -> CipheredKeyValue:
+    from trezor import TR
     from trezor.crypto import aes, hmac
     from trezor.messages import CipheredKeyValue
     from trezor.ui.layouts import confirm_action
@@ -26,16 +27,21 @@ async def cipher_key_value(msg: CipherKeyValue) -> CipheredKeyValue:
     if (encrypt and msg.ask_on_encrypt) or (decrypt and msg.ask_on_decrypt):
         # Special case for Trezor Suite, which asks for setting up labels
         if msg.key == "Enable labeling?":
-            title = "SUITE LABELING"
-            verb = "ENABLE"
+            title = TR.misc__title_suite_labeling
+            description = TR.misc__enable_labeling
+            verb = TR.buttons__enable
         else:
-            if encrypt:
-                title = "Encrypt value"
-            else:
-                title = "Decrypt value"
-            verb = "CONFIRM"
+            title = TR.misc__encrypt_value if encrypt else TR.misc__decrypt_value
+            description = msg.key
+            verb = TR.buttons__confirm
 
-        await confirm_action("cipher_key_value", title, description=msg.key, verb=verb)
+        await confirm_action(
+            "cipher_key_value",
+            title,
+            description=description,
+            verb=verb,
+            prompt_screen=True,
+        )
 
     node = keychain.derive(msg.address_n)
 

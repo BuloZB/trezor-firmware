@@ -20,7 +20,7 @@ from io import BytesIO
 
 import pytest
 
-from trezorlib import messages, protobuf
+from trezorlib import protobuf
 
 
 class SomeEnum(IntEnum):
@@ -92,19 +92,6 @@ class RecursiveMessage(protobuf.MessageType):
         1: protobuf.Field("uvarint", "uint64"),
         2: protobuf.Field("recursivefield", "RecursiveMessage", required=False),
     }
-
-
-# message types are read from the messages module so we need to "include" these messages there for now
-messages.SomeEnum = SomeEnum
-messages.WiderEnum = WiderEnum
-messages.NarrowerEnum = NarrowerEnum
-messages.PrimitiveMessage = PrimitiveMessage
-messages.EnumMessageMoreValues = EnumMessageMoreValues
-messages.EnumMessageLessValues = EnumMessageLessValues
-messages.RepeatedFields = RepeatedFields
-messages.RequiredFields = RequiredFields
-messages.DefaultFields = DefaultFields
-messages.RecursiveMessage = RecursiveMessage
 
 
 def load_uvarint(buffer):
@@ -323,7 +310,7 @@ def test_recursive():
 
     assert msg == retr
     assert retr.uvarint == 1
-    assert type(retr.recursivefield) == RecursiveMessage
+    assert type(retr.recursivefield) is RecursiveMessage
     assert retr.recursivefield.uvarint == 2
-    assert type(retr.recursivefield.recursivefield) == RecursiveMessage
+    assert type(retr.recursivefield.recursivefield) is RecursiveMessage
     assert retr.recursivefield.recursivefield.uvarint == 3

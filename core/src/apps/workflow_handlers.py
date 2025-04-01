@@ -1,8 +1,6 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from trezorio import WireInterface
-
     from trezor.wire import Handler, Msg
 
 
@@ -31,6 +29,12 @@ def _find_message_handler_module(msg_type: int) -> str:
     if __debug__ and msg_type == MessageType.LoadDevice:
         return "apps.debug.load_device"
 
+    # benchmark
+    if __debug__ and msg_type == MessageType.BenchmarkListNames:
+        return "apps.benchmark.list_names"
+    if __debug__ and msg_type == MessageType.BenchmarkRun:
+        return "apps.benchmark.run"
+
     # management
     if msg_type == MessageType.ResetDevice:
         return "apps.management.reset_device"
@@ -42,6 +46,8 @@ def _find_message_handler_module(msg_type: int) -> str:
         return "apps.management.recovery_device"
     if msg_type == MessageType.ApplySettings:
         return "apps.management.apply_settings"
+    if msg_type == MessageType.ChangeLanguage:
+        return "apps.management.change_language"
     if msg_type == MessageType.ApplyFlags:
         return "apps.management.apply_flags"
     if msg_type == MessageType.ChangePin:
@@ -53,8 +59,16 @@ def _find_message_handler_module(msg_type: int) -> str:
     if msg_type == MessageType.RebootToBootloader:
         return "apps.management.reboot_to_bootloader"
 
-    if utils.INTERNAL_MODEL in ("T2B1",) and msg_type == MessageType.ShowDeviceTutorial:
+    if (
+        # pylint: disable-next=consider-using-in
+        utils.INTERNAL_MODEL == "T2B1"
+        or utils.INTERNAL_MODEL == "T3B1"
+        or utils.INTERNAL_MODEL == "T3T1"
+    ) and msg_type == MessageType.ShowDeviceTutorial:
         return "apps.management.show_tutorial"
+
+    if utils.USE_BACKLIGHT and msg_type == MessageType.SetBrightness:
+        return "apps.management.set_brightness"
 
     if utils.USE_SD_CARD and msg_type == MessageType.SdProtect:
         return "apps.management.sd_protect"
@@ -91,10 +105,18 @@ def _find_message_handler_module(msg_type: int) -> str:
         return "apps.misc.cipher_key_value"
     if msg_type == MessageType.GetFirmwareHash:
         return "apps.misc.get_firmware_hash"
-    if msg_type == MessageType.CosiCommit:
-        return "apps.misc.cosi_commit"
 
     if not utils.BITCOIN_ONLY:
+        # When promoting the Nostr app to production-level
+        # and removing the "if" guard don't forget to also remove
+        # the corresponding guards (PYOPT == '0') in Sconscript.*
+        if __debug__:
+            # nostr
+            if msg_type == MessageType.NostrGetPubkey:
+                return "apps.nostr.get_pubkey"
+            if msg_type == MessageType.NostrSignEvent:
+                return "apps.nostr.sign_event"
+
         if msg_type == MessageType.SetU2FCounter:
             return "apps.management.set_u2f_counter"
         if msg_type == MessageType.GetNextU2FCounter:
@@ -201,7 +223,7 @@ def _find_message_handler_module(msg_type: int) -> str:
     raise ValueError
 
 
-def find_registered_handler(iface: WireInterface, msg_type: int) -> Handler | None:
+def find_registered_handler(msg_type: int) -> Handler | None:
     if msg_type in workflow_handlers:
         # Message has a handler available, return it directly.
         return workflow_handlers[msg_type]
