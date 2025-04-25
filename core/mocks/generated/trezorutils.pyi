@@ -105,10 +105,17 @@ if __debug__:
         Dump GC info in case of an OOM.
         """
 if __debug__:
-    def check_reallocs() -> None:
+    def check_free_heap(previous: int) -> int:
         """
-        Assert that `sys.modules` and `main`'s globals are never
-        reallocated.
+        Assert that free heap memory doesn't decrease.
+        Returns current free heap memory (in bytes).
+        Enabled only for frozen debug builds.
+        """
+if __debug__:
+    def check_heap_fragmentation() -> None:
+        """
+        Assert known sources for heap fragmentation.
+        Enabled only for frozen debug builds.
         """
 
 

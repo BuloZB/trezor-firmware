@@ -32,6 +32,8 @@
 #include "panels/lx154a2422cpt23.h"
 #elif defined TOUCH_PANEL_LHS200KB_IF21
 #include "panels/lhs200kb-if21.h"
+#elif defined TOUCH_PANEL_LX250A2410A
+#include "panels/lx250a2410a.h"
 #endif
 
 #include "../touch_fsm.h"
@@ -173,14 +175,13 @@ static void ft6x36_power_down(void) {
                                       // held in reset until released
 #endif
 
-  // set above pins to OUTPUT / NOPULL
-  GPIO_InitTypeDef GPIO_InitStructure = {0};
+  HAL_GPIO_DeInit(TOUCH_INT_PORT, TOUCH_INT_PIN);
 
+#if defined(TOUCH_RST_PIN) || defined(TOUCH_ON_PIN)
+  GPIO_InitTypeDef GPIO_InitStructure = {0};
   GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStructure.Pull = GPIO_NOPULL;
   GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStructure.Pin = TOUCH_INT_PIN;
-  HAL_GPIO_Init(TOUCH_INT_PORT, &GPIO_InitStructure);
 
 #ifdef TOUCH_RST_PIN
   GPIO_InitStructure.Pin = TOUCH_RST_PIN;
@@ -195,6 +196,7 @@ static void ft6x36_power_down(void) {
     // 90 ms for circuitry to stabilize (being conservative)
     systick_delay_ms(90);
   }
+#endif
 #endif
 }
 
@@ -282,6 +284,8 @@ static void ft6x36_panel_correction(uint16_t x, uint16_t y, uint16_t* x_new,
   lx154a2422cpt23_touch_correction(x, y, x_new, y_new);
 #elif defined TOUCH_PANEL_LHS200KB_IF21
   lhs200kb_if21_touch_correction(x, y, x_new, y_new);
+#elif defined TOUCH_PANEL_LX250A2410A
+  lx250a2410a_touch_correction(x, y, x_new, y_new);
 #else
   *x_new = x;
   *y_new = y;
@@ -503,7 +507,7 @@ static uint32_t touch_get_state(touch_driver_t* driver) {
   // Read the set of registers containing touch event and coordinates
   if (sectrue != ft6x36_read_regs(driver->i2c_bus, 0x00, regs, sizeof(regs))) {
     // Failed to read the touch registers
-    return 0;
+    return driver->state;
   }
 
 #ifdef TOUCH_TRACE_REGS
@@ -516,7 +520,7 @@ static uint32_t touch_get_state(touch_driver_t* driver) {
   if (gesture != FT6X36_GESTURE_NONE) {
     // This is here for unknown historical reasons
     // It seems we can't get here with FT6X36
-    return 0;
+    return driver->state;
   }
 
   // Extract number of touches (0, 1, 2) or 0x0F before
@@ -536,21 +540,17 @@ static uint32_t touch_get_state(touch_driver_t* driver) {
 
   ft6x36_panel_correction(x_raw, y_raw, &x, &y);
 
-  uint32_t state = 0;
-
   uint32_t xy = touch_pack_xy(x, y);
 
   if ((nb_touches == 1) && (flags == FT6X63_EVENT_PRESS_DOWN)) {
-    state = TOUCH_START | xy;
+    driver->state = TOUCH_START | xy;
   } else if ((nb_touches == 1) && (flags == FT6X63_EVENT_CONTACT)) {
-    state = TOUCH_MOVE | xy;
+    driver->state = TOUCH_MOVE | xy;
   } else if ((nb_touches == 0) && (flags == FT6X63_EVENT_LIFT_UP)) {
-    state = TOUCH_END | xy;
+    driver->state = TOUCH_END | xy;
   }
 
-  driver->state = state;
-
-  return state;
+  return driver->state;
 }
 
 uint32_t touch_get_event(void) {
@@ -586,9 +586,7 @@ static void on_event_poll(void* context, bool read_awaited,
 
   if (read_awaited) {
     uint32_t touch_state = touch_get_state(driver);
-    if (touch_state != 0) {
-      syshandle_signal_read_ready(SYSHANDLE_TOUCH, &touch_state);
-    }
+    syshandle_signal_read_ready(SYSHANDLE_TOUCH, &touch_state);
   }
 }
 

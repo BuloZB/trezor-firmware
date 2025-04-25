@@ -66,7 +66,7 @@ def configure(
             "vendor/libtropic/src/lt_l2_frame_check.c",
             "vendor/libtropic/src/lt_l3.c",
             "vendor/libtropic/src/lt_random.c",
-            "vendor/libtropic/hal/port/unix/lt_port_unix.c",
+            "vendor/libtropic/hal/port/unix/lt_port_unix_tcp.c",
             "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_aesgcm.c",
             "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_ed25519.c",
             "vendor/libtropic/hal/crypto/trezor_crypto/lt_crypto_trezor_sha256.c",
@@ -76,8 +76,9 @@ def configure(
         paths += ["vendor/libtropic/include"]
         paths += ["vendor/libtropic/src"]
         defines += ["USE_TREZOR_CRYPTO"]
+        defines += [("LT_USE_TREZOR_CRYPTO", "1")]
         features_available.append("tropic")
-        defines += ["USE_TROPIC=1"]
+        defines += [("USE_TROPIC", "1")]
 
     if "input" in features_wanted:
         sources += ["embed/io/touch/unix/touch.c"]
@@ -86,9 +87,27 @@ def configure(
         features_available.append("touch")
         defines += [("USE_TOUCH", "1")]
 
+        sources += ["embed/io/button/unix/button.c"]
+        sources += ["embed/io/button/button_fsm.c"]
+        paths += ["embed/io/button/inc"]
+        features_available.append("button")
+        defines += [("USE_BUTTON", "1")]
+
+    if "ble" in features_wanted:
+        sources += ["embed/io/ble/unix/ble.c"]
+        paths += ["embed/io/ble/inc"]
+        features_available.append("ble")
+        defines += [("USE_BLE", "1")]
+
     features_available.append("backlight")
     defines += [("USE_BACKLIGHT", "1")]
 
     sources += ["embed/util/flash/stm32u5/flash_layout.c"]
+
+    defines += ["USE_HW_JPEG_DECODER"]
+    features_available.append("hw_jpeg_decoder")
+    sources += [
+        "embed/gfx/jpegdec/unix/jpegdec.c",
+    ]
 
     return features_available

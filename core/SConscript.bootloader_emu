@@ -207,7 +207,7 @@ ALLPATHS = ['embed/rust',
 env.Replace(
     COPT=env.get('ENV').get('OPTIMIZE', '-Os'),
     CCFLAGS='$COPT '
-    '-g3 '
+    '-g '
     '-nostdlib '
     '-std=gnu11 -Wall -Werror -Wpointer-arith -Wno-missing-braces -fno-common '
     '-fdata-sections -ffunction-sections '
@@ -225,6 +225,11 @@ env.Replace(
         'PB_VALIDATE_UTF8',
     ] + CPPDEFINES_MOD + CPPDEFINES_HAL,
     ASPPFLAGS='$CFLAGS $CCFLAGS', )
+
+try:
+    env.ParseConfig('pkg-config --cflags --libs libjpeg')
+except OSError:
+    print("libjpeg not installed, Emulator build is not possible")
 
 try:
     env.ParseConfig('pkg-config --cflags --libs sdl2 SDL2_image')

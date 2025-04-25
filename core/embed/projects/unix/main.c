@@ -422,8 +422,8 @@ STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
   }
 }
 
-// Inject SystemExit exception. This is primarily needed by prof.py to run the
-// atexit() handler.
+// Inject SystemExit exception. This is primarily needed by `prof/__main__.py`
+// to run the flush the coverage data.
 static void __attribute__((noreturn)) main_clean_exit() {
   const int status = 3;
   fflush(stdout);
@@ -568,7 +568,7 @@ MP_NOINLINE int main_(int argc, char **argv) {
 #ifdef MICROPY_PY_SYS_PATH_DEFAULT
     path = MICROPY_PY_SYS_PATH_DEFAULT;
 #else
-    path = ".frozen:~/.micropython/lib:/usr/lib/micropython";
+    path = ".frozen";
 #endif
   }
   size_t path_num = 1;  // [0] is for current dir (or base dir of the script)

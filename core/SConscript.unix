@@ -21,7 +21,7 @@ if BENCHMARK and PYOPT != '0':
   print("BENCHMARK=1 works only with PYOPT=0.")
   exit(1)
 
-FEATURES_WANTED = ["input", "sd_card", "dma2d", "optiga"]
+FEATURES_WANTED = ["input", "sd_card", "dma2d", "optiga", "ble"]
 
 if not DISABLE_TROPIC:
     FEATURES_WANTED.append('tropic')
@@ -253,9 +253,6 @@ SOURCE_MOD += [
 SOURCE_MOD += [
     'embed/upymod/modutime.c',
 ]
-
-CPPDEFINES_MOD += ['USE_TREZOR_CRYPTO']
-
 
 SOURCE_MICROPYTHON = [
     'vendor/micropython/extmod/modubinascii.c',
@@ -516,7 +513,7 @@ ALLPATHS=['.',
 
 env.Replace(
     CCFLAGS='$COPT '
-    '-g3 '
+    '-g '
     '-std=gnu11 -Wall -Werror -Wuninitialized -Wno-missing-braces '
     '-fdata-sections -ffunction-sections -fPIE ' + CCFLAGS_MOD,
     CCFLAGS_QSTR='-DNO_QSTR -DN_X64 -DN_X86 -DN_THUMB',
@@ -529,6 +526,11 @@ env.Replace(
         ui.get_ui_layout(TREZOR_MODEL),
     ] + CPPDEFINES_MOD + CPPDEFINES_HAL,
     ASPPFLAGS='$CFLAGS $CCFLAGS', )
+
+try:
+    env.ParseConfig('pkg-config --cflags --libs libjpeg')
+except OSError:
+    print("libjpeg not installed, Emulator build is not possible")
 
 try:
     env.ParseConfig('pkg-config --cflags --libs sdl2 SDL2_image')
@@ -557,6 +559,8 @@ PROTO_SOURCES_DIR = '../../../common/protob/'
 exclude_list = [PROTO_SOURCES_DIR + 'messages-bootloader.proto']
 if not THP:
     exclude_list.append(PROTO_SOURCES_DIR + 'messages-thp.proto')
+if PYOPT != '0':
+    exclude_list.append(PROTO_SOURCES_DIR + 'messages-debug.proto')
 
 PROTO_SOURCES = Glob(PROTO_SOURCES_DIR + '*.proto',
     exclude=exclude_list
@@ -572,6 +576,8 @@ qstr_protobuf = env.Command(
 
 qstr_micropython = 'vendor/micropython/py/qstrdefs.h'
 
+qstr_extra = 'embed/upymod/qstrdefsport.h'
+
 micropy_defines = env.MicroPyDefines(source=SOURCE_QSTR)
 
 qstr_collected = env.CollectQstr(
@@ -579,7 +585,7 @@ qstr_collected = env.CollectQstr(
 
 qstr_preprocessed = env.PreprocessQstr(
     target='genhdr/qstrdefs.preprocessed.h',
-    source=[qstr_micropython, qstr_protobuf, qstr_collected])
+    source=[qstr_micropython, qstr_protobuf, qstr_collected, qstr_extra])
 
 qstr_generated = env.GenerateQstrDefs(
     target='genhdr/qstrdefs.generated.h', source=qstr_preprocessed)
@@ -652,12 +658,14 @@ if FROZEN:
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/wire/codec/*.py'))
 
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'storage/*.py',
-        exclude=[
-            SOURCE_PY_DIR + 'storage/sd_salt.py',
-        ] if 'sd_card' not in FEATURES_AVAILABLE else []
+        exclude=(
+            ([SOURCE_PY_DIR + 'storage/sd_salt.py'] if 'sd_card' not in FEATURES_AVAILABLE else []) +
+            ([SOURCE_PY_DIR + 'storage/debug.py'] if PYOPT != '0' else [])
+        )
     ))
 
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/messages/__init__.py'))
+    SOURCE_PY_DEBUG_ENUMS = [SOURCE_PY_DIR + 'trezor/enums/Debug*.py']
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/*.py',
         exclude=[
             SOURCE_PY_DIR + 'trezor/enums/Binance*.py',
@@ -672,7 +680,7 @@ if FROZEN:
             SOURCE_PY_DIR + 'trezor/enums/Stellar*.py',
             SOURCE_PY_DIR + 'trezor/enums/Tezos*.py',
             SOURCE_PY_DIR + 'trezor/enums/Zcash*.py',
-        ])
+        ] + (SOURCE_PY_DEBUG_ENUMS if PYOPT != '0' else []))
     )
 
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/*.py'))
@@ -681,7 +689,8 @@ if FROZEN:
             SOURCE_PY_DIR + 'apps/common/sdcard.py',
         ] if "sd_card" not in FEATURES_AVAILABLE else []
     ))
-    SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/debug/*.py'))
+    if PYOPT == '0':
+        SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/debug/*.py'))
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/homescreen/*.py'))
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/management/*.py',
         exclude=[
@@ -690,7 +699,11 @@ if FROZEN:
             SOURCE_PY_DIR + 'apps/management/authenticate_device.py',
         ] if "optiga" not in FEATURES_AVAILABLE else [])
     )
-    SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/management/*/*.py'))
+    SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/management/*/*.py',
+        exclude=[
+            SOURCE_PY_DIR + 'apps/management/ble/*.py',
+        ] if "ble" not in FEATURES_AVAILABLE else [])
+    )
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/misc/*.py'))
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/bitcoin/*.py'))
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/bitcoin/*/*.py',
@@ -762,6 +775,9 @@ if FROZEN:
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/bitcoin/sign_tx/bitcoinlike.py'))
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/bitcoin/sign_tx/zcash_v4.py'))
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Zcash*.py'))
+
+    if PYOPT == '0':
+        SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'prof/*.py'))
 
 
     source_mpy = env.FrozenModule(

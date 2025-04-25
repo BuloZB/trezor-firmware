@@ -354,7 +354,9 @@ pub enum TranslatedString {
     confirm_total__sending_from_account = 221,  // "Sending from account:"
     confirm_total__title_fee = 222,  // "Fee info"
     confirm_total__title_sending_from = 223,  // "Sending from"
+    #[cfg(feature = "debug")]
     debug__loading_seed = 224,  // "Loading seed"
+    #[cfg(feature = "debug")]
     debug__loading_seed_not_recommended = 225,  // "Loading private seed is not recommended."
     device_name__change_template = 226,  // "Change device name to {0}?"
     device_name__title = 227,  // "Device name"
@@ -450,7 +452,7 @@ pub enum TranslatedString {
     #[cfg(feature = "universal_fw")]
     ethereum__gas_price = 275,  // "Gas price"
     #[cfg(feature = "universal_fw")]
-    ethereum__max_gas_price = 276,  // "Max gas price"
+    ethereum__max_gas_price = 276,  // "Max fee per gas"
     #[cfg(feature = "universal_fw")]
     ethereum__name_and_version = 277,  // "Name and version"
     #[cfg(feature = "universal_fw")]
@@ -458,7 +460,7 @@ pub enum TranslatedString {
     #[cfg(feature = "universal_fw")]
     ethereum__no_message_field = 279,  // "No message field"
     #[cfg(feature = "universal_fw")]
-    ethereum__priority_fee = 280,  // "Priority fee"
+    ethereum__priority_fee = 280,  // "Max priority fee"
     #[cfg(feature = "universal_fw")]
     ethereum__show_full_array = 281,  // "Show full array"
     #[cfg(feature = "universal_fw")]
@@ -1404,6 +1406,9 @@ pub enum TranslatedString {
     instructions__tap_to_continue = 991,  // "Tap to continue"
     #[cfg(feature = "universal_fw")]
     nostr__event_kind_template = 992,  // "Event kind: {0}"
+    ble__unpair_all = 993,  // "Unpair all bluetooth devices"
+    ble__unpair_current = 994,  // "Unpair connected device"
+    ble__unpair_title = 995,  // "Unpair"
 }
 
 impl TranslatedString {
@@ -1754,7 +1759,9 @@ impl TranslatedString {
             Self::confirm_total__sending_from_account => "Sending from account:",
             Self::confirm_total__title_fee => "Fee info",
             Self::confirm_total__title_sending_from => "Sending from",
+            #[cfg(feature = "debug")]
             Self::debug__loading_seed => "Loading seed",
+            #[cfg(feature = "debug")]
             Self::debug__loading_seed_not_recommended => "Loading private seed is not recommended.",
             Self::device_name__change_template => "Change device name to {0}?",
             Self::device_name__title => "Device name",
@@ -1850,7 +1857,7 @@ impl TranslatedString {
             #[cfg(feature = "universal_fw")]
             Self::ethereum__gas_price => "Gas price",
             #[cfg(feature = "universal_fw")]
-            Self::ethereum__max_gas_price => "Max gas price",
+            Self::ethereum__max_gas_price => "Max fee per gas",
             #[cfg(feature = "universal_fw")]
             Self::ethereum__name_and_version => "Name and version",
             #[cfg(feature = "universal_fw")]
@@ -1858,7 +1865,7 @@ impl TranslatedString {
             #[cfg(feature = "universal_fw")]
             Self::ethereum__no_message_field => "No message field",
             #[cfg(feature = "universal_fw")]
-            Self::ethereum__priority_fee => "Priority fee",
+            Self::ethereum__priority_fee => "Max priority fee",
             #[cfg(feature = "universal_fw")]
             Self::ethereum__show_full_array => "Show full array",
             #[cfg(feature = "universal_fw")]
@@ -2804,6 +2811,9 @@ impl TranslatedString {
             Self::instructions__tap_to_continue => "Tap to continue",
             #[cfg(feature = "universal_fw")]
             Self::nostr__event_kind_template => "Event kind: {0}",
+            Self::ble__unpair_all => "Unpair all bluetooth devices",
+            Self::ble__unpair_current => "Unpair connected device",
+            Self::ble__unpair_title => "Unpair",
         }
     }
 
@@ -3153,7 +3163,9 @@ impl TranslatedString {
             Qstr::MP_QSTR_confirm_total__sending_from_account => Some(Self::confirm_total__sending_from_account),
             Qstr::MP_QSTR_confirm_total__title_fee => Some(Self::confirm_total__title_fee),
             Qstr::MP_QSTR_confirm_total__title_sending_from => Some(Self::confirm_total__title_sending_from),
+            #[cfg(feature = "debug")]
             Qstr::MP_QSTR_debug__loading_seed => Some(Self::debug__loading_seed),
+            #[cfg(feature = "debug")]
             Qstr::MP_QSTR_debug__loading_seed_not_recommended => Some(Self::debug__loading_seed_not_recommended),
             Qstr::MP_QSTR_device_name__change_template => Some(Self::device_name__change_template),
             Qstr::MP_QSTR_device_name__title => Some(Self::device_name__title),
@@ -4203,6 +4215,9 @@ impl TranslatedString {
             Qstr::MP_QSTR_instructions__tap_to_continue => Some(Self::instructions__tap_to_continue),
             #[cfg(feature = "universal_fw")]
             Qstr::MP_QSTR_nostr__event_kind_template => Some(Self::nostr__event_kind_template),
+            Qstr::MP_QSTR_ble__unpair_all => Some(Self::ble__unpair_all),
+            Qstr::MP_QSTR_ble__unpair_current => Some(Self::ble__unpair_current),
+            Qstr::MP_QSTR_ble__unpair_title => Some(Self::ble__unpair_title),
             _ => None,
         }
     }

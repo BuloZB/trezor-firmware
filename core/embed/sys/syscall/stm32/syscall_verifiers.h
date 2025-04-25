@@ -25,7 +25,7 @@
 #include <sys/sysevent.h>
 
 void sysevents_poll__verified(const sysevents_t *awaited,
-                              sysevents_t *signalled, uint32_t timeout);
+                              sysevents_t *signalled, uint32_t deadline);
 
 // ---------------------------------------------------------------------
 #include <sys/systask.h>
@@ -229,6 +229,8 @@ bool jpegdec_get_info__verified(jpegdec_image_t *image);
 
 bool jpegdec_get_slice_rgba8888__verified(void *rgba8888,
                                           jpegdec_slice_t *slice);
+
+bool jpegdec_get_slice_mono8__verified(void *mono8, jpegdec_slice_t *slice);
 
 #endif  // USE_HW_JPEG_DECODER
 

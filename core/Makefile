@@ -127,6 +127,7 @@ SCONS_VARS = \
 	CMAKELISTS="$(CMAKELISTS)" \
 	DISABLE_OPTIGA="$(DISABLE_OPTIGA)" \
 	DISABLE_TROPIC="$(DISABLE_TROPIC)" \
+	HW_REVISION="$(HW_REVISION)" \
 	LOG_STACK_USAGE="$(LOG_STACK_USAGE)" \
 	PRODUCTION="$(PRODUCTION)" \
 	PYOPT="$(PYOPT)" \
@@ -148,6 +149,9 @@ SCONS_OPTS += --quiet
 endif
 
 SCONS = scons $(SCONS_OPTS) $(SCONS_VARS)
+
+# LD_LIBRARY_PATH workaround: https://discourse.nixos.org/t/nixpkgs-nixos-unstable-many-package-fail-with-glibc-2-38-not-found/35078 https://github.com/NixOS/nixpkgs/issues/287764
+unexport LD_LIBRARY_PATH
 
 ## help commands:
 

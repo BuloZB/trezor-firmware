@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 import typing as t
 from enum import IntEnum
 from pathlib import Path
@@ -27,7 +28,7 @@ import xdist
 from _pytest.python import IdMaker
 from _pytest.reports import TestReport
 
-from trezorlib import debuglink, log, models
+from trezorlib import debuglink, log, messages, models
 from trezorlib.debuglink import TrezorClientDebugLink as Client
 from trezorlib.device import apply_settings
 from trezorlib.device import wipe as wipe_device
@@ -54,6 +55,8 @@ if t.TYPE_CHECKING:
 HERE = Path(__file__).resolve().parent
 CORE = HERE.parent / "core"
 
+LOG = logging.getLogger(__name__)
+
 # So that we see details of failed asserts from this module
 pytest.register_assert_rewrite("tests.common")
 pytest.register_assert_rewrite("tests.input_flows")
@@ -64,11 +67,10 @@ def _emulator_wrapper_main_args() -> list[str]:
     """Look at TREZOR_PROFILING env variable, so that we can generate coverage reports."""
     do_profiling = os.environ.get("TREZOR_PROFILING") == "1"
     if do_profiling:
-        core_dir = HERE.parent / "core"
-        profiling_wrapper = core_dir / "prof" / "prof.py"
+        src_dir = HERE.parent / "core" / "src"
         # So that the coverage reports have the correct paths
-        os.environ["TREZOR_SRC"] = str(core_dir / "src")
-        return [str(profiling_wrapper)]
+        os.environ["TREZOR_SRC"] = str(src_dir)
+        return ["-m", "prof"]
     else:
         return ["-m", "main"]
 
@@ -239,6 +241,22 @@ class ModelsFilter:
         return selected_models
 
 
+def _initialize_with_retries(
+    request: pytest.FixtureRequest, raw_client: Client
+) -> None:
+    """Stop the test session if the error reproduces a few times."""
+    for _ in range(5):
+        try:
+            raw_client.sync_responses()
+            raw_client.init_device()
+            return
+        except Exception:
+            LOG.warning("Failed to initialize client", exc_info=True)
+            time.sleep(1)
+    request.session.shouldstop = "Failed to communicate with Trezor"
+    pytest.fail("Failed to communicate with Trezor")
+
+
 @pytest.fixture(scope="function")
 def client(
     request: pytest.FixtureRequest, _raw_client: Client
@@ -270,6 +288,12 @@ def client(
     if _raw_client.model not in models_filter:
         pytest.skip(f"Skipping test for model {_raw_client.model.internal_name}")
 
+    is_btc_only = (
+        messages.Capability.Bitcoin_like not in _raw_client.features.capabilities
+    )
+    if request.node.get_closest_marker("altcoin") and is_btc_only:
+        pytest.skip("Skipping altcoin test")
+
     sd_marker = request.node.get_closest_marker("sd_card")
     if sd_marker and not _raw_client.features.sd_card_present:
         raise RuntimeError(
@@ -283,73 +307,69 @@ def client(
     _raw_client.reset_debug_features()
     _raw_client.open()
     try:
-        _raw_client.sync_responses()
-        _raw_client.init_device()
-    except Exception:
-        request.session.shouldstop = "Failed to communicate with Trezor"
-        pytest.fail("Failed to communicate with Trezor")
+        _initialize_with_retries(request, _raw_client)
 
-    # Resetting all the debug events to not be influenced by previous test
-    _raw_client.debug.reset_debug_events()
+        # Resetting all the debug events to not be influenced by previous test
+        _raw_client.debug.reset_debug_events()
 
-    if test_ui:
-        # we need to reseed before the wipe
-        _raw_client.debug.reseed(0)
+        if test_ui:
+            # we need to reseed before the wipe
+            _raw_client.debug.reseed(0)
 
-    if sd_marker:
-        should_format = sd_marker.kwargs.get("formatted", True)
-        _raw_client.debug.erase_sd_card(format=should_format)
+        if sd_marker:
+            should_format = sd_marker.kwargs.get("formatted", True)
+            _raw_client.debug.erase_sd_card(format=should_format)
 
-    wipe_device(_raw_client)
+        wipe_device(_raw_client)
 
-    # Load language again, as it got erased in wipe
-    if _raw_client.model is not models.T1B1:
-        lang = request.session.config.getoption("lang") or "en"
-        assert isinstance(lang, str)
-        translations.set_language(_raw_client, lang)
+        # Load language again, as it got erased in wipe
+        if _raw_client.model is not models.T1B1:
+            lang = request.session.config.getoption("lang") or "en"
+            assert isinstance(lang, str)
+            translations.set_language(_raw_client, lang)
 
-    setup_params = dict(
-        uninitialized=False,
-        mnemonic=" ".join(["all"] * 12),
-        pin=None,
-        passphrase=False,
-        needs_backup=False,
-        no_backup=False,
-    )
-
-    marker = request.node.get_closest_marker("setup_client")
-    if marker:
-        setup_params.update(marker.kwargs)
-
-    use_passphrase = setup_params["passphrase"] is True or isinstance(
-        setup_params["passphrase"], str
-    )
-
-    if not setup_params["uninitialized"]:
-        debuglink.load_device(
-            _raw_client,
-            mnemonic=setup_params["mnemonic"],  # type: ignore
-            pin=setup_params["pin"],  # type: ignore
-            passphrase_protection=use_passphrase,
-            label="test",
-            needs_backup=setup_params["needs_backup"],  # type: ignore
-            no_backup=setup_params["no_backup"],  # type: ignore
-            _skip_init_device=True,
+        setup_params = dict(
+            uninitialized=False,
+            mnemonic=" ".join(["all"] * 12),
+            pin=None,
+            passphrase=False,
+            needs_backup=False,
+            no_backup=False,
         )
 
-        if request.node.get_closest_marker("experimental"):
-            apply_settings(_raw_client, experimental_features=True)
+        marker = request.node.get_closest_marker("setup_client")
+        if marker:
+            setup_params.update(marker.kwargs)
 
-        if use_passphrase and isinstance(setup_params["passphrase"], str):
-            _raw_client.use_passphrase(setup_params["passphrase"])
+        use_passphrase = setup_params["passphrase"] is True or isinstance(
+            setup_params["passphrase"], str
+        )
 
-        _raw_client.lock(_refresh_features=False)
-        _raw_client.init_device(new_session=True)
+        if not setup_params["uninitialized"]:
+            debuglink.load_device(
+                _raw_client,
+                mnemonic=setup_params["mnemonic"],  # type: ignore
+                pin=setup_params["pin"],  # type: ignore
+                passphrase_protection=use_passphrase,
+                label="test",
+                needs_backup=setup_params["needs_backup"],  # type: ignore
+                no_backup=setup_params["no_backup"],  # type: ignore
+                _skip_init_device=True,
+            )
 
-    with ui_tests.screen_recording(_raw_client, request):
-        yield _raw_client
+            if request.node.get_closest_marker("experimental"):
+                apply_settings(_raw_client, experimental_features=True)
 
-    _raw_client.close()
+            if use_passphrase and isinstance(setup_params["passphrase"], str):
+                _raw_client.use_passphrase(setup_params["passphrase"])
+
+            _raw_client.lock(_refresh_features=False)
+            _raw_client.init_device(new_session=True)
+
+        with ui_tests.screen_recording(_raw_client, request):
+            yield _raw_client
+    finally:
+        _raw_client.close()
 
 
 def _is_main_runner(session_or_request: pytest.Session | pytest.FixtureRequest) -> bool:
@@ -499,10 +519,6 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     models_filter = ModelsFilter(item)
     if not models_filter:
         raise RuntimeError("Don't skip tests for all trezor models!")
-
-    skip_altcoins = int(os.environ.get("TREZOR_PYTEST_SKIP_ALTCOINS", 0))
-    if item.get_closest_marker("altcoin") and skip_altcoins:
-        pytest.skip("Skipping altcoin test")
 
 
 def pytest_set_filtered_exceptions():

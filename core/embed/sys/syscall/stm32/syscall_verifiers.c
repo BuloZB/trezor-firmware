@@ -46,7 +46,7 @@
 // ---------------------------------------------------------------------
 
 void sysevents_poll__verified(const sysevents_t *awaited,
-                              sysevents_t *signalled, uint32_t timeout) {
+                              sysevents_t *signalled, uint32_t deadline) {
   if (!probe_read_access(awaited, sizeof(*awaited))) {
     goto access_violation;
   }
@@ -55,7 +55,7 @@ void sysevents_poll__verified(const sysevents_t *awaited,
     goto access_violation;
   }
 
-  sysevents_poll(awaited, signalled, timeout);
+  sysevents_poll(awaited, signalled, deadline);
   return;
 
 access_violation:
@@ -872,6 +872,22 @@ bool jpegdec_get_slice_rgba8888__verified(void *rgba8888,
   }
 
   return jpegdec_get_slice_rgba8888(rgba8888, slice);
+
+access_violation:
+  apptask_access_violation();
+  return false;
+}
+
+bool jpegdec_get_slice_mono8__verified(void *mono8, jpegdec_slice_t *slice) {
+  if (!probe_write_access(mono8, JPEGDEC_RGBA8888_BUFFER_SIZE)) {
+    goto access_violation;
+  }
+
+  if (!probe_write_access(slice, sizeof(*slice))) {
+    goto access_violation;
+  }
+
+  return jpegdec_get_slice_mono8(mono8, slice);
 
 access_violation:
   apptask_access_violation();

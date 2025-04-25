@@ -274,6 +274,7 @@ fn generate_micropython_bindings() {
         .allowlist_var("mp_type_OverflowError")
         .allowlist_var("mp_type_ValueError")
         .allowlist_var("mp_type_TypeError")
+        .allowlist_var("mp_type_RuntimeError")
         // time
         .allowlist_function("mp_hal_ticks_ms")
         .allowlist_function("mp_hal_delay_ms")
@@ -401,8 +402,15 @@ fn generate_trezorhal_bindings() {
         .allowlist_type("usb_event_t")
         .allowlist_function("usb_get_state")
         // ble
+        .allowlist_var("BLE_PAIRING_CODE_LEN")
+        .allowlist_var("BLE_RX_PACKET_SIZE")
+        .allowlist_var("BLE_TX_PACKET_SIZE")
+        .allowlist_var("BLE_ADV_NAME_LEN")
         .allowlist_function("ble_get_state")
         .allowlist_function("ble_issue_command")
+        .allowlist_function("ble_start")
+        .allowlist_function("ble_write")
+        .allowlist_function("ble_read")
         .allowlist_type("ble_command_t")
         .allowlist_type("ble_state_t")
         // touch
@@ -416,6 +424,7 @@ fn generate_trezorhal_bindings() {
         .allowlist_function("haptic_play_custom")
         // jpegdec
         .allowlist_var("JPEGDEC_RGBA8888_BUFFER_SIZE")
+        .allowlist_var("JPEGDEC_MONO8_BUFFER_SIZE")
         .allowlist_type("jpegdec_state_t")
         .allowlist_type("jpegdec_image_t")
         .allowlist_type("jpegdec_image_format_t")
@@ -424,7 +433,8 @@ fn generate_trezorhal_bindings() {
         .allowlist_function("jpegdec_close")
         .allowlist_function("jpegdec_process")
         .allowlist_function("jpegdec_get_info")
-        .allowlist_function("jpegdec_get_slice_rgba8888");
+        .allowlist_function("jpegdec_get_slice_rgba8888")
+        .allowlist_function("jpegdec_get_slice_mono8");
 
     // Write the bindings to a file in the OUR_DIR.
     bindings

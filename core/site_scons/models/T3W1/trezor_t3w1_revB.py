@@ -60,6 +60,7 @@ def configure(
 
     if "input" in features_wanted:
         sources += ["embed/io/touch/ft6x36/ft6x36.c"]
+        sources += ["embed/io/touch/ft6x36/panels/lx250a2410a.c"]
         sources += ["embed/io/touch/touch_fsm.c"]
         paths += ["embed/io/touch/inc"]
         features_available.append("touch")
@@ -166,7 +167,7 @@ def configure(
         paths += ["vendor/libtropic/include"]
         paths += ["vendor/libtropic/src"]
         defines += [("USE_TROPIC", "1")]
-        defines += [("USE_TREZOR_CRYPTO", "1")]
+        defines += [("LT_USE_TREZOR_CRYPTO", "1")]
 
     if "sbu" in features_wanted:
         sources += ["embed/io/sbu/stm32/sbu.c"]

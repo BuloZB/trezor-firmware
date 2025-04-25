@@ -77,8 +77,8 @@ uint64_t systick_us_to_cycles(uint64_t us) {
 #include <sys/sysevent.h>
 
 void sysevents_poll(const sysevents_t *awaited, sysevents_t *signalled,
-                    uint32_t timeout) {
-  syscall_invoke3((uint32_t)awaited, (uint32_t)signalled, timeout,
+                    uint32_t deadline) {
+  syscall_invoke3((uint32_t)awaited, (uint32_t)signalled, deadline,
                   SYSCALL_SYSEVENTS_POLL);
 }
 
@@ -731,6 +731,11 @@ bool jpegdec_get_info(jpegdec_image_t *info) {
 bool jpegdec_get_slice_rgba8888(uint32_t *rgba8888, jpegdec_slice_t *slice) {
   return (bool)syscall_invoke2((uint32_t)rgba8888, (uint32_t)slice,
                                SYSCALL_JPEGDEC_GET_SLICE_RGBA8888);
+}
+
+bool jpegdec_get_slice_mono8(uint32_t *mono8, jpegdec_slice_t *slice) {
+  return (bool)syscall_invoke2((uint32_t)mono8, (uint32_t)slice,
+                               SYSCALL_JPEGDEC_GET_SLICE_MONO8);
 }
 
 #endif  // USE_HW_JPEG_DECODER
