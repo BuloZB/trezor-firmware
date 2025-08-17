@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .. import get_hw_model_as_number
+from ..unix_common import unix_common_files
 
 
 def configure(
@@ -17,6 +18,8 @@ def configure(
     hw_revision = 0
     mcu = "STM32U5G9xx"
 
+    unix_common_files(env, defines, sources, paths)
+
     defines += [
         "FRAMEBUFFER",
         ("USE_RGB_COLORS", "1"),
@@ -24,6 +27,7 @@ def configure(
         "UI_COLOR_32BIT",
         ("DISPLAY_RESX", "380"),
         ("DISPLAY_RESY", "520"),
+        ("LOCKABLE_BOOTLOADER", "1"),
     ]
     features_available.append("framebuffer")
     features_available.append("display_rgba8888")
@@ -45,6 +49,12 @@ def configure(
         paths += ["embed/io/sbu/inc"]
         defines += [("USE_SBU", "1")]
 
+    if "rgb_led" in features_wanted:
+        sources += ["embed/io/rgb_led/unix/rgb_led.c"]
+        paths += ["embed/io/rgb_led/inc"]
+        features_available.append("rgb_led")
+        defines += [("USE_RGB_LED", "1")]
+
     if "optiga" in features_wanted:
         sources += ["embed/sec/optiga/unix/optiga_hal.c"]
         sources += ["embed/sec/optiga/unix/optiga.c"]
@@ -54,7 +64,6 @@ def configure(
 
     if "tropic" in features_wanted:
         sources += [
-            "embed/sec/secret/unix/secret.c",
             "embed/sec/tropic/tropic.c",
             "embed/sec/tropic/unix/tropic01.c",
             "vendor/libtropic/src/libtropic.c",
@@ -82,13 +91,13 @@ def configure(
 
     if "input" in features_wanted:
         sources += ["embed/io/touch/unix/touch.c"]
-        sources += ["embed/io/touch/touch_fsm.c"]
+        sources += ["embed/io/touch/touch_poll.c"]
         paths += ["embed/io/touch/inc"]
         features_available.append("touch")
         defines += [("USE_TOUCH", "1")]
 
         sources += ["embed/io/button/unix/button.c"]
-        sources += ["embed/io/button/button_fsm.c"]
+        sources += ["embed/io/button/button_poll.c"]
         paths += ["embed/io/button/inc"]
         features_available.append("button")
         defines += [("USE_BUTTON", "1")]
@@ -98,6 +107,15 @@ def configure(
         paths += ["embed/io/ble/inc"]
         features_available.append("ble")
         defines += [("USE_BLE", "1")]
+
+    sources += [
+        "embed/sys/power_manager/unix/power_manager.c",
+    ]
+    defines += [("USE_POWER_MANAGER", "1")]
+    paths += ["embed/sys/power_manager/inc"]
+    features_available.append("power_manager")
+
+    paths += ["embed/sys/suspend/inc"]
 
     features_available.append("backlight")
     defines += [("USE_BACKLIGHT", "1")]

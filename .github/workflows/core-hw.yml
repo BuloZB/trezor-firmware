@@ -38,8 +38,18 @@ jobs:
       DISABLE_OPTIGA: 1
       STORAGE_INSECURE_TESTING_MODE: 1
       BOOTLOADER_DEVEL: ${{ matrix.model == 'T2B1' && '1' || '0' }}
-      TESTOPTS: "-k 'not authenticate and not recovery and not lots' --durations=50 --session-timeout 19800"  # 5.5h pytest global timeout
+      # TODO: enable SD-related tests after fixing #4924
+      # Disable authenticity test since it requires DISABLE_OPTIGA=0
+      # 5.5h pytest global timeout
+      TESTOPTS: >-
+        -m 'not sd_card'
+        -k 'not test_authenticate_device'
+        --durations=50
+        --session-timeout 19800
+        --retries=5
+        --retry-delay=1
       TT_UHUB_PORT: 1
+      QUIET_MODE: 1
     timeout-minutes: 360  # 6h CI job timeout
     steps:
       - uses: actions/checkout@v4
@@ -52,8 +62,7 @@ jobs:
       - run: nix-shell --run "poetry run trezorctl list"
       - run: nix-shell --run "poetry run trezorctl get-features"
       - run: |
-          # log serial console to file; sleep is used because tio needs stdin that is not /dev/null
-          nix-shell --arg hardwareTest true --run "sleep 8h | tio --timestamp --no-autoconnect /dev/ttyTREZOR &> trezor.log" &
+          nix-shell --arg hardwareTest true --run "./tools/read-device-log.sh /dev/ttyTREZOR &> trezor.log" &
           nix-shell --run "poetry run pytest -v --verbose-log-file pytest.log tests/device_tests $TESTOPTS"
       - run: tail -n50 trezor.log || true
         if: failure()
@@ -84,6 +93,7 @@ jobs:
       DISABLE_OPTIGA: 1
       BOOTLOADER_DEVEL: ${{ matrix.model == 'T2B1' && '1' || '0' }}
       TT_UHUB_PORT: 1
+      QUIET_MODE: 1
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,8 +105,7 @@ jobs:
       - run: nix-shell --run "poetry run trezorctl list"
       - run: nix-shell --run "poetry run trezorctl get-features"
       - run: |
-          # log serial console to file; sleep is used because tio needs stdin that is not /dev/null
-          nix-shell --arg hardwareTest true --run "sleep 8h | tio --timestamp --no-autoconnect /dev/ttyTREZOR &> trezor.log" &
+          nix-shell --arg hardwareTest true --run "./tools/read-device-log.sh /dev/ttyTREZOR &> trezor.log" &
           nix-shell --arg fullDeps true --run "./core/tests/run_tests_device_emu_monero.sh --trezor-path webusb:"
       - run: tail -n50 trezor.log || true
         if: failure()

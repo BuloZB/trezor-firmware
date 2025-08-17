@@ -25,6 +25,8 @@
 
 #include <io/rgb_led.h>
 
+#include "sys/systick.h"
+
 #define LED_SWITCHING_FREQUENCY_HZ 20000
 #define TIMER_PERIOD (16000000 / LED_SWITCHING_FREQUENCY_HZ)
 
@@ -64,20 +66,20 @@ void rgb_led_init(void) {
 
   rgb_led_set_default_pin_state();
 
-  // enable LSE clock
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  HAL_RCC_OscConfig(&RCC_OscInitStruct);
+  uint32_t deadline = ticks_timeout(HSI_TIMEOUT_VALUE);
 
-  // select LSE as LPTIM clock source
-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
-  PeriphClkInitStruct.PeriphClockSelection =
-      RCC_PERIPHCLK_LPTIM1 | RCC_PERIPHCLK_LPTIM34;
-  PeriphClkInitStruct.Lptim1ClockSelection = RCC_LPTIM1CLKSOURCE_HSI;
-  PeriphClkInitStruct.Lptim34ClockSelection = RCC_LPTIM34CLKSOURCE_HSI;
-  HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
+  // enable HSI clock
+  RCC->CR |= RCC_CR_HSION;
+  // wait until the HSI is on
+  while ((RCC->CR & RCC_CR_HSIRDY) != RCC_CR_HSIRDY) {
+    if (ticks_expired(deadline)) {
+      return;
+    }
+  }
+
+  // select HSI as LPTIM clock source
+  __HAL_RCC_LPTIM1_CONFIG(RCC_LPTIM1CLKSOURCE_HSI);
+  __HAL_RCC_LPTIM34_CONFIG(RCC_LPTIM34CLKSOURCE_HSI);
 
   __HAL_RCC_LPTIM1_CLK_ENABLE();
   __HAL_RCC_LPTIM1_FORCE_RESET();

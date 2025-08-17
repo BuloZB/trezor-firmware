@@ -20,6 +20,7 @@ def configure(
         "FRAMEBUFFER",
         ("DISPLAY_RESX", "128"),
         ("DISPLAY_RESY", "64"),
+        ("LOCKABLE_BOOTLOADER", "1"),
     ]
     features_available.append("framebuffer")
     features_available.append("display_mono")
@@ -45,12 +46,14 @@ def configure(
         ("USE_HSE", "1"),
     ]
 
-    sources += ["embed/io/display/vg-2864/display_driver.c"]
-    paths += ["embed/io/display/inc"]
+    if "display" in features_wanted:
+        sources += ["embed/io/display/vg-2864/display_driver.c"]
+        paths += ["embed/io/display/inc"]
+        defines += [("USE_DISPLAY", "1")]
 
     if "input" in features_wanted:
         sources += ["embed/io/button/stm32/button.c"]
-        sources += ["embed/io/button/button_fsm.c"]
+        sources += ["embed/io/button/button_poll.c"]
         paths += ["embed/io/button/inc"]
         features_available.append("button")
         defines += [("USE_BUTTON", "1")]

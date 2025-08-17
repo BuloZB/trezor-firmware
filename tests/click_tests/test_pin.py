@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Generator
 import pytest
 
 from trezorlib import device, exceptions
-from trezorlib.debuglink import LayoutType
+from trezorlib.debuglink import DisplayStyle, LayoutType
 
 from .. import translations as TR
 from .common import go_back, go_next, navigate_to_action_and_press
@@ -45,6 +45,7 @@ PIN4 = "1234"
 PIN24 = "875163065288639289952973"
 PIN50 = "31415926535897932384626433832795028841971693993751"
 PIN60 = PIN50 + "9" * 10
+MAX_PIN_LEN = 50
 
 DELETE = "inputs__delete"
 SHOW = "inputs__show"
@@ -88,43 +89,49 @@ def prepare(
     # without reseeding "again", the results are still random.
     debug.reseed(0)
 
-    tap = False
+    device_handler.client.get_seedless_session().lock()
 
     # Setup according to the wanted situation
     if situation == Situation.PIN_INPUT:
         # Any action triggering the PIN dialogue
-        device_handler.run(device.apply_settings, auto_lock_delay_ms=300_000)  # type: ignore
-        tap = True
-    if situation == Situation.PIN_INPUT_CANCEL:
+        device_handler.run_with_session(lambda session: session.ping("pin_input", False))  # type: ignore
+    elif situation == Situation.PIN_INPUT_CANCEL:
         # Any action triggering the PIN dialogue
-        device_handler.run(device.apply_settings, auto_lock_delay_ms=300_000)  # type: ignore
+        device_handler.run_with_session(device.apply_settings, auto_lock_delay_ms=300_000)  # type: ignore
     elif situation == Situation.PIN_SETUP:
         # Set new PIN
-        device_handler.run(device.change_pin)  # type: ignore
-        assert (
-            TR.pin__turn_on in debug.read_layout().text_content()
-            or TR.pin__info in debug.read_layout().text_content()
-        )
-        if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia):
+        device_handler.run_with_provided_session(device_handler.client.get_seedless_session(), device.change_pin)  # type: ignore
+        debug.synchronize_at([TR.pin__turn_on, TR.pin__info, TR.pin__title_settings])
+        if debug.layout_type in (
+            LayoutType.Bolt,
+            LayoutType.Delizia,
+            LayoutType.Eckhart,
+        ):
             go_next(debug)
         elif debug.layout_type is LayoutType.Caesar:
             go_next(debug)
             go_next(debug)
             go_next(debug)
             go_next(debug)
+        else:
+            raise RuntimeError("Unknown model")
     elif situation == Situation.PIN_CHANGE:
         # Change PIN
-        device_handler.run(device.change_pin)  # type: ignore
+        device_handler.run_with_provided_session(device_handler.client.get_seedless_session(), device.change_pin)  # type: ignore
+        _assert_pin_entry(debug)
         _input_see_confirm(debug, old_pin)
-        assert TR.pin__change in debug.read_layout().text_content()
+        debug.synchronize_at(TR.pin__change)
         go_next(debug)
         _input_see_confirm(debug, old_pin)
     elif situation == Situation.WIPE_CODE_SETUP:
         # Set wipe code
-        device_handler.run(device.change_wipe_code)  # type: ignore
+        device_handler.run_with_provided_session(device_handler.client.get_seedless_session(), device.change_wipe_code)  # type: ignore
         if old_pin:
+            _assert_pin_entry(debug)
             _input_see_confirm(debug, old_pin)
-        assert TR.wipe_code__turn_on in debug.read_layout().text_content()
+        debug.synchronize_at(
+            [TR.wipe_code__turn_on, TR.wipe_code__info, TR.wipe_code__title_settings]
+        )
         go_next(debug)
         if debug.layout_type is LayoutType.Caesar:
             go_next(debug)
@@ -136,9 +143,11 @@ def prepare(
     _assert_pin_entry(debug)
     yield debug
 
-    if debug.layout_type is LayoutType.Delizia and tap:
-        go_next(debug)
-        debug.click(debug.screen_buttons.tap_to_confirm())
+    if debug.layout_type is LayoutType.Eckhart:
+        # After the test, we need to go back to the main screen
+        main_component = debug.read_layout().main_component()
+        if main_component != "Homescreen":
+            go_next(debug)
     else:
         go_next(debug)
 
@@ -146,22 +155,26 @@ def prepare(
 
 
 def _assert_pin_entry(debug: "DebugLink") -> None:
+    debug.synchronize_at("PinKeyboard")
     assert "PinKeyboard" in debug.read_layout().all_components()
 
 
 def _input_pin(debug: "DebugLink", pin: str, check: bool = False) -> None:
     """Input the PIN"""
-    if check:
-        before = debug.read_layout().pin()
-    if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia):
+    before = debug.read_layout().pin()
+    if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia, LayoutType.Eckhart):
         digits_order = debug.read_layout().tt_pin_digits_order()
-        for digit in pin:
+        for idx, digit in enumerate(pin):
             digit_index = digits_order.index(digit)
             coords = debug.screen_buttons.pin_passphrase_index(digit_index)
             debug.click(coords)
+            if idx + len(before) < MAX_PIN_LEN:
+                assert debug.read_layout().display_style() is DisplayStyle.LastOnly
     elif debug.layout_type is LayoutType.Caesar:
         for digit in pin:
             navigate_to_action_and_press(debug, digit, TR_PIN_ACTIONS)
+    else:
+        raise RuntimeError("Unknown model")
 
     if check:
         after = debug.read_layout().pin()
@@ -170,10 +183,18 @@ def _input_pin(debug: "DebugLink", pin: str, check: bool = False) -> None:
 
 def _see_pin(debug: "DebugLink") -> None:
     """Navigate to "SHOW" and press it"""
-    if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia):
-        debug.click(debug.screen_buttons.pin_passphrase_input())
+    if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia, LayoutType.Eckhart):
+
+        with debug.hold_touch(debug.screen_buttons.pin_passphrase_input()):
+            layout = debug.read_layout()
+            if layout.pin():
+                assert layout.display_style() is DisplayStyle.Shown
+        assert debug.read_layout().display_style() is DisplayStyle.Hidden
+
     elif debug.layout_type is LayoutType.Caesar:
         navigate_to_action_and_press(debug, SHOW, TR_PIN_ACTIONS)
+    else:
+        raise RuntimeError("Unknown model")
 
 
 def _delete_pin(debug: "DebugLink", digits_to_delete: int, check: bool = True) -> None:
@@ -182,10 +203,16 @@ def _delete_pin(debug: "DebugLink", digits_to_delete: int, check: bool = True) -
         before = debug.read_layout().pin()
 
     for _ in range(digits_to_delete):
-        if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia):
+        if debug.layout_type in (
+            LayoutType.Bolt,
+            LayoutType.Delizia,
+            LayoutType.Eckhart,
+        ):
             debug.click(debug.screen_buttons.pin_passphrase_erase())
         elif debug.layout_type is LayoutType.Caesar:
             navigate_to_action_and_press(debug, DELETE, TR_PIN_ACTIONS)
+        else:
+            raise RuntimeError("Unknown model")
 
     if check:
         after = debug.read_layout().pin()
@@ -194,13 +221,15 @@ def _delete_pin(debug: "DebugLink", digits_to_delete: int, check: bool = True) -
 
 def _delete_all(debug: "DebugLink", check: bool = True) -> None:
     """Navigate to "DELETE" and hold it until all digits are deleted"""
-    if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia):
+    if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia, LayoutType.Eckhart):
         debug.click(
             debug.screen_buttons.pin_passphrase_erase(),
             hold_ms=1500,
         )
     elif debug.layout_type is LayoutType.Caesar:
         navigate_to_action_and_press(debug, DELETE, TR_PIN_ACTIONS, hold_ms=1000)
+    else:
+        raise RuntimeError("Unknown model")
 
     if check:
         after = debug.read_layout().pin()
@@ -221,10 +250,12 @@ def _cancel_pin(debug: "DebugLink") -> None:
 
 def _confirm_pin(debug: "DebugLink") -> None:
     """Navigate to "ENTER" and press it"""
-    if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia):
+    if debug.layout_type in (LayoutType.Bolt, LayoutType.Delizia, LayoutType.Eckhart):
         debug.click(debug.screen_buttons.pin_confirm())
     elif debug.layout_type is LayoutType.Caesar:
         navigate_to_action_and_press(debug, ENTER, TR_PIN_ACTIONS)
+    else:
+        raise RuntimeError("Unknown model")
 
 
 def _input_see_confirm(debug: "DebugLink", pin: str) -> None:
@@ -285,14 +316,14 @@ def test_pin_delete_hold(device_handler: "BackgroundDeviceHandler"):
         _input_see_confirm(debug, PIN4)
 
 
-@pytest.mark.setup_client(pin=PIN60[:50])
+@pytest.mark.setup_client(pin=PIN60[:MAX_PIN_LEN])
 def test_pin_longer_than_max(device_handler: "BackgroundDeviceHandler"):
     with prepare(device_handler) as debug:
         _input_pin(debug, PIN60, check=False)
 
         # What is over 50 digits was not entered
         # TODO: do some UI change when limit is reached?
-        assert debug.read_layout().pin() == PIN60[:50]
+        assert debug.read_layout().pin() == PIN60[:MAX_PIN_LEN]
 
         _see_pin(debug)
         _confirm_pin(debug)
@@ -326,15 +357,18 @@ def test_pin_setup(device_handler: "BackgroundDeviceHandler"):
 def test_pin_setup_mismatch(device_handler: "BackgroundDeviceHandler"):
     with PIN_CANCELLED, prepare(device_handler, Situation.PIN_SETUP) as debug:
         _enter_two_times(debug, "1", "2")
-        if debug.layout_type is LayoutType.Bolt:
+        if debug.layout_type in (
+            LayoutType.Bolt,
+            LayoutType.Delizia,
+            LayoutType.Eckhart,
+        ):
             go_next(debug)
             _cancel_pin(debug)
         elif debug.layout_type is LayoutType.Caesar:
             debug.press_middle()
             debug.press_no()
-        elif debug.layout_type is LayoutType.Delizia:
-            go_next(debug)
-            _cancel_pin(debug)
+        else:
+            raise RuntimeError("Unknown model")
 
 
 @pytest.mark.setup_client(pin="1")
@@ -378,14 +412,64 @@ def test_pin_same_as_wipe_code(device_handler: "BackgroundDeviceHandler"):
         go_back(debug, r_middle=True)
 
 
+@pytest.mark.models("t2t1", "delizia", "eckhart")
 @pytest.mark.setup_client(pin=PIN4)
 def test_last_digit_timeout(device_handler: "BackgroundDeviceHandler"):
     with prepare(device_handler) as debug:
-        for digit in PIN4:
-            # insert a digit
-            _input_pin(debug, digit)
-            # wait until the last digit is hidden
+        _input_pin(debug, PIN4)
+        # wait until the last digit is hidden
+        time.sleep(DELAY_S)
+        assert debug.read_layout().display_style() is DisplayStyle.Hidden
+        # show the entire PIN
+        _see_pin(debug)
+        _confirm_pin(debug)
+
+
+@pytest.mark.models("t2t1", "delizia", "eckhart")
+@pytest.mark.setup_client(pin=PIN4)
+def test_show_pin_issue5328(device_handler: "BackgroundDeviceHandler"):
+    with prepare(device_handler) as debug:
+        _input_pin(debug, PIN4)
+        pos = debug.screen_buttons.pin_passphrase_input()
+        assert debug.read_layout().display_style() is DisplayStyle.LastOnly
+        # Hold the PIN area to show the PIN
+        with debug.hold_touch(pos):
+            assert debug.read_layout().display_style() is DisplayStyle.Shown
+
+            # Wait until the last digit timeout happens and make sure the pin did not hide
             time.sleep(DELAY_S)
-            # show the entire PIN
-            _see_pin(debug)
+            assert debug.read_layout().display_style() is DisplayStyle.Shown
+
+        # Release the touch and check that the PIN is hidden
+        assert debug.read_layout().display_style() is DisplayStyle.Hidden
+
+        _confirm_pin(debug)
+
+
+@pytest.mark.models("t2t1", "delizia", "eckhart")
+@pytest.mark.setup_client(pin=PIN4)
+def test_long_press_digit(device_handler: "BackgroundDeviceHandler"):
+    with prepare(device_handler) as debug:
+
+        # Input the PIN except the last digit
+        _input_pin(debug, PIN4[:-1])
+
+        # Prepare last digit for long press
+        digits_order = debug.read_layout().tt_pin_digits_order()
+        digit_index = digits_order.index(PIN4[-1])
+        pos = debug.screen_buttons.pin_passphrase_index(digit_index)
+
+        # Hold the key with the last digit
+        with debug.hold_touch(pos):
+            assert debug.read_layout().display_style() is DisplayStyle.LastOnly
+            # Wait until the last digit timeout happens and the pin is hidden
+            time.sleep(DELAY_S)
+            assert debug.read_layout().display_style() is DisplayStyle.Hidden
+            # Check that the the last digit hasn't been added yet
+            assert debug.read_layout().pin() == PIN4[:-1]
+
+        # Release the touch and check that the last digit is added
+        assert debug.read_layout().pin() == PIN4
+        assert debug.read_layout().display_style() is DisplayStyle.LastOnly
+
         _confirm_pin(debug)

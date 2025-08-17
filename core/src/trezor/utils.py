@@ -16,6 +16,7 @@ from trezorutils import (  # noqa: F401
     USE_BUTTON,
     USE_HAPTIC,
     USE_OPTIGA,
+    USE_POWER_MANAGER,
     USE_SD_CARD,
     USE_THP,
     USE_TOUCH,
@@ -28,6 +29,8 @@ from trezorutils import (  # noqa: F401
     firmware_vendor,
     halt,
     memcpy,
+    memzero,
+    presize_module,
     reboot_to_bootloader,
     sd_hotswap_enabled,
     unit_btconly,
@@ -37,7 +40,13 @@ from trezorutils import (  # noqa: F401
 from typing import TYPE_CHECKING
 
 if __debug__:
-    from trezorutils import LOG_STACK_USAGE, check_free_heap, check_heap_fragmentation
+    from trezorutils import get_gc_info  # noqa: F401
+    from trezorutils import (
+        LOG_STACK_USAGE,
+        check_heap_fragmentation,
+        clear_gc_info,
+        update_gc_info,
+    )
 
     if LOG_STACK_USAGE:
         from trezorutils import estimate_unused_stack, zero_unused_stack  # noqa: F401
@@ -95,7 +104,7 @@ class unimport:
     def __init__(self) -> None:
         self.mods: set[str] | None = None
         if __debug__:
-            self.free_heap = 0
+            clear_gc_info()
 
     def __enter__(self) -> None:
         self.mods = unimport_begin()
@@ -107,27 +116,14 @@ class unimport:
         self.mods = None
         gc.collect()
 
-        if __debug__ and exc_type is not SystemExit:
-            self.free_heap = check_free_heap(self.free_heap)
-
-
-def presize_module(modname: str, size: int) -> None:
-    """Ensure the module's dict is preallocated to an expected size.
-
-    This is used in modules like `trezor`, whose dict size depends not only on the
-    symbols defined in the file itself, but also on the number of submodules that will
-    be inserted into the module's namespace.
-    """
-    module = sys.modules[modname]
-    for i in range(size):
-        setattr(module, f"___PRESIZE_MODULE_{i}", None)
-    for i in range(size):
-        delattr(module, f"___PRESIZE_MODULE_{i}")
+        # If an exception is being handled here, `update_gc_info()` internal assertion
+        #  will fail (since the exception survives `gc.collect()` call above).
+        # So we prefer to skip the check, in order to preserve the exception.
+        if __debug__ and exc_type is None:
+            update_gc_info()
 
 
 if __debug__:
-    from ubinascii import hexlify
-
     try:
         from trezorutils import enable_oom_dump
 
@@ -149,10 +145,6 @@ if __debug__:
             mem_info()
         else:
             mem_info(True)
-
-    def get_bytes_as_str(a: bytes) -> str:
-        """Converts the provided bytes to a hexadecimal string (decoded as `utf-8`)."""
-        return hexlify(a).decode("utf-8")
 
 
 def ensure(cond: bool, msg: str | None = None) -> None:
@@ -378,6 +370,17 @@ def empty_bytearray(preallocate: int) -> bytearray:
     b = bytearray(preallocate)
     b[:] = bytes()
     return b
+
+
+def hexlify_if_bytes(data: str | bytes | bytearray | memoryview) -> str:
+    if isinstance(data, str):
+        return data
+    elif isinstance(data, (bytes, bytearray, memoryview)):
+        from ubinascii import hexlify
+
+        return hexlify(data).decode()
+    else:
+        raise TypeError("Expected str, bytes, bytearray, or memoryview")
 
 
 if __debug__:

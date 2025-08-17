@@ -138,7 +138,6 @@ MAKO_FILTERS = {
 }
 
 ALTCOIN_PREFIXES = (
-    "binance",
     "cardano",
     "eos",
     "ethereum",
@@ -171,7 +170,7 @@ def render_file(
     result = template.render(
         support_info=support_info,
         supported_on=make_support_filter(support_info),
-        ethereum_defs_timestamp=int(eth_defs_date.timestamp()),
+        defs_timestamp=int(eth_defs_date.timestamp()),
         THIS_FILE=this_file,
         ROOT=ROOT,
         ALTCOIN_PREFIXES=ALTCOIN_PREFIXES,

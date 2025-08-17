@@ -17,17 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef SECURE_MODE
+
 #include <trezor_rtl.h>
 
 #include <sec/optiga.h>
 #include <sec/optiga_commands.h>
 #include <sec/optiga_transport.h>
-#include <sec/secret.h>
+#include <sec/secret_keys.h>
 #include <sys/systick.h>
 
 #include "memzero.h"
-
-#ifdef KERNEL_MODE
 
 #ifdef USE_OPTIGA_LOGGING
 #include <inttypes.h>
@@ -57,8 +57,8 @@ void optiga_init_and_configure(void) {
 
   optiga_init();
 
-  uint8_t secret[SECRET_OPTIGA_KEY_LEN] = {0};
-  secbool secret_ok = secret_optiga_get(secret);
+  uint8_t secret[OPTIGA_PAIRING_SECRET_SIZE] = {0};
+  secbool secret_ok = secret_key_optiga_pairing(secret);
 
   if (sectrue == secret_ok) {
     // If the shielded connection cannot be established, reset Optiga and
@@ -73,4 +73,4 @@ void optiga_init_and_configure(void) {
          "Cannot initialize optiga.");
 }
 
-#endif  // KERNEL_MODE
+#endif  // SECURE_MODE

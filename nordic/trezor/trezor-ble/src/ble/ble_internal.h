@@ -28,6 +28,7 @@
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/uuid.h>
 
+#include <ble/ble.h>
 #include <trz_comm/trz_comm.h>
 
 /** @brief UUID of the NUS Service. **/
@@ -46,6 +47,9 @@
 #define BT_UUID_TRZ_RX BT_UUID_DECLARE_128(BT_UUID_TRZ_RX_VAL)
 #define BT_UUID_TRZ_TX BT_UUID_DECLARE_128(BT_UUID_TRZ_TX_VAL)
 
+#define BLE_TX_PACKET_SIZE 244
+#define BLE_RX_PACKET_SIZE 244
+
 #define BLE_PAIRING_CODE_LEN 6
 #define BLE_ADV_NAME_LEN 20
 
@@ -56,7 +60,8 @@ typedef struct {
   uint8_t advertising_whitelist;
 
   uint8_t peer_count;
-  uint8_t reserved[2];
+  uint8_t busy_flag;
+  uint8_t reserved;
   uint8_t sd_version_number;
 
   uint16_t sd_company_id;
@@ -64,6 +69,9 @@ typedef struct {
 
   uint32_t app_version;
   uint32_t bld_version;
+
+  uint8_t connected_addr[6];  // MAC address of the connected device
+  uint8_t connected_addr_type;
 
 } event_status_msg_t;
 
@@ -74,6 +82,7 @@ typedef enum {
   INTERNAL_EVENT_PAIRING_REQUEST = 0x04,
   INTERNAL_EVENT_PAIRING_CANCELLED = 0x05,
   INTERNAL_EVENT_MAC = 0x06,
+  INTERNAL_EVENT_PAIRING_COMPLETED = 0x07,
 } internal_event_t;
 
 typedef enum {
@@ -87,6 +96,7 @@ typedef enum {
   INTERNAL_CMD_REJECT_PAIRING = 0x07,
   INTERNAL_CMD_UNPAIR = 0x08,
   INTERNAL_CMD_GET_MAC = 0x09,
+  INTERNAL_CMD_SET_BUSY = 0x0A,
 } internal_cmd_t;
 
 typedef struct {
@@ -94,7 +104,7 @@ typedef struct {
   uint8_t whitelist;
   uint8_t color;
   uint8_t static_addr;
-  uint32_t device_code;
+  uint8_t device_code;
   uint8_t name[BLE_ADV_NAME_LEN];
 } cmd_advertising_on_t;
 
@@ -102,6 +112,16 @@ typedef struct {
   uint8_t cmd_id;
   uint8_t code[BLE_PAIRING_CODE_LEN];
 } cmd_allow_pairing_t;
+
+typedef struct {
+  uint8_t cmd_id;
+  uint8_t flag;
+} cmd_set_busy_t;
+
+// Set device to busy state, autoresponse
+void ble_set_busy_flag(uint8_t flag);
+
+uint8_t ble_get_busy_flag(void);
 
 // BLE management functions
 // Initialization
@@ -112,6 +132,8 @@ void ble_management_send_status_event(void);
 void ble_management_send_pairing_request_event(uint8_t *data, uint16_t len);
 // Send Pairing Cancelled event
 void ble_management_send_pairing_cancelled_event(void);
+// Send Pairing Completed event
+void ble_management_send_pairing_completed(void);
 
 // Bonds
 // Erase all bonds
@@ -125,10 +147,8 @@ bool bonds_erase_current(void);
 // Initialization
 void advertising_init(void);
 // Start advertising, with or without whitelist
-void advertising_start(bool wl, uint8_t color, uint32_t device_code,
+void advertising_start(bool wl, uint8_t color, uint8_t device_code,
                        bool static_addr, char *name, int name_len);
-// Stop advertising
-void advertising_stop(void);
 // Check if advertising is active
 bool advertising_is_advertising(void);
 // Check if advertising is active with whitelist
@@ -162,3 +182,5 @@ typedef void (*service_received_cb)(struct bt_conn *conn,
 int service_init(service_received_cb callbacks);
 // Send data to the connected device
 int service_send(struct bt_conn *conn, trz_packet_t *data);
+// Send hard-coded error response
+void service_send_busy(void);

@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from trezor.crypto import base58
+from trezor.wire import ProcessError
 
 from .transaction import Transaction
 from .transaction.instructions import (
@@ -14,9 +15,10 @@ from .transaction.instructions import (
 if TYPE_CHECKING:
     from typing import Type
 
-    from trezor.messages import SolanaTxAdditionalInfo
+    from trezor.messages import PaymentRequest
 
     from .transaction import Fee
+    from .types import AdditionalTxInfo
 
     TransferTokenInstruction = (
         TokenProgramTransferCheckedInstruction
@@ -122,9 +124,11 @@ async def try_confirm_token_transfer_transaction(
     fee: Fee,
     signer_path: list[int],
     blockhash: bytes,
-    additional_info: SolanaTxAdditionalInfo | None = None,
+    additional_info: AdditionalTxInfo,
+    verified_payment_request: PaymentRequest | None,
 ) -> bool:
-    from .layout import confirm_token_transfer
+    from .definitions import unknown_token
+    from .layout import confirm_payment_request, confirm_token_transfer
     from .token_account import try_get_token_account_base_address
 
     visible_instructions = transaction.get_visible_instructions()
@@ -141,15 +145,11 @@ async def try_confirm_token_transfer_transaction(
     token_mint = transfer_token_instructions[0].token_mint[0]
     token_account = transfer_token_instructions[0].destination_account[0]
 
-    base_address = (
-        try_get_token_account_base_address(
-            token_account,
-            token_program,
-            token_mint,
-            additional_info.token_accounts_infos,
-        )
-        if additional_info is not None
-        else None
+    base_address = try_get_token_account_base_address(
+        token_account,
+        token_program,
+        token_mint,
+        additional_info.token_accounts_infos,
     )
 
     total_token_amount = sum(
@@ -159,29 +159,53 @@ async def try_confirm_token_transfer_transaction(
         ]
     )
 
-    await confirm_token_transfer(
-        token_account if base_address is None else base_address,
-        token_account,
-        token_mint,
-        total_token_amount,
-        transfer_token_instructions[0].decimals,
-        fee,
-        signer_path,
-        blockhash,
-    )
+    token = additional_info.definitions.get_token(token_mint)
+    is_unknown = token is None
+    if is_unknown:
+        token = unknown_token(token_mint)
+
+    if verified_payment_request:
+        if len(transfer_token_instructions) > 1:
+            raise ProcessError("Multiple transfers not supported for payment requests")
+        provider_address = base58.encode(token_account)
+        await confirm_payment_request(
+            provider_address,
+            signer_path,
+            total_token_amount,
+            transfer_token_instructions[0].decimals,
+            token,
+            fee,
+            verified_payment_request,
+        )
+    else:
+        await confirm_token_transfer(
+            token_account if base_address is None else base_address,
+            token_account,
+            token,
+            is_unknown,
+            total_token_amount,
+            transfer_token_instructions[0].decimals,
+            fee,
+            blockhash,
+        )
     return True
 
 
 async def try_confirm_predefined_transaction(
     transaction: Transaction,
-    fee: Fee,
+    fee: Fee | None,
     signer_path: list[int],
     signer_public_key: bytes,
     blockhash: bytes,
-    additional_info: SolanaTxAdditionalInfo | None = None,
+    additional_info: AdditionalTxInfo,
+    verified_payment_request: PaymentRequest | None,
 ) -> bool:
     from .layout import confirm_system_transfer
     from .transaction.instructions import SystemProgramTransferInstruction
+
+    if fee is None:
+        # fee must be known for predefined transaction types
+        return False
 
     instructions = transaction.get_visible_instructions()
     instructions_count = len(instructions)
@@ -192,7 +216,7 @@ async def try_confirm_predefined_transaction(
 
     if instructions_count == 1:
         if SystemProgramTransferInstruction.is_type_of(instructions[0]):
-            await confirm_system_transfer(instructions[0], fee, signer_path, blockhash)
+            await confirm_system_transfer(instructions[0], fee, blockhash)
             return True
 
     if await try_confirm_staking_transaction(
@@ -205,7 +229,12 @@ async def try_confirm_predefined_transaction(
         return True
 
     return await try_confirm_token_transfer_transaction(
-        transaction, fee, signer_path, blockhash, additional_info
+        transaction,
+        fee,
+        signer_path,
+        blockhash,
+        additional_info,
+        verified_payment_request,
     )
 
 

@@ -1,10 +1,13 @@
 #[cfg(feature = "micropython")]
 mod micropython;
 
+#[cfg(feature = "ui")]
+use crate::ui::event::BLEEvent;
+
 use crate::error::Error;
 use core::mem::size_of;
 
-use super::{ffi, model};
+use super::ffi;
 
 pub const ADV_NAME_LEN: usize = ffi::BLE_ADV_NAME_LEN as usize;
 pub const PAIRING_CODE_LEN: usize = ffi::BLE_PAIRING_CODE_LEN as usize;
@@ -21,6 +24,27 @@ fn prefix_utf8_bytes(text: &str, max_len: usize) -> &[u8] {
         i -= 1;
     }
     &text.as_bytes()[..i]
+}
+
+#[cfg(feature = "ui")]
+pub fn ble_parse_event(event: ffi::ble_event_t) -> BLEEvent {
+    match event.type_ {
+        ffi::ble_event_type_t_BLE_CONNECTED => BLEEvent::Connected,
+        ffi::ble_event_type_t_BLE_DISCONNECTED => BLEEvent::Disconnected,
+        ffi::ble_event_type_t_BLE_PAIRING_REQUEST => {
+            let code: u32 = event
+                .data
+                .iter()
+                .take(6)
+                .map(|&b| (b - b'0'))
+                .fold(0, |acc, d| acc * 10 + d as u32);
+            BLEEvent::PairingRequest(code)
+        }
+        ffi::ble_event_type_t_BLE_PAIRING_CANCELLED => BLEEvent::PairingCanceled,
+        ffi::ble_event_type_t_BLE_PAIRING_COMPLETED => BLEEvent::PairingCompleted,
+        ffi::ble_event_type_t_BLE_CONNECTION_CHANGED => BLEEvent::ConnectionChanged,
+        _ => panic!(),
+    }
 }
 
 fn state() -> ffi::ble_state_t {
@@ -91,11 +115,11 @@ pub fn pairing_mode(name: &str) -> Result<(), Error> {
     issue_command(ffi::ble_command_type_t_BLE_PAIRING_MODE, data_advname(name))
 }
 
-pub fn connectable_mode(name: &str) -> Result<(), Error> {
+pub fn switch_on(name: &str) -> Result<(), Error> {
     issue_command(ffi::ble_command_type_t_BLE_SWITCH_ON, data_advname(name))
 }
 
-pub fn stop_advertising() -> Result<(), Error> {
+pub fn switch_off() -> Result<(), Error> {
     issue_command(ffi::ble_command_type_t_BLE_SWITCH_OFF, data_none())
 }
 
@@ -117,6 +141,11 @@ pub fn unpair() -> Result<(), Error> {
 
 pub fn disconnect() -> Result<(), Error> {
     issue_command(ffi::ble_command_type_t_BLE_DISCONNECT, data_none())
+}
+
+pub fn set_name(name: &str) {
+    let bytes = prefix_utf8_bytes(name, ADV_NAME_LEN);
+    unsafe { ffi::ble_set_name(bytes.as_ptr(), bytes.len()) }
 }
 
 pub fn start_comm() {

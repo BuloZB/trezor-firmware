@@ -19,7 +19,7 @@
 
 #pragma once
 
-#ifdef SYSCALL_DISPATCH
+#ifdef KERNEL
 
 // ---------------------------------------------------------------------
 #include <sys/sysevent.h>
@@ -43,6 +43,14 @@ void system_exit_fatal__verified(const char *message, size_t message_len,
 #include <sys/bootutils.h>
 
 void reboot_and_upgrade__verified(const uint8_t hash[32]);
+
+// ---------------------------------------------------------------------
+
+#include <util/boot_image.h>
+
+bool boot_image_check__verified(const boot_image_t *image);
+
+void boot_image_replace__verified(const boot_image_t *image);
 
 // ---------------------------------------------------------------------
 #include <io/display.h>
@@ -139,10 +147,9 @@ bool __wur optiga_random_buffer__verified(uint8_t *dest, size_t size);
 #endif  // USE_OPTIGA
 
 // ---------------------------------------------------------------------
-#include "storage.h"
+#include <sec/storage.h>
 
-void storage_init__verified(PIN_UI_WAIT_CALLBACK callback, const uint8_t *salt,
-                            const uint16_t salt_len);
+void storage_setup__verified(PIN_UI_WAIT_CALLBACK callback);
 
 secbool storage_unlock__verified(const uint8_t *pin, size_t pin_len,
                                  const uint8_t *ext_salt);
@@ -176,18 +183,12 @@ bool translations_write__verified(const uint8_t *data, uint32_t offset,
 const uint8_t *translations_read__verified(uint32_t *len, uint32_t offset);
 
 // ---------------------------------------------------------------------
-#include <sec/entropy.h>
-
-void entropy_get__verified(uint8_t *buf);
-
-// ---------------------------------------------------------------------
 #include <util/fwutils.h>
 
-secbool firmware_calc_hash__verified(const uint8_t *challenge,
-                                     size_t challenge_len, uint8_t *hash,
-                                     size_t hash_len,
-                                     firmware_hash_callback_t callback,
-                                     void *callback_context);
+int firmware_hash_start__verified(const uint8_t *challenge,
+                                  size_t challenge_len);
+
+int firmware_hash_continue__verified(uint8_t *hash, size_t hash_len);
 
 secbool firmware_get_vendor__verified(char *buff, size_t buff_size);
 
@@ -206,15 +207,31 @@ bool ble_write__verified(const uint8_t *data, size_t len);
 
 secbool ble_read__verified(uint8_t *data, size_t len);
 
+void ble_set_name__verified(const uint8_t *name, size_t len);
+
 #endif
 
 // ---------------------------------------------------------------------
+#ifdef USE_NRF
 
-#ifdef USE_POWERCTL
+#include <io/nrf.h>
 
-#include <sys/powerctl.h>
+bool nrf_update_required__verified(const uint8_t *data, size_t len);
 
-bool powerctl_get_status__verified(powerctl_status_t *status);
+bool nrf_update__verified(const uint8_t *data, size_t len);
+
+#endif
+// ---------------------------------------------------------------------
+
+#ifdef USE_POWER_MANAGER
+
+#include <sys/power_manager.h>
+
+pm_status_t pm_get_state__verified(pm_state_t *status);
+
+bool pm_get_events__verified(pm_event_t *event);
+
+pm_status_t pm_suspend__verified(wakeup_flags_t *wakeup_reason);
 
 #endif
 
@@ -288,4 +305,4 @@ bool tropic_ecc_sign__verified(uint16_t key_slot_index, const uint8_t *dig,
 
 #endif
 
-#endif  // SYSCALL_DISPATCH
+#endif  // KERNEL

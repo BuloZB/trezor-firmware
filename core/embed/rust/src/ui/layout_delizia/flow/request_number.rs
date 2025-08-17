@@ -3,7 +3,6 @@ use crate::{
     strutil::TString,
     translations::TR,
     ui::{
-        component::swipe_detect::SwipeSettings,
         flow::{
             base::{Decision, DecisionBuilder as _},
             FlowController, FlowMsg, SwipeFlow,
@@ -37,9 +36,9 @@ impl FlowController for RequestNumber {
 
     fn handle_swipe(&'static self, direction: Direction) -> Decision {
         match (self, direction) {
-            (Self::Number, Direction::Left) => Self::Menu.swipe(direction),
-            (Self::Menu, Direction::Right) => Self::Number.swipe(direction),
-            (Self::Info, Direction::Right) => Self::Menu.swipe(direction),
+            (Self::Number, Direction::Up) => self.return_msg(FlowMsg::Choice(
+                NUM_DISPLAYED.load(Ordering::Relaxed).into(),
+            )),
             _ => self.do_nothing(),
         }
     }
@@ -50,7 +49,6 @@ impl FlowController for RequestNumber {
             (Self::Menu, FlowMsg::Choice(0)) => Self::Info.swipe_left(),
             (Self::Menu, FlowMsg::Cancelled) => Self::Number.swipe_right(),
             (Self::Info, FlowMsg::Cancelled) => Self::Menu.goto(),
-            (Self::Number, FlowMsg::Choice(n)) => self.return_msg(FlowMsg::Choice(n)),
             _ => self.do_nothing(),
         }
     }
@@ -75,19 +73,19 @@ pub fn new_request_number(
         info_closure(curr_number as u32)
     };
 
-    let number_input_dialog = NumberInputDialog::new(min_count, max_count, count, description)?;
+    let number_input_dialog = NumberInputDialog::new(
+        min_count as u16,
+        max_count as u16,
+        count as u16,
+        description,
+    )?;
     let content_number_input = Frame::left_aligned(title, SwipeContent::new(number_input_dialog))
         .with_menu_button()
         .with_swipeup_footer(None)
-        .with_swipe(Direction::Left, SwipeSettings::default())
         .map(|msg| match msg {
             NumberInputDialogMsg::Changed(n) => {
-                NUM_DISPLAYED.store(n as u16, Ordering::Relaxed);
+                NUM_DISPLAYED.store(n, Ordering::Relaxed);
                 None
-            }
-            NumberInputDialogMsg::Confirmed(n) => {
-                NUM_DISPLAYED.store(n as u16, Ordering::Relaxed);
-                Some(FlowMsg::Choice(n as usize))
             }
         });
 
@@ -96,13 +94,11 @@ pub fn new_request_number(
         VerticalMenu::empty().item(theme::ICON_CHEVRON_RIGHT, TR::buttons__more_info.into()),
     )
     .with_cancel_button()
-    .with_swipe(Direction::Right, SwipeSettings::immediate())
     .map(super::util::map_to_choice);
 
     let updatable_info = UpdatableMoreInfo::new(info_closure);
     let content_info = Frame::left_aligned(TString::empty(), SwipeContent::new(updatable_info))
         .with_cancel_button()
-        .with_swipe(Direction::Right, SwipeSettings::immediate())
         .map_to_button_msg();
 
     let mut res = SwipeFlow::new(&RequestNumber::Number)?;

@@ -28,7 +28,7 @@
 #include "syscall_probe.h"
 #include "syscall_verifiers.h"
 
-#ifdef SYSCALL_DISPATCH
+#ifdef KERNEL
 
 // Checks if bitblt destination is accessible
 #define CHECK_BB_DST(_bb)                                       \
@@ -56,6 +56,36 @@ void sysevents_poll__verified(const sysevents_t *awaited,
   }
 
   sysevents_poll(awaited, signalled, deadline);
+  return;
+
+access_violation:
+  apptask_access_violation();
+}
+
+// ---------------------------------------------------------------------
+
+bool boot_image_check__verified(const boot_image_t *image) {
+  if (!probe_read_access(image, sizeof(*image))) {
+    goto access_violation;
+  }
+
+  return boot_image_check(image);
+
+access_violation:
+  apptask_access_violation();
+  return false;
+};
+
+void boot_image_replace__verified(const boot_image_t *image) {
+  if (!probe_read_access(image, sizeof(*image))) {
+    goto access_violation;
+  }
+
+  if (!probe_read_access(image->image_ptr, image->image_size)) {
+    goto access_violation;
+  }
+
+  boot_image_replace(image);
   return;
 
 access_violation:
@@ -532,13 +562,25 @@ access_violation:
 
 // ---------------------------------------------------------------------
 
-void storage_init__verified(PIN_UI_WAIT_CALLBACK callback, const uint8_t *salt,
-                            const uint16_t salt_len) {
-  if (!probe_read_access(salt, salt_len)) {
+static PIN_UI_WAIT_CALLBACK storage_callback = NULL;
+
+static secbool storage_callback_wrapper(uint32_t wait, uint32_t progress,
+                                        enum storage_ui_message_t message) {
+  secbool result;
+
+  applet_t *applet = syscall_get_context();
+  result = systask_invoke_callback(&applet->task, wait, progress, message,
+                                   storage_callback);
+  return result;
+}
+
+void storage_setup__verified(PIN_UI_WAIT_CALLBACK callback) {
+  if (!probe_execute_access(callback)) {
     goto access_violation;
   }
+  storage_callback = callback;
 
-  storage_init(callback, salt, salt_len);
+  storage_setup(storage_callback_wrapper);
   return;
 
 access_violation:
@@ -698,39 +740,29 @@ access_violation:
 
 // ---------------------------------------------------------------------
 
-void entropy_get__verified(uint8_t *buf) {
-  if (!probe_write_access(buf, HW_ENTROPY_LEN)) {
-    goto access_violation;
-  }
-
-  entropy_get(buf);
-  return;
-
-access_violation:
-  apptask_access_violation();
-}
-
-// ---------------------------------------------------------------------
-
-secbool firmware_calc_hash__verified(const uint8_t *challenge,
-                                     size_t challenge_len, uint8_t *hash,
-                                     size_t hash_len,
-                                     firmware_hash_callback_t callback,
-                                     void *callback_context) {
+int firmware_hash_start__verified(const uint8_t *challenge,
+                                  size_t challenge_len) {
   if (!probe_read_access(challenge, challenge_len)) {
     goto access_violation;
   }
 
+  return firmware_hash_start(challenge, challenge_len);
+
+access_violation:
+  apptask_access_violation();
+  return -1;
+}
+
+int firmware_hash_continue__verified(uint8_t *hash, size_t hash_len) {
   if (!probe_write_access(hash, hash_len)) {
     goto access_violation;
   }
 
-  return firmware_calc_hash(challenge, challenge_len, hash, hash_len, callback,
-                            callback_context);
+  return firmware_hash_continue(hash, hash_len);
 
 access_violation:
   apptask_access_violation();
-  return secfalse;
+  return -1;
 }
 
 secbool firmware_get_vendor__verified(char *buff, size_t buff_size) {
@@ -809,26 +841,98 @@ access_violation:
   apptask_access_violation();
   return 0;
 }
+
+void ble_set_name__verified(const uint8_t *name, size_t len) {
+  if (!probe_read_access(name, len)) {
+    goto access_violation;
+  }
+
+  ble_set_name(name, len);
+
+  return;
+
+access_violation:
+  apptask_access_violation();
+}
+
 #endif
 
 // ---------------------------------------------------------------------
 
-#ifdef USE_POWERCTL
+#ifdef USE_NRF
 
-bool powerctl_get_status__verified(powerctl_status_t *status) {
+bool nrf_update_required__verified(const uint8_t *data, size_t len) {
+  if (!probe_read_access(data, len)) {
+    goto access_violation;
+  }
+
+  return nrf_update_required(data, len);
+
+access_violation:
+  apptask_access_violation();
+  return false;
+}
+
+bool nrf_update__verified(const uint8_t *data, size_t len) {
+  if (!probe_read_access(data, len)) {
+    goto access_violation;
+  }
+
+  return nrf_update(data, len);
+
+access_violation:
+  apptask_access_violation();
+  return false;
+}
+
+#endif
+
+// ---------------------------------------------------------------------
+
+#ifdef USE_POWER_MANAGER
+
+pm_status_t pm_get_state__verified(pm_state_t *status) {
   if (!probe_write_access(status, sizeof(*status))) {
     goto access_violation;
   }
 
-  powerctl_status_t status_copy = {0};
-  bool retval = powerctl_get_status(&status_copy);
+  pm_state_t status_copy = {0};
+  pm_status_t retval = pm_get_state(&status_copy);
   *status = status_copy;
 
   return retval;
 
 access_violation:
   apptask_access_violation();
+  return PM_ERROR;
+}
+
+bool pm_get_events__verified(pm_event_t *event) {
+  if (!probe_write_access(event, sizeof(*event))) {
+    goto access_violation;
+  }
+
+  pm_event_t event_copy = {0};
+  bool retval = pm_get_events(&event_copy);
+  *event = event_copy;
+
+  return retval;
+
+access_violation:
+  apptask_access_violation();
   return false;
+}
+
+pm_status_t pm_suspend__verified(wakeup_flags_t *wakeup_reason) {
+  if (!probe_write_access(wakeup_reason, sizeof(*wakeup_reason))) {
+    goto access_violation;
+  }
+
+  return pm_suspend(wakeup_reason);
+
+access_violation:
+  apptask_access_violation();
+  return PM_ERROR;
 }
 
 #endif
@@ -1159,4 +1263,4 @@ access_violation:
 }
 #endif
 
-#endif  // SYSCALL_DISPATCH
+#endif  // KERNEL

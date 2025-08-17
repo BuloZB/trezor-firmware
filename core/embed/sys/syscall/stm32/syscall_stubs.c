@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <trezor_types.h>
+
 #ifndef KERNEL_MODE
 
 #include "syscall_internal.h"
@@ -80,6 +82,20 @@ void sysevents_poll(const sysevents_t *awaited, sysevents_t *signalled,
                     uint32_t deadline) {
   syscall_invoke3((uint32_t)awaited, (uint32_t)signalled, deadline,
                   SYSCALL_SYSEVENTS_POLL);
+}
+
+// =============================================================================
+// boot_image.h
+// =============================================================================
+
+#include <util/boot_image.h>
+
+bool boot_image_check(const boot_image_t *image) {
+  return (bool)syscall_invoke1((uint32_t)image, SYSCALL_BOOT_IMAGE_CHECK);
+}
+
+void boot_image_replace(const boot_image_t *image) {
+  syscall_invoke1((uint32_t)image, SYSCALL_BOOT_IMAGE_REPLACE);
 }
 
 // =============================================================================
@@ -361,11 +377,13 @@ void unit_properties_get(unit_properties_t *props) {
 // secret.h
 // =============================================================================
 
+#ifdef LOCKABLE_BOOTLOADER
 #include <sec/secret.h>
 
 secbool secret_bootloader_locked(void) {
   return (secbool)syscall_invoke0(SYSCALL_SECRET_BOOTLOADER_LOCKED);
 }
+#endif
 
 // =============================================================================
 // button.h
@@ -486,22 +504,20 @@ void optiga_set_sec_max(void) { syscall_invoke0(SYSCALL_OPTIGA_SET_SEC_MAX); }
 // storage.h
 // =============================================================================
 
-#include "storage.h"
+#include <sec/storage.h>
 
 static PIN_UI_WAIT_CALLBACK storage_init_callback = NULL;
 
-static void storage_init_callback_wrapper(uint32_t wait, uint32_t progress,
-                                          enum storage_ui_message_t message) {
+static void storage_callback_wrapper(uint32_t wait, uint32_t progress,
+                                     enum storage_ui_message_t message) {
   secbool retval = storage_init_callback(wait, progress, message);
-  syscall_return_from_callback(retval);
+  return_from_unprivileged_callback(retval);
 }
 
-void storage_init(PIN_UI_WAIT_CALLBACK callback, const uint8_t *salt,
-                  const uint16_t salt_len) {
+void storage_setup(PIN_UI_WAIT_CALLBACK callback) {
   storage_init_callback = callback;
 
-  syscall_invoke3((uint32_t)storage_init_callback_wrapper, (uint32_t)salt,
-                  salt_len, SYSCALL_STORAGE_INIT);
+  syscall_invoke1((uint32_t)storage_callback_wrapper, SYSCALL_STORAGE_SETUP);
 }
 
 void storage_wipe(void) { syscall_invoke0(SYSCALL_STORAGE_WIPE); }
@@ -583,14 +599,6 @@ secbool storage_next_counter(const uint16_t key, uint32_t *count) {
 }
 
 // =============================================================================
-// entropy.h
-// =============================================================================
-
-void entropy_get(uint8_t *buf) {
-  syscall_invoke1((uint32_t)buf, SYSCALL_ENTROPY_GET);
-}
-
-// =============================================================================
 // translations.h
 // =============================================================================
 
@@ -631,24 +639,14 @@ secbool firmware_get_vendor(char *buff, size_t buff_size) {
                          SYSCALL_FIRMWARE_GET_VENDOR);
 }
 
-static firmware_hash_callback_t firmware_hash_callback = NULL;
-
-static void firmware_hash_callback_wrapper(void *context, uint32_t progress,
-                                           uint32_t total) {
-  firmware_hash_callback(context, progress, total);
-  syscall_return_from_callback(0);
+int firmware_hash_start(const uint8_t *challenge, size_t challenge_len) {
+  return (int)syscall_invoke2((uint32_t)challenge, challenge_len,
+                              SYSCALL_FIRMWARE_HASH_START);
 }
 
-secbool firmware_calc_hash(const uint8_t *challenge, size_t challenge_len,
-                           uint8_t *hash, size_t hash_len,
-                           firmware_hash_callback_t callback,
-                           void *callback_context) {
-  firmware_hash_callback = callback;
-
-  return syscall_invoke6((uint32_t)challenge, challenge_len, (uint32_t)hash,
-                         hash_len, (uint32_t)firmware_hash_callback_wrapper,
-                         (uint32_t)callback_context,
-                         SYSCALL_FIRMWARE_CALC_HASH);
+int firmware_hash_continue(uint8_t *hash, size_t hash_len) {
+  return (int)syscall_invoke2((uint32_t)hash, hash_len,
+                              SYSCALL_FIRMWARE_HASH_CONTINUE);
 }
 
 #ifdef USE_BLE
@@ -685,27 +683,58 @@ uint32_t ble_read(uint8_t *data, uint16_t len) {
   return (uint32_t)syscall_invoke2((uint32_t)data, len, SYSCALL_BLE_READ);
 }
 
+void ble_set_name(const uint8_t *name, size_t len) {
+  syscall_invoke2((uint32_t)name, len, SYSCALL_BLE_SET_NAME);
+}
+
+#endif
+
+#ifdef USE_NRF
+
+// =============================================================================
+// nrf.h
+// =============================================================================
+
+bool nrf_update_required(const uint8_t *data, size_t len) {
+  return (bool)syscall_invoke2((uint32_t)data, (uint32_t)len,
+                               SYSCALL_NRF_UPDATE_REQUIRED);
+}
+
+bool nrf_update(const uint8_t *data, size_t len) {
+  return (bool)syscall_invoke2((uint32_t)data, (uint32_t)len,
+                               SYSCALL_NRF_UPDATE);
+}
+
 #endif
 
 // =============================================================================
-// powerctl.h
+// power_manager.h
 // =============================================================================
 
-#ifdef USE_POWERCTL
+#ifdef USE_POWER_MANAGER
 
-#include <sys/powerctl.h>
+#include <sys/power_manager.h>
 
-void powerctl_suspend(void) { syscall_invoke0(SYSCALL_POWERCTL_SUSPEND); }
-
-bool powerctl_hibernate(void) {
-  return (bool)syscall_invoke0(SYSCALL_POWERCTL_HIBERNATE);
+pm_status_t pm_suspend(wakeup_flags_t *wakeup_reason) {
+  return (pm_status_t)syscall_invoke1((uint32_t)wakeup_reason,
+                                      SYSCALL_POWER_MANAGER_SUSPEND);
 }
 
-bool powerctl_get_status(powerctl_status_t *status) {
-  return (bool)syscall_invoke1((uint32_t)status, SYSCALL_POWERCTL_GET_STATUS);
+pm_status_t pm_hibernate(void) {
+  return (pm_status_t)syscall_invoke0(SYSCALL_POWER_MANAGER_HIBERNATE);
 }
 
-#endif  // USE_POWERCTL
+pm_status_t pm_get_state(pm_state_t *state) {
+  return (pm_status_t)syscall_invoke1((uint32_t)state,
+                                      SYSCALL_POWER_MANAGER_GET_STATE);
+}
+
+bool pm_get_events(pm_event_t *events) {
+  return (bool)syscall_invoke1((uint32_t)events,
+                               SYSCALL_POWER_MANAGER_GET_EVENTS);
+}
+
+#endif  // USE_POWER_MANAGER
 
 // =============================================================================
 // jpegdec.h

@@ -10,7 +10,6 @@ def stm32f4_common_files(env, defines, sources, paths):
     ]
 
     paths += [
-        "embed/sec/entropy/inc",
         "embed/sec/monoctr/inc",
         "embed/sec/random_delays/inc",
         "embed/sec/rng/inc",
@@ -29,6 +28,7 @@ def stm32f4_common_files(env, defines, sources, paths):
         "embed/sys/task/inc",
         "embed/sys/time/inc",
         "embed/util/board_capabilities/inc",
+        "embed/util/cpuid/inc",
         "embed/util/flash/inc",
         "embed/util/fwutils/inc",
         "embed/util/option_bytes/inc",
@@ -63,13 +63,15 @@ def stm32f4_common_files(env, defines, sources, paths):
     ]
 
     sources += [
-        "embed/sec/entropy/stm32f4/entropy.c",
         "embed/sec/monoctr/stm32f4/monoctr.c",
         "embed/sec/random_delays/stm32/random_delays.c",
         "embed/sec/rng/stm32/rng.c",
         "embed/sec/secret/stm32f4/secret.c",
+        "embed/sec/secret/stm32f4/secret_keys.c",
+        "embed/sec/storage/stm32f4/storage_salt.c",
         "embed/sec/time_estimate/stm32/time_estimate.c",
         "embed/sys/dbg/stm32/dbg_printf.c",
+        "embed/sys/irq/stm32/irq.c",
         "embed/sys/linker/linker_utils.c",
         "embed/sys/mpu/stm32f4/mpu.c",
         "embed/sys/pvd/stm32/pvd.c",
@@ -79,8 +81,9 @@ def stm32f4_common_files(env, defines, sources, paths):
         "embed/sys/startup/stm32f4/reset_flags.c",
         "embed/sys/startup/stm32f4/startup_init.c",
         "embed/sys/startup/stm32f4/vectortable.S",
-        "embed/sys/syscall/stm32/syscall.c",
+        "embed/sys/syscall/stm32/syscall_context.c",
         "embed/sys/syscall/stm32/syscall_dispatch.c",
+        "embed/sys/syscall/stm32/syscall_ipc.c",
         "embed/sys/syscall/stm32/syscall_probe.c",
         "embed/sys/syscall/stm32/syscall_stubs.c",
         "embed/sys/syscall/stm32/syscall_verifiers.c",
@@ -91,6 +94,7 @@ def stm32f4_common_files(env, defines, sources, paths):
         "embed/sys/time/stm32/systimer.c",
         "embed/sys/task/sysevent.c",
         "embed/util/board_capabilities/stm32/board_capabilities.c",
+        "embed/util/cpuid/stm32/cpuid.c",
         "embed/util/flash/stm32f4/flash.c",
         "embed/util/flash/stm32f4/flash_layout.c",
         "embed/util/flash/stm32f4/flash_otp.c",
@@ -102,3 +106,4 @@ def stm32f4_common_files(env, defines, sources, paths):
 
     env.get("ENV")["SUFFIX"] = "stm32f4"
     env.get("ENV")["LINKER_SCRIPT"] = """embed/sys/linker/stm32f4/{target}.ld"""
+    env.get("ENV")["MEMORY_LAYOUT"] = "memory.ld"

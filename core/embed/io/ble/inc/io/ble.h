@@ -26,7 +26,7 @@
 #include <trezor_types.h>
 
 #define BLE_RX_PACKET_SIZE 244
-#define BLE_TX_PACKET_SIZE 64
+#define BLE_TX_PACKET_SIZE 244
 
 #define BLE_ADV_NAME_LEN 20
 #define BLE_PAIRING_CODE_LEN 6
@@ -41,6 +41,14 @@ typedef enum {
   BLE_REJECT_PAIRING = 6,  // Reject pairing request
   BLE_UNPAIR = 7,          // Erase bond for currently connected device
 } ble_command_type_t;
+
+typedef enum {
+  BLE_MODE_OFF,
+  BLE_MODE_KEEP_CONNECTION,
+  BLE_MODE_CONNECTABLE,
+  BLE_MODE_PAIRING,
+  BLE_MODE_DFU,
+} ble_mode_t;
 
 typedef struct {
   uint8_t name[BLE_ADV_NAME_LEN];
@@ -59,12 +67,25 @@ typedef struct {
   ble_command_data_t data;
 } ble_command_t;
 
+typedef struct {
+  bool accept_msgs;
+  bool reboot_on_resume;
+  uint8_t peer_count;
+  ble_mode_t mode_requested;
+  uint8_t connected_addr[6];
+  uint8_t connected_addr_type;
+  ble_adv_start_cmd_data_t adv_data;
+} ble_wakeup_params_t;
+
 typedef enum {
   BLE_NONE = 0,               // No event
   BLE_CONNECTED = 1,          // Connected to a device
   BLE_DISCONNECTED = 2,       // Disconnected from a device
   BLE_PAIRING_REQUEST = 3,    // Pairing request received
-  BLE_PAIRING_CANCELLED = 4,  // Pairing was cancelled by host
+  BLE_PAIRING_CANCELLED = 4,  // Pairing was canceled by host
+  BLE_PAIRING_COMPLETED = 5,  // Pairing was completed successfully
+  BLE_CONNECTION_CHANGED =
+      6,  // Connection change (e.g. different device connected)
 } ble_event_type_t;
 
 typedef struct {
@@ -96,6 +117,12 @@ bool ble_init(void);
 // and shuts down the BLE module.
 void ble_deinit(void);
 
+// Suspends the BLE module
+void ble_suspend(ble_wakeup_params_t *wakeup_params);
+
+// Resumes the BLE module
+bool ble_resume(const ble_wakeup_params_t *wakeup_params);
+
 // Starts BLE operations
 //
 // Enables reception of messages over BLE
@@ -114,6 +141,9 @@ void ble_stop(void);
 // Returns `true` if the command was successfully issued.
 bool ble_issue_command(ble_command_t *command);
 
+// Sets the BLE advertising name, but does not affect advertising
+void ble_set_name(const uint8_t *name, size_t len);
+
 // Reads an event from the BLE module
 //
 // Retrieves the next event from the BLE module's event queue.
@@ -126,6 +156,9 @@ bool ble_get_event(ble_event_t *event);
 //
 // Obtains the current operational state of the BLE module.
 void ble_get_state(ble_state_t *state);
+
+// Retrieves last set advertising name
+void ble_get_advertising_name(char *name, size_t max_len);
 
 // Check if write is possible
 bool ble_can_write(void);

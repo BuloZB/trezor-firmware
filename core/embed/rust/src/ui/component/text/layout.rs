@@ -7,7 +7,7 @@ use crate::ui::{
 
 const ELLIPSIS: &str = "...";
 
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub enum LineBreaking {
     /// Break line only at whitespace, if possible. If we don't find any
     /// whitespace, break words.
@@ -19,7 +19,7 @@ pub enum LineBreaking {
     BreakWordsNoHyphen,
 }
 
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub enum PageBreaking {
     /// Stop after hitting the bottom-right edge of the bounds.
     Cut,
@@ -54,7 +54,7 @@ pub struct TextLayout {
 }
 
 /// Configuration for chunkifying the text into smaller parts.
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub struct Chunks {
     /// How many characters will be grouped in one chunk.
     pub chunk_size: usize,
@@ -79,7 +79,7 @@ impl Chunks {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub struct TextStyle {
     /// Text font ID.
     pub text_font: Font,
@@ -232,21 +232,35 @@ impl TextLayout {
     }
 
     /// Draw as much text as possible on the current screen.
-    pub fn render_text<'s>(&self, text: &str, target: &mut impl Renderer<'s>) -> LayoutFit {
-        self.render_text_with_alpha(text, target, 255)
+    pub fn render_text<'s>(
+        &self,
+        text: &str,
+        target: &mut impl Renderer<'s>,
+        must_fit: bool,
+    ) -> LayoutFit {
+        self.render_text_with_alpha(text, target, 255, must_fit)
     }
+
     /// Draw as much text as possible on the current screen.
     pub fn render_text_with_alpha<'s>(
         &self,
         text: &str,
         target: &mut impl Renderer<'s>,
         alpha: u8,
+        _must_fit: bool,
     ) -> LayoutFit {
-        self.layout_text(
+        let fit = self.layout_text(
             text,
             &mut self.initial_cursor(),
             &mut TextRenderer::new(target).with_alpha(alpha),
-        )
+        );
+
+        #[cfg(feature = "ui_debug")]
+        if _must_fit && matches!(fit, LayoutFit::OutOfBounds { .. }) {
+            target.raise_overflow_exception();
+        }
+
+        fit
     }
 
     /// Loop through the `text` and try to fit it on the current screen,
@@ -292,6 +306,8 @@ impl TextLayout {
                 sink.prev_page_ellipsis(*cursor, self);
                 cursor.x += self.style.prev_page_ellipsis_width();
             }
+            // Ignore leading '\r' character if the above ellipsis has been drawn
+            remaining_text = remaining_text.strip_prefix('\r').unwrap_or(remaining_text);
         }
 
         while !remaining_text.is_empty() {
@@ -605,6 +621,50 @@ struct Span {
     insert_hyphen_before_line_break: bool,
 }
 
+pub struct Lines<'a, F> {
+    text: &'a str,
+    max_width: i16,
+    font: F,
+}
+
+impl<'a, F> Lines<'a, F> {
+    pub fn split(text: &'a str, max_width: i16, font: F) -> Self {
+        Self {
+            text,
+            max_width,
+            font,
+        }
+    }
+}
+
+impl<'a, F> Iterator for Lines<'a, F>
+where
+    F: Copy + GlyphMetrics,
+{
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.text.is_empty() {
+            return None;
+        }
+        let span = Span::fit_horizontally(
+            self.text,
+            self.max_width,
+            self.font,
+            LineBreaking::BreakAtWhitespace,
+            0,
+            None,
+        );
+        let chunk = &self.text[..span.length];
+        self.text = &self.text[span.length + span.skip_next_chars..];
+        if chunk.is_empty() {
+            None
+        } else {
+            Some(chunk)
+        }
+    }
+}
+
 impl Span {
     pub fn fit_horizontally(
         text: &str,
@@ -733,6 +793,7 @@ impl Span {
 mod tests {
     use super::*;
 
+    #[derive(Copy, Clone)]
     pub struct Fixed {
         pub width: i16,
         pub height: i16,
@@ -826,5 +887,33 @@ mod tests {
             }
         }
         spans
+    }
+
+    #[test]
+    fn test_split_lines() {
+        let text = "Hello World!";
+
+        let mut i = Lines::split(text, 13, FIXED_FONT);
+        assert_eq!(i.next(), Some("Hello World!"));
+        assert_eq!(i.next(), None);
+
+        let mut i = Lines::split(text, 12, FIXED_FONT);
+        assert_eq!(i.next(), Some("Hello World!"));
+        assert_eq!(i.next(), None);
+
+        let mut i = Lines::split(text, 11, FIXED_FONT);
+        assert_eq!(i.next(), Some("Hello"));
+        assert_eq!(i.next(), Some("World!"));
+        assert_eq!(i.next(), None);
+
+        let mut i = Lines::split(text, 10, FIXED_FONT);
+        assert_eq!(i.next(), Some("Hello"));
+        assert_eq!(i.next(), Some("World!"));
+        assert_eq!(i.next(), None);
+
+        let mut i = Lines::split(text, 6, FIXED_FONT);
+        assert_eq!(i.next(), Some("Hello"));
+        assert_eq!(i.next(), Some("World!"));
+        assert_eq!(i.next(), None);
     }
 }

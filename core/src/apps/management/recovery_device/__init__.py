@@ -22,8 +22,9 @@ async def recovery_device(msg: RecoveryDevice) -> Success:
     import storage.device as storage_device
     import storage.recovery as storage_recovery
     from trezor import TR, config, wire, workflow
-    from trezor.enums import BackupType, ButtonRequestType
-    from trezor.ui.layouts import confirm_action, confirm_reset_device
+    from trezor.enums import BackupType
+    from trezor.ui.layouts import confirm_reset_device, prompt_recovery_check
+    from trezor.wire.context import try_get_ctx_ids
 
     from apps.common import mnemonic
     from apps.common.request_pin import (
@@ -69,8 +70,8 @@ async def recovery_device(msg: RecoveryDevice) -> Success:
     if recovery_type == RecoveryType.NormalRecovery:
         await confirm_reset_device(recovery=True)
 
-        # wipe storage to make sure the device is in a clear state
-        storage.reset()
+        # wipe storage to make sure the device is in a clear state (except protocol cache)
+        storage.reset(excluded=try_get_ctx_ids())
 
         # set up pin if requested
         if msg.pin_protection:
@@ -86,18 +87,7 @@ async def recovery_device(msg: RecoveryDevice) -> Success:
             storage_device.set_label(msg.label)
 
     elif recovery_type in (RecoveryType.DryRun, RecoveryType.UnlockRepeatedBackup):
-        title = (
-            TR.recovery__title_dry_run
-            if recovery_type == RecoveryType.DryRun
-            else TR.recovery__title_unlock_repeated_backup
-        )
-        await confirm_action(
-            "confirm_seedcheck",
-            title,
-            description=TR.recovery__check_dry_run,
-            br_code=ButtonRequestType.ProtectCall,
-            verb=TR.buttons__check,
-        )
+        await prompt_recovery_check(recovery_type)
 
         curpin, salt = await request_pin_and_sd_salt(TR.pin__enter)
         if not config.check_pin(curpin, salt):

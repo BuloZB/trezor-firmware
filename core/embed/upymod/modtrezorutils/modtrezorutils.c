@@ -40,23 +40,15 @@
 #include <util/scm_revision.h>
 #include <util/unit_properties.h>
 #include "blake2s.h"
+#include "memzero.h"
 
-#if USE_OPTIGA && !defined(TREZOR_EMULATOR)
+#if !defined(TREZOR_EMULATOR)
 #include <sec/secret.h>
 #endif
 
 #if !PYOPT && LOG_STACK_USAGE
 #include <sys/stack_utils.h>
 #endif
-
-static void ui_progress(void *context, uint32_t current, uint32_t total) {
-  mp_obj_t ui_wait_callback = (mp_obj_t)context;
-
-  if (mp_obj_is_callable(ui_wait_callback)) {
-    mp_call_function_2_protected(ui_wait_callback, mp_obj_new_int(current),
-                                 mp_obj_new_int(total));
-  }
-}
 
 /// def consteq(sec: bytes, pub: bytes) -> bool:
 ///     """
@@ -129,6 +121,21 @@ STATIC mp_obj_t mod_trezorutils_memcpy(size_t n_args, const mp_obj_t *args) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_trezorutils_memcpy_obj, 4, 5,
                                            mod_trezorutils_memcpy);
 
+/// def memzero(
+///     dst: bytearray | memoryview,
+/// ) -> None:
+///     """
+///     Zeroes all bytes at `dst`.
+///     """
+STATIC mp_obj_t mod_trezorutils_memzero(const mp_obj_t dst) {
+  mp_buffer_info_t buf = {0};
+  mp_get_buffer_raise(dst, &buf, MP_BUFFER_WRITE);
+  memzero(buf.buf, buf.len);
+  return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_trezorutils_memzero_obj,
+                                 mod_trezorutils_memzero);
+
 /// def halt(msg: str | None = None) -> None:
 ///     """
 ///     Halts execution.
@@ -168,14 +175,33 @@ STATIC mp_obj_t mod_trezorutils_firmware_hash(size_t n_args,
   vstr_t vstr = {0};
   vstr_init_len(&vstr, BLAKE2S_DIGEST_LENGTH);
 
-  if (sectrue != firmware_calc_hash(chal.buf, chal.len, (uint8_t *)vstr.buf,
-                                    vstr.len, ui_progress, ui_wait_callback)) {
+  if (firmware_hash_start(chal.buf, chal.len) < 0) {
     vstr_clear(&vstr);
-    mp_raise_msg(&mp_type_RuntimeError, "Failed to calculate firmware hash.");
+    mp_raise_msg(&mp_type_RuntimeError,
+                 MP_ERROR_TEXT("Failed to start firmware hash."));
+  }
+
+  int progress = 0;
+
+  while (progress < 100) {
+    progress = firmware_hash_continue((uint8_t *)vstr.buf, vstr.len);
+
+    if (progress < 0) {
+      vstr_clear(&vstr);
+      mp_raise_msg(&mp_type_RuntimeError,
+                   MP_ERROR_TEXT("Failed to calculate firmware hash."));
+      break;
+    }
+
+    if (mp_obj_is_callable(ui_wait_callback)) {
+      mp_call_function_2_protected(ui_wait_callback, mp_obj_new_int(progress),
+                                   mp_obj_new_int(100));
+    }
   }
 
   return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
+
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_trezorutils_firmware_hash_obj, 0,
                                            2, mod_trezorutils_firmware_hash);
 
@@ -189,7 +215,8 @@ STATIC mp_obj_t mod_trezorutils_firmware_vendor(void) {
 #else
   char vendor[64] = {0};
   if (sectrue != firmware_get_vendor(vendor, sizeof(vendor))) {
-    mp_raise_msg(&mp_type_RuntimeError, "Failed to read vendor header.");
+    mp_raise_msg(&mp_type_RuntimeError,
+                 MP_ERROR_TEXT("Failed to read vendor header."));
   }
   return mp_obj_new_str_copy(&mp_type_str, (byte *)vendor, strlen(vendor));
 #endif
@@ -245,6 +272,26 @@ STATIC mp_obj_t mod_trezorutils_sd_hotswap_enabled(void) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_sd_hotswap_enabled_obj,
                                  mod_trezorutils_sd_hotswap_enabled);
+
+/// def presize_module(mod: module, n: int):
+///     """
+///     Ensure the module's dict is preallocated to an expected size.
+///
+///     This is used in modules like `trezor`, whose dict size depends not only
+///     on the symbols defined in the file itself, but also on the number of
+///     submodules that will be inserted into the module's namespace.
+///     """
+STATIC mp_obj_t mod_trezorutils_presize_module(mp_obj_t mod, mp_obj_t n) {
+  if (!mp_obj_is_type(mod, &mp_type_module)) {
+    mp_raise_TypeError(MP_ERROR_TEXT("expected module type"));
+  }
+  mp_uint_t size = trezor_obj_get_uint(n);
+  mp_obj_dict_t *globals = mp_obj_module_get_globals(mod);
+  mp_obj_dict_presize(globals, size);
+  return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_trezorutils_presize_module_obj,
+                                 mod_trezorutils_presize_module);
 
 #if !PYOPT
 #if LOG_STACK_USAGE
@@ -302,30 +349,69 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_enable_oom_dump_obj,
                                  mod_trezorutils_enable_oom_dump);
 #endif  // MICROPY_OOM_CALLBACK
 
+static gc_info_t current_gc_info = {0};
+
 /// if __debug__:
-///     def check_free_heap(previous: int) -> int:
+///     def clear_gc_info() -> None:
 ///         """
-///         Assert that free heap memory doesn't decrease.
-///         Returns current free heap memory (in bytes).
+///         Clear GC heap stats.
+///         """
+STATIC mp_obj_t mod_trezorutils_clear_gc_info() {
+  memzero(&current_gc_info, sizeof(current_gc_info));
+  return mp_const_none;
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_clear_gc_info_obj,
+                                 mod_trezorutils_clear_gc_info);
+
+/// if __debug__:
+///     def get_gc_info() -> dict[str, int]:
+///         """
+///         Get GC heap stats, updated by `update_gc_info`.
+///         """
+STATIC mp_obj_t mod_trezorutils_get_gc_info() {
+  mp_obj_t result = mp_obj_new_dict(4);
+  mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_total),
+                    mp_obj_new_int_from_uint(current_gc_info.total));
+  mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_used),
+                    mp_obj_new_int_from_uint(current_gc_info.used));
+  mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_free),
+                    mp_obj_new_int_from_uint(current_gc_info.free));
+  mp_obj_dict_store(result, MP_OBJ_NEW_QSTR(MP_QSTR_max_free),
+                    mp_obj_new_int_from_uint(current_gc_info.max_free *
+                                             MICROPY_BYTES_PER_GC_BLOCK));
+  return result;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_get_gc_info_obj,
+                                 mod_trezorutils_get_gc_info);
+
+/// if __debug__:
+///     def update_gc_info() -> None:
+///         """
+///         Update current GC heap statistics.
+///         On emulator, also assert that free heap memory doesn't decrease.
 ///         Enabled only for frozen debug builds.
 ///         """
-STATIC mp_obj_t mod_trezorutils_check_free_heap(mp_obj_t arg) {
-  mp_uint_t free_heap = trezor_obj_get_uint(arg);
+STATIC mp_obj_t mod_trezorutils_update_gc_info() {
 #if MICROPY_MODULE_FROZEN_MPY
-  gc_info_t info;
-  gc_info(&info);
-  if (free_heap > info.free) {
-    gc_dump_info();
-    mp_raise_msg_varg(&mp_type_AssertionError,
-                      "Free heap decreased by " UINT_FMT " bytes",
-                      free_heap - info.free);
-  }
-  free_heap = info.free;  // current free heap
+#ifdef TREZOR_EMULATOR
+  size_t prev_free = current_gc_info.free;
 #endif
-  return mp_obj_new_int_from_uint(free_heap);
+  gc_info(&current_gc_info);
+  // Currently, it may misdetect on-heap buffers' data as valid heap
+  // pointers (resulting in `gc_mark_subtree` false-positives).
+#ifdef TREZOR_EMULATOR
+  if (prev_free > current_gc_info.free) {
+    gc_dump_info();
+    mp_raise_msg(&mp_type_AssertionError,
+                 MP_ERROR_TEXT("Free heap size decreased"));
+  }
+#endif
+#endif
+  return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_trezorutils_check_free_heap_obj,
-                                 mod_trezorutils_check_free_heap);
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_update_gc_info_obj,
+                                 mod_trezorutils_update_gc_info);
 
 /// if __debug__:
 ///     def check_heap_fragmentation() -> None:
@@ -337,7 +423,8 @@ STATIC mp_obj_t mod_trezorutils_check_heap_fragmentation(void) {
 #if MICROPY_MODULE_FROZEN_MPY
   mp_obj_dict_t *modules = &MP_STATE_VM(mp_loaded_modules_dict);
   if (modules->map.alloc > MICROPY_LOADED_MODULES_DICT_SIZE) {
-    mp_raise_msg(&mp_type_AssertionError, "sys.modules dict is reallocated");
+    mp_raise_msg(&mp_type_AssertionError,
+                 MP_ERROR_TEXT("sys.modules dict is reallocated"));
   }
 #ifdef TREZOR_EMULATOR
   // when profiling, __main__ module is `prof`, not `main`
@@ -348,18 +435,16 @@ STATIC mp_obj_t mod_trezorutils_check_heap_fragmentation(void) {
   size_t main_map_alloc = MP_STATE_VM(dict_main).map.alloc;
 #endif
   if (main_map_alloc > MICROPY_MAIN_DICT_SIZE) {
-    mp_raise_msg(&mp_type_AssertionError, "main globals dict is reallocated");
+    mp_raise_msg(&mp_type_AssertionError,
+                 MP_ERROR_TEXT("main globals dict is reallocated"));
   }
 
   size_t n_pool, n_qstr, n_str_data_bytes, n_total_bytes;
   qstr_pool_info(&n_pool, &n_qstr, &n_str_data_bytes, &n_total_bytes);
   if (n_pool) {
     qstr_dump_data();
-    mp_raise_msg_varg(&mp_type_AssertionError,
-                      "Runtime QSTR allocation: " UINT_FMT " pools, " UINT_FMT
-                      " strings, " UINT_FMT " data bytes, " UINT_FMT
-                      " total bytes",
-                      n_pool, n_qstr, n_str_data_bytes, n_total_bytes);
+    mp_raise_msg(&mp_type_AssertionError,
+                 MP_ERROR_TEXT("Runtime QSTR allocation detected"));
   }
 #endif  // MICROPY_MODULE_FROZEN_MPY
   return mp_const_none;
@@ -395,13 +480,13 @@ STATIC mp_obj_t mod_trezorutils_reboot_to_bootloader(size_t n_args,
         }
 
         if (hash.len != 32) {
-          mp_raise_ValueError("Invalid value.");
+          mp_raise_ValueError(MP_ERROR_TEXT("Invalid value."));
         }
 
         reboot_and_upgrade((uint8_t *)hash.buf);
         break;
       default:
-        mp_raise_ValueError("Invalid value.");
+        mp_raise_ValueError(MP_ERROR_TEXT("Invalid value."));
         break;
     }
   } else {
@@ -450,7 +535,7 @@ STATIC mp_obj_t mod_trezorutils_check_firmware_header(mp_obj_t header) {
     return mp_obj_new_attrtuple(fields, MP_ARRAY_SIZE(fields), values);
   }
 
-  mp_raise_ValueError("Invalid value.");
+  mp_raise_ValueError(MP_ERROR_TEXT("Invalid value."));
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_trezorutils_check_firmware_header_obj,
@@ -462,7 +547,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_trezorutils_check_firmware_header_obj,
 ///     the feature is not supported.
 ///     """
 STATIC mp_obj_t mod_trezorutils_bootloader_locked() {
-#if USE_OPTIGA
+#if LOCKABLE_BOOTLOADER
 #ifdef TREZOR_EMULATOR
   return mp_const_true;
 #else
@@ -526,6 +611,8 @@ STATIC mp_obj_tuple_t mod_trezorutils_version_obj = {
 /// """Whether the hardware supports touch screen."""
 /// USE_BUTTON: bool
 /// """Whether the hardware supports two-button input."""
+/// USE_POWER_MANAGER: bool
+/// """Whether the hardware has a battery."""
 /// MODEL: str
 /// """Model name."""
 /// MODEL_FULL_NAME: str
@@ -556,6 +643,7 @@ STATIC const mp_rom_map_elem_t mp_module_trezorutils_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_trezorutils)},
     {MP_ROM_QSTR(MP_QSTR_consteq), MP_ROM_PTR(&mod_trezorutils_consteq_obj)},
     {MP_ROM_QSTR(MP_QSTR_memcpy), MP_ROM_PTR(&mod_trezorutils_memcpy_obj)},
+    {MP_ROM_QSTR(MP_QSTR_memzero), MP_ROM_PTR(&mod_trezorutils_memzero_obj)},
     {MP_ROM_QSTR(MP_QSTR_halt), MP_ROM_PTR(&mod_trezorutils_halt_obj)},
     {MP_ROM_QSTR(MP_QSTR_firmware_hash),
      MP_ROM_PTR(&mod_trezorutils_firmware_hash_obj)},
@@ -584,13 +672,19 @@ STATIC const mp_rom_map_elem_t mp_module_trezorutils_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_enable_oom_dump),
      MP_ROM_PTR(&mod_trezorutils_enable_oom_dump_obj)},
 #endif
-    {MP_ROM_QSTR(MP_QSTR_check_free_heap),
-     MP_ROM_PTR(&mod_trezorutils_check_free_heap_obj)},
+    {MP_ROM_QSTR(MP_QSTR_clear_gc_info),
+     MP_ROM_PTR(&mod_trezorutils_clear_gc_info_obj)},
+    {MP_ROM_QSTR(MP_QSTR_get_gc_info),
+     MP_ROM_PTR(&mod_trezorutils_get_gc_info_obj)},
+    {MP_ROM_QSTR(MP_QSTR_update_gc_info),
+     MP_ROM_PTR(&mod_trezorutils_update_gc_info_obj)},
     {MP_ROM_QSTR(MP_QSTR_check_heap_fragmentation),
      MP_ROM_PTR(&mod_trezorutils_check_heap_fragmentation_obj)},
 #endif
     {MP_ROM_QSTR(MP_QSTR_sd_hotswap_enabled),
      MP_ROM_PTR(&mod_trezorutils_sd_hotswap_enabled_obj)},
+    {MP_ROM_QSTR(MP_QSTR_presize_module),
+     MP_ROM_PTR(&mod_trezorutils_presize_module_obj)},
     // various built-in constants
     {MP_ROM_QSTR(MP_QSTR_SCM_REVISION),
      MP_ROM_PTR(&mod_trezorutils_revision_obj)},
@@ -635,6 +729,11 @@ STATIC const mp_rom_map_elem_t mp_module_trezorutils_globals_table[] = {
 #else
     {MP_ROM_QSTR(MP_QSTR_USE_BUTTON), mp_const_false},
 #endif
+#ifdef USE_POWER_MANAGER
+    {MP_ROM_QSTR(MP_QSTR_USE_POWER_MANAGER), mp_const_true},
+#else
+    {MP_ROM_QSTR(MP_QSTR_USE_POWER_MANAGER), mp_const_false},
+#endif
     {MP_ROM_QSTR(MP_QSTR_MODEL), MP_ROM_PTR(&mod_trezorutils_model_name_obj)},
     {MP_ROM_QSTR(MP_QSTR_MODEL_FULL_NAME),
      MP_ROM_PTR(&mod_trezorutils_full_name_obj)},
@@ -667,6 +766,8 @@ STATIC const mp_rom_map_elem_t mp_module_trezorutils_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_UI_LAYOUT), MP_ROM_QSTR(MP_QSTR_CAESAR)},
 #elif UI_LAYOUT_DELIZIA
     {MP_ROM_QSTR(MP_QSTR_UI_LAYOUT), MP_ROM_QSTR(MP_QSTR_DELIZIA)},
+#elif UI_LAYOUT_ECKHART
+    {MP_ROM_QSTR(MP_QSTR_UI_LAYOUT), MP_ROM_QSTR(MP_QSTR_ECKHART)},
 #else
 #error Unknown layout
 #endif

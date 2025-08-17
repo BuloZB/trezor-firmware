@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 
 import click
 
@@ -40,7 +40,7 @@ def bump_python(filename, new_version):
 
 
 def hex_lit(version):
-    return r'"\x{:02X}"'.format(int(version))
+    return rf'"\x{int(version):02X}"'
 
 
 @click.command()
@@ -54,7 +54,7 @@ def hex_lit(version):
 )
 def cli(project, version):
     """Bump version for given project (core, python, legacy/firmware,
-    legacy/bootloader).
+    legacy/bootloader, core/embed/projects/prodtest).
     """
     project = Path(project)
 

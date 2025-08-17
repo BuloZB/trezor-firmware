@@ -21,10 +21,11 @@
 
 #include <sec/optiga.h>
 #include <sec/optiga_common.h>
+#include <sec/storage.h>
+
 #include "ecdsa.h"
 #include "nist256p1.h"
 #include "rand.h"
-#include "storage.h"
 
 #if defined(TREZOR_MODEL_T2B1)
 #include "certs/T2B1.h"
@@ -43,26 +44,27 @@
 #endif
 
 optiga_sign_result optiga_sign(uint8_t index, const uint8_t *digest,
-                               size_t digest_size, uint8_t *signature,
-                               size_t max_sig_size, size_t *sig_size) {
-  const uint8_t DEVICE_PRIV_KEY[32] = {1};
+                               size_t digest_size, uint8_t *der_signature,
+                               size_t max_der_signature_size,
+                               size_t *der_signature_size) {
+  const uint8_t DEVICE_PRIV_KEY[ECDSA_PRIVATE_KEY_SIZE] = {1};
 
   if (index != OPTIGA_DEVICE_ECC_KEY_INDEX) {
     return OPTIGA_SIGN_ERROR;
   }
 
-  if (max_sig_size < 72) {
+  if (max_der_signature_size < MAX_DER_SIGNATURE_SIZE) {
     return OPTIGA_SIGN_ERROR;
   }
 
-  uint8_t raw_signature[64] = {0};
+  uint8_t raw_signature[ECDSA_RAW_SIGNATURE_SIZE] = {0};
   int ret = ecdsa_sign_digest(&nist256p1, DEVICE_PRIV_KEY, digest,
                               raw_signature, NULL, NULL);
   if (ret != 0) {
     return OPTIGA_SIGN_ERROR;
   }
 
-  *sig_size = ecdsa_sig_to_der(raw_signature, signature);
+  *der_signature_size = ecdsa_sig_to_der(raw_signature, der_signature);
   return OPTIGA_SIGN_SUCCESS;
 }
 

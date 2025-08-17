@@ -16,9 +16,10 @@ To exit from interactive mode type `.+ENTER`.
 
 ### Commands
 These commands begin with the command name and may optionally include parameters separated by spaces.
+Parameters are marked with angle brackets (`<...>`), square brackets (`[<...>]`) indicate optional parameters.
 
 Command Format:
-`command <arg1> <arg2> ...`
+`command <arg1> <arg2> [<optional_arg3>]...`
 
 Example:
 ```
@@ -112,6 +113,17 @@ reboot
 OK
 ```
 
+
+### reboot-to-bootloader
+This command initiates device reboot to bootloader.
+
+Example:
+```
+reboot-to-bootloader
+OK
+```
+
+
 ### boardloader-version
 Retrieves the version of the boardloader. The command returns `OK` followed by the version in the format `<major>.<minor>.<patch>`.
 
@@ -121,14 +133,24 @@ boardloader-version
 OK 0.2.6
 ```
 
+### boardloader-update
+Updates the boardloader to the supplied binary file. Only works on development boards, not in production firmware.
+Use `core/tools/bin_update.py` script to update the boardloader binary.
+
+
 ### bootloader-version
-Retrives the version of the bootlaoder. The command returns `OK` followed by the version in the format `<major>.<minor>.<patch>`.
+Retrieves the version of the bootloader. The command returns `OK` followed by the version in the format `<major>.<minor>.<patch>`.
 
 Example:
 ```
 bootloader-version
 OK 2.1.7
 ```
+
+### bootloader-update
+Updates the bootloader to the supplied binary file.
+Use `core/tools/bld_update.py` script to update the bootloader binary.
+
 
 ### ble-adv-start
 Starts BLE advertising. Accepts one parameter, advertising name. The command returns `OK` if the operation is successful.
@@ -177,6 +199,15 @@ ble-erase-bonds
 # Erased 2 bonds.
 OK
 ```
+
+
+### ble-radio-test
+Runs radio test proxy-client. It requires special nRF radio test firmware, see https://docs.nordicsemi.com/bundle/sdk_nrf5_v17.0.2/page/nrf_radio_test_example.html for usage.
+
+
+### ble-direct-test-mode
+Runs direct-test-mode test proxy-client. It requires special nRF direct-test-mode firmware. To exit, hard reset is required.
+
 
 ### button-test
 The `button-test` command tests the functionality of the device's hardware buttons. It waits for the user to press and release a specified button in a designated timeout period.
@@ -300,6 +331,30 @@ Example:
 nrf-version
 OK 0.1.2.3
 ```
+
+### nrf-update
+Updates the nRF firmware. Use `core/tools/bin_update.py` script to update the nRF application binary.
+
+
+### nrf-pair
+Writes the pairing secret to the nRF chip to pair it with the MCU.
+The command `secrets-init` must be executed before calling this command.
+Pairing needs to be done before writing device serial number in the OTP memory and before locking the Optiga chip.
+
+Example:
+```
+nrf-pair
+OK
+```
+
+### nrf-verify-pairing
+Verifies the pairing between the main MCU and the nRF chip. The command returns `OK` if the pairing is valid, or `ERROR` if it is not.
+Example:
+```
+nrf-verify-pairing
+OK
+```
+
 
 ### touch-draw
 Starts a drawing canvas, where user can draw with finger on pen. Canvas is exited by sending CTRL+C command.
@@ -489,40 +544,42 @@ otp-batch-write T2B1-231231 --dry-run
 # !!! It's a dry run, OTP will be left unchanged.
 # !!! Use '--execute' switch to write to OTP memory.
 #
-# Writing device batch info into OTP memory...
+# Writing info into OTP memory...
 # Bytes written: 543242312D323331323331000000000000000000000000000000000000000000
 # Locking OTP block...
 ```
 
 
-### otp-device-id-read
-Retrieves the device ID string from the device's OTP memory. The device ID string is unique for each device.
+### otp-device-sn-read
+Retrieves the device's serial number from the device's OTP memory. The device serial number is unique for each device.
+A QR code with the serial number is displayed on the prodtest screen and printed on the packaging.
 
 If the OTP memory has not been written yet, it returns error code `no-data`.
 
 Example:
 ```
-otp-device-id-read
+otp-device-sn-read
 # Reading device OTP memory...
 # Bytes read: <hexadecimal string>
 ERROR no-data "OTP block is empty."
 ```
 
-### otp-device-id-write
-Writes the device ID string to the device's OTP memory. The device ID string is unique for each device.
+### otp-device-sn-write
+Writes the device serial number to the device's OTP memory. The device serial number is unique for each device.
+A QR code with the serial number is displayed on the prodtest screen and printed on the packaging.
 
-The batch string can be up to 31 characters in length.
+The serial number can be up to 31 characters in length.
 
 In non-production firmware, you must include `--execute` as the last parameter to write the data to the OTP memory. Conversely, in production firmware, you can use `--dry-run` as the last parameter to simulate the command without actually writing to the OTP memory.
 
 Example:
 ```
-otp-device-id-write 123456ABCD --dry-run
+otp-device-sn-write 123456ABCD --dry-run
 #
 # !!! It's a dry run, OTP will be left unchanged.
 # !!! Use '--execute' switch to write to OTP memory.
 #
-# Writing device batch info into OTP memory...
+# Writing info into OTP memory...
 # Bytes written: 3132333435364142434400000000000000000000000000000000000000000000
 # Locking OTP block...
 ```
@@ -563,12 +620,12 @@ OK 1 2 3 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 
 ### prodtest-version
 Retrieves the version of the prodtest firmware.
-The command returns `OK` followed by the version in the format `<major>.<minor>.<patch>`.
+The command returns `OK` followed by the version in the format `<major>.<minor>.<patch>.<build>`.
 
 Example:
 ```
 prodtest-version
-OK 0.2.6
+OK 0.2.6.1
 ```
 
 ### prodtest-wipe
@@ -577,6 +634,34 @@ This command invalidates the current firmware in the flash memory by erasing its
 Example:
 ```
 prodtest-wipe
+OK
+```
+
+
+### prodtest-homescreen
+Shows prodtest homescreen, which displays essential information about the device.
+
+Example:
+```
+prodtest-homescreen
+OK
+```
+
+### secrets-init
+Generates random secrets and stores them in the protected storage.
+
+Example:
+```
+secrets-init
+OK
+```
+
+### optiga-pair
+Writes the pairing secret to the Optiga chip to pair it with the MCU. The command `secrets-init` must be executed before calling this command.
+
+Example:
+```
+optiga-pair
 OK
 ```
 
@@ -681,101 +766,137 @@ optiga-counter-read
 OK 0E
 ```
 
-### pmic-init
-Reinitializes the PMIC driver, restoring it to its default state.
+### pm-new-soc-estimate
+Erase power manager recovery data from the backup RAM and immediately reboot the device to run new battery SoC estimate.
 
 Example:
 ```
-# Initializing the NPM1300 driver...
+pm-new-soc-estimate
+# Erasing backup RAM and rebooting...
 OK
 ```
 
-### pmic-charge-enable
+### pm-set-soc-target
+Sets the battery state of charge (SOC) target. The SOC limit is a percentage value between 10 and 100.
+
+The command returns `OK` if the operation is successful.
+
+```
+pm-set-soc-target 50
+# Set SOC target to 50%
+OK
+
+```
+
+### pm-report
+Starts single or continuous reporting of power manager data, including voltage, current and temperature.
+
+`pm-report`
+
+Progress report contains these values in order:
+ - power state
+ - usb connected indication
+ - wireless charger connected indication
+ - battery voltage
+ - battery current
+ - battery temperature
+ - battery SOC
+ - battery SOC latched
+ - PMIC die temperature
+ - WLC voltage
+ - WLC current
+ - WLC die temperature
+ - System voltage
+
+Example:
+```
+pm-report
+# Power manager report:
+# Power state 5
+#   USB connected
+#   WLC disconnected
+#   Battery voltage: 3.465 V
+#   Battery current: -192.150 mA
+#   Battery temperature: 32.416 C
+#   Battery SoC: 72.11
+#   Battery SoC latched: 72.11
+#   PMIC die temperature: 58.607 C
+#   WLC voltage: 0.000 V
+#   WLC current: 0.000 mA
+#   WLC die temperature: 0.000 C
+#   System voltage: 4.449 V
+PROGRESS 5 USB_connected WLC_disconnected 3.465 -192.150 32.416 72.11 72.11 58.607 0.000 0.000 0.000 4.449
+OK
+```
+
+### pm-fuel-gauge-monitor
+Runs continous monitor of the battery measurements and fuel gauge state of charge (vbat, ibat, ntc_temp, soc) and
+prints them on display and into console. Monitor is stoped with CTRL+C.
+
+Example:
+```
+pm-fuel-gauge-monitor
+PROGRESS 3.465 -191.475 32.636 73.27
+PROGRESS 3.465 -191.925 32.747 73.27
+PROGRESS 3.465 -192.150 32.636 73.28
+PROGRESS 3.460 -191.925 32.636 73.29
+PROGRESS 3.465 -192.600 32.636 73.29
+PROGRESS 3.465 -191.925 32.636 73.30
+# aborted
+OK
+```
+
+### pm-charge-enable
 Enables battery charging. If a charger is connected, charging starts immediately.
 
 Example:
 ```
-pmic-charge-enable
+pm-charge-enable
 # Enabling battery charging @ 180mA...
 OK
 ```
 
-### pmic-charge-disable
+### pm-charge-disable
 Disables battery charging.
 
 Example:
 ```
-pmic-charge-disable
+pm-charge-disable
 # Disabling battery charging...
 OK
 ```
 
-### pmic-charge-set-limit
-Sets the batter charging current limit.
-
-`pmic-charge-set-limit <limit>`
-
-* `limit` - Charging limit in mA, ranging from 30 to 180.
-
-```
-pmic-charge-set-limit 100
-# Setting battery charging limit to 100 mA...
-OK
-```
-
-### pmic-buck-set-mode
-Selects of one PMIC buck converter modes.
-
-`pmic-buck-set-mode <mode>`
-
-* `pmic-buck-set-mode` - Buck converter mode (pwm, pfm or auto)
-
-Example:
-```
-pmic-buck-set-mode auto
-# Setting the buck converter mode...
-OK
-```
-
-### pmic-report
-Starts single or continuous reporting of PMIC state including voltage, current and temperature.
-
-`pmic-report [<count>] [<period>]`
-
-* `count` - Number of measurement periods
-* `period` - Duration of single measurement period in milliseconds
-
-Example:
-```
-pmic-report 4 1000
-#       time      vbat  ibat  ntc    vsys  die    bat  buck mode
-PROGRESS 000229555 0.000 0.000 -88.117 4.692 36.414 0x08 0x0C IDLE
-PROGRESS 000230555 0.000 0.000 -88.117 4.673 37.207 0x08 0x0C IDLE
-PROGRESS 000231555 0.004 0.000 -88.117 4.673 36.414 0x08 0x0C IDLE
-PROGRESS 000232555 0.004 0.000 -88.117 4.679 36.414 0x08 0x0C IDLE
-OK
-```
-
-### powerctl-suspend
+### pm-suspend
 Enters low-power mode.
 
 In low-power mode, the CPU retains its state, including SRAM content.
-The device can be woken by pressing the power button and will continue
-operation from the point where it was suspended.
+
+The following wake-up reasons are currently possible:
+- BUTTON - the power button was pressed
+- POWER - USB or WPC power was detected
+- BLE - BLE communication was detected
+- RTC - the RTC wake-up timer expired
+
+```
+pm-suspend [<wakeup-time>]
+```
+
+The command returns OK followed by a list of wake-up reasons, separated
+by spaces.
 
 Example:
 ```
-powerctl-suspend
+pm-suspend
 # Suspending the device to low-power mode...
-# Press the POWER button to resume.
+# Press a button button to resume.
 
 ....
 
 # Resumed to active mode.
-OK
+OK BUTTON
 ```
 
-### powerctl-hibernate
+### pm-hibernate
 Enters Hibernate mode.
 
 In Hibernate mode, the CPU is powered off, and only the VBAT domain remains
@@ -787,7 +908,7 @@ wireless charger.
 
 Example:
 ```
-powerctl-hibernate
+pm-hibernate
 # Hibernating the the device...
 # Device is powered externally, hibernation is not possible.
 OK
@@ -834,71 +955,10 @@ tropic-get-chip-id
 OK 00000001000000000000000000000000000000000000000000000000000000000000000001000000054400000000FFFFFFFFFFFF01F00F000544545354303103001300000B54524F50494330312D4553FFFFFFFF000100000000FFFF000100000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF13000300
 ```
 
-### wpc-init
-Reinitializes the wireless power receiver driver, restoring it to its default state.
-
-Example:
-```
-wpc-init
-# Initializing the WPC driver...
-OK
-```
-
-### wpc-enable
-Enables the wireless power receiver. When enabled, the receiver can initiate communication with the transmitter. To start battery charging, the voltage output must also be enabled (see `wpc-out-enable`).
-
-Example:
-```
-wpc-enable
-# Enabling STWLC38...
-OK
-```
-
-### wpc-disable
-Disables wireless power receiver.
-
-Example:
-```
-wpc-disable
-# Disabling STWLC38...
-OK
-```
-
-### wpc-out-enable
-Enables the voltage output of the wireless power receiver.  By default, the voltage output is enabled.
-
-Example:
-```
-wpc-out-enable
-# Enabling STWLC38 output...
-OK
-```
-
-### wpc-out-disable
-Disables the voltage output of the wireless power receiver.
-
-Example:
-```
-wpc-out-disable
-# Disabling STWLC38 output...
-OK
-```
-
-### wpc-report
-
-Example:
-```
-#       time       ready vout_ready vrect vout icur tmeas opfreq ntc
-PROGRESS 000314886 1 1 5.068 5.001 59.000 41.000 146 320.900
-PROGRESS 000315886 1 1 5.064 5.006 61.000 41.100 146 321.000
-PROGRESS 000316886 1 1 5.114 5.003 61.000 41.200 146 321.100
-PROGRESS 000317886 1 1 5.151 5.006 61.000 41.300 146 321.000
-PROGRESS 000318886 1 1 5.150 5.002 59.000 41.000 146 320.800
-OK
-```
-
 ### wpc-info
 Retrieves detailed information from the wireless power receiver, including chip identification, firmware version, configuration settings, and error status.
+
+WARNING: The command will only succeed if the receiver is externally powered (5V present on the VOUT/VRECT test point).
 
 Example:
 ```
@@ -922,13 +982,14 @@ Example:
 #   nvm_config_err:    0x0
 #   nvm_patch_err:     0x0
 #   nvm_prod_info_err: 0x0
+PROGRESS 0x38 0x4 0x0 0x161 0x1645 0x1D7C 0xC 0x1 0x52353038385055AA09446D0655AA55AA 0x0
 OK
 ```
 
 ### wpc-update
 Updates the firmware and configuration of the wireless power receiver.
 
-WARNING: The update will only succeed if the receiver is externally powered (5V present on the VOUT test point).
+WARNING: The command will only succeed if the receiver is externally powered (5V present on the VOUT/VRECT test point).
 
 Example:
 ```
@@ -940,10 +1001,13 @@ wpc-update
 ### nfc-read-card
 Activate the NFC in reader mode for a given time. Read general information from firstly discovered NFC tag or exits on timeout.
 
+When used without a timeout, the command will wait indefinitely for a card to be placed on the reader and will repeat the read operation
+each 100ms.
+
 Example:
 ```
-nfc-read-card <timeout_seconds>
-# NFC activated in reader mode for <timeout_seconds> seconds.
+nfc-read-card [<timeout_ms>]
+# NFC activated in reader mode for <timeout_ms> ms.
 # NFC card detected.
 # NFC Type A: UID: %s
 OK
@@ -951,12 +1015,12 @@ OK
 
 
 ### nfc-emulate-card
-Activate NFC in Card Emulator mode for given time.
+Activate NFC in Card Emulator mode for given time, or infinite time if no timeout is specified.
 
 Example:
 ```
-nfc-emulate-card <timeout_seconds>
-# Emulation started for <timeout_seconds>
+nfc-emulate-card [<timeout_ms>]
+# Emulation started for <timeout_ms>
 # Emulation over
 OK
 ```
@@ -964,11 +1028,17 @@ OK
 ### nfc-write-card
 Activates the NFC reader for given time. Writes the NDEF URI message into the first discovered NFC tag type A or exits on timeout.
 
+When used without a timeout, the command will wait indefinitely for a card to be placed on the reader and will repeat the write operation
+each 100ms.
+
 Example:
 ```
-nfc-write_card <timeout_seconds>
-# NFC reader on, put the card on the reader (timeout <timeout_seconds> s)
+nfc-write-card [<timeout_ms>]
+# NFC reader on, put the card on the reader (timeout <timeout_ms> ms)
 # Writting URI to NFC tag 7AF403
+OK
+```
+
 ### unit-test-run
 Prodtest have capability to verify the overall firmware functionality by running built-in unit tests which should excercise the basic
 features of the firmware drivers. This command will run all registered unit tests and return 'OK' if all tests passed.
@@ -991,3 +1061,40 @@ Example:
 # ut-pmic-init-deinit - Test PMIC driver initialization and deinitialization
 OK
 ```
+
+### rtc-timestamp
+Retrieves the current RTC timestamp as a number of seconds since the device got powered up for the first time.
+
+Example:
+```
+rtc-timestamp
+OK 1886533
+```
+
+### rtc-set
+Sets the current RTC date and time.
+
+`rtc-set <year> <month> <day> <hour> <minute> <second>`
+
+Example:
+```
+rtc-set 2025 07 03 14 23 00
+OK
+```
+
+### rtc-get
+Reads the current RTC date and time.
+
+Response format:
+`OK <year> <month> <day> <hour> <minute> <second> <day-of-week>`, where `day-of-week` is a number from 1 (Monday) to 7 (Sunday).
+
+Where:
+
+Example:
+```
+rtc-get
+OK 2025 07 03 14 23 00 4
+```
+
+
+

@@ -39,9 +39,10 @@
 
 uint32_t last_touch_sample_time = 0;
 
-#define CHECK_PARAM_RANGE(value, minimum, maximum)  \
-  if (value < minimum || value > maximum) {         \
-    mp_raise_ValueError(#value " is out of range"); \
+#define CHECK_PARAM_RANGE(value, minimum, maximum) \
+  if (value < minimum || value > maximum) {        \
+    const char *msg = (#value " is out of range"); \
+    mp_raise_ValueError((mp_rom_error_text_t)msg); \
   }
 
 // clang-format off
@@ -58,15 +59,20 @@ uint32_t last_touch_sample_time = 0;
 #ifdef USE_HAPTIC
 #include "modtrezorio-haptic.h"
 #endif
+#ifdef USE_POWER_MANAGER
+#include "modtrezorio-pm.h"
+#endif
 
 /// package: trezorio.__init__
-/// from . import fatfs, haptic, sdcard, ble
+/// from . import fatfs, haptic, sdcard, ble, pm
 
 /// POLL_READ: int  # wait until interface is readable and return read data
 /// POLL_WRITE: int  # wait until interface is writable
 ///
 /// BLE: int  # interface id of the BLE events
 /// BLE_EVENT: int # interface id for BLE events
+///
+/// PM_EVENT: int  # interface id for power manager events
 ///
 /// TOUCH: int  # interface id of the touch events
 /// TOUCH_START: int  # event id of touch start event
@@ -111,6 +117,10 @@ STATIC const mp_rom_map_elem_t mp_module_trezorio_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_BUTTON_LEFT), MP_ROM_INT(BTN_LEFT)},
     {MP_ROM_QSTR(MP_QSTR_BUTTON_RIGHT), MP_ROM_INT(BTN_RIGHT)},
 #endif
+#ifdef USE_POWER_MANAGER
+    {MP_ROM_QSTR(MP_QSTR_pm), MP_ROM_PTR(&mod_trezorio_pm_module)},
+    {MP_ROM_QSTR(MP_QSTR_PM_EVENT), MP_ROM_INT(SYSHANDLE_POWER_MANAGER)},
+#endif
 
     {MP_ROM_QSTR(MP_QSTR_USB), MP_ROM_PTR(&mod_trezorio_USB_type)},
     {MP_ROM_QSTR(MP_QSTR_HID), MP_ROM_PTR(&mod_trezorio_HID_type)},
@@ -129,7 +139,7 @@ STATIC MP_DEFINE_CONST_DICT(mp_module_trezorio_globals,
 
 const mp_obj_module_t mp_module_trezorio = {
     .base = {&mp_type_module},
-    .globals = (mp_obj_dict_t*)&mp_module_trezorio_globals,
+    .globals = (mp_obj_dict_t *)&mp_module_trezorio_globals,
 };
 
 MP_REGISTER_MODULE(MP_QSTR_trezorio, mp_module_trezorio);

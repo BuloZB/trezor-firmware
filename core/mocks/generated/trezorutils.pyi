@@ -35,6 +35,15 @@ def memcpy(
 
 
 # upymod/modtrezorutils/modtrezorutils.c
+def memzero(
+    dst: bytearray | memoryview,
+) -> None:
+    """
+    Zeroes all bytes at `dst`.
+    """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
 def halt(msg: str | None = None) -> None:
     """
     Halts execution.
@@ -88,6 +97,17 @@ def sd_hotswap_enabled() -> bool:
 
 
 # upymod/modtrezorutils/modtrezorutils.c
+def presize_module(mod: module, n: int):
+    """
+    Ensure the module's dict is preallocated to an expected size.
+
+    This is used in modules like `trezor`, whose dict size depends not only
+    on the symbols defined in the file itself, but also on the number of
+    submodules that will be inserted into the module's namespace.
+    """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
 def zero_unused_stack() -> None:
     """
     Zero unused stack memory.
@@ -105,10 +125,20 @@ if __debug__:
         Dump GC info in case of an OOM.
         """
 if __debug__:
-    def check_free_heap(previous: int) -> int:
+    def clear_gc_info() -> None:
         """
-        Assert that free heap memory doesn't decrease.
-        Returns current free heap memory (in bytes).
+        Clear GC heap stats.
+        """
+if __debug__:
+    def get_gc_info() -> dict[str, int]:
+        """
+        Get GC heap stats, updated by `update_gc_info`.
+        """
+if __debug__:
+    def update_gc_info() -> None:
+        """
+        Update current GC heap statistics.
+        On emulator, also assert that free heap memory doesn't decrease.
         Enabled only for frozen debug builds.
         """
 if __debug__:
@@ -169,6 +199,8 @@ USE_TOUCH: bool
 """Whether the hardware supports touch screen."""
 USE_BUTTON: bool
 """Whether the hardware supports two-button input."""
+USE_POWER_MANAGER: bool
+"""Whether the hardware has a battery."""
 MODEL: str
 """Model name."""
 MODEL_FULL_NAME: str

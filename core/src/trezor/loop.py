@@ -37,9 +37,6 @@ class TaskClosed(Exception):
     pass
 
 
-TASK_CLOSED = TaskClosed()
-
-
 def schedule(
     task: Task,
     value: Any = None,
@@ -130,6 +127,9 @@ def run() -> None:
 
 def clear() -> None:
     """Clear all queue state.  Any scheduled or paused tasks will be forgotten."""
+    global this_task
+    this_task = None
+
     _ = [0, 0, 0]
     while _queue:
         _queue.pop(_)
@@ -507,7 +507,7 @@ class spawn(Syscall):
         self.finished = True
         if isinstance(value, GeneratorExit):
             # coerce GeneratorExit to a catchable TaskClosed
-            self.return_value = TASK_CLOSED
+            self.return_value = TaskClosed()
         else:
             self.return_value = value
 

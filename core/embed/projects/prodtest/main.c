@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <memzero.h>
 #include <trezor_bsp.h>
 #include <trezor_model.h>
 #include <trezor_rtl.h>
@@ -26,11 +27,15 @@
 #include <rtl/cli.h>
 #include <sys/system.h>
 #include <sys/systick.h>
+#include <util/board_capabilities.h>
 #include <util/flash_otp.h>
 #include <util/rsod.h>
 #include <util/unit_properties.h>
 
+#include "commands.h"
+#include "rust_types.h"
 #include "rust_ui_prodtest.h"
+#include "sys/sysevent.h"
 
 #ifdef USE_BUTTON
 #include <io/button.h>
@@ -44,6 +49,10 @@
 #include <io/sdcard.h>
 #endif
 
+#ifdef USE_BACKUP_RAM
+#include <sys/backup_ram.h>
+#endif
+
 #ifdef USE_TOUCH
 #include <io/touch.h>
 #endif
@@ -52,6 +61,10 @@
 #include <sec/optiga_commands.h>
 #include <sec/optiga_transport.h>
 #include "cmd/prodtest_optiga.h"
+#endif
+
+#ifdef USE_RTC
+#include <sys/rtc.h>
 #endif
 
 #ifdef USE_TROPIC
@@ -74,8 +87,8 @@
 #include <sec/hash_processor.h>
 #endif
 
-#ifdef USE_POWERCTL
-#include <sys/powerctl.h>
+#ifdef USE_POWER_MANAGER
+#include <sys/power_manager.h>
 #endif
 
 #ifdef USE_STORAGE_HWKEY
@@ -105,6 +118,11 @@
 // Command line interface context
 cli_t g_cli = {0};
 
+struct {
+  c_layout_t layout;
+  bool set;
+} g_layout __attribute__((aligned(4))) = {0};
+
 #define VCP_IFACE 0
 
 static size_t console_read(void *context, char *buf, size_t size) {
@@ -112,7 +130,7 @@ static size_t console_read(void *context, char *buf, size_t size) {
 }
 
 static size_t console_write(void *context, const char *buf, size_t size) {
-  return usb_vcp_write_blocking(VCP_IFACE, (const uint8_t *)buf, size, -1);
+  return usb_vcp_write_blocking(VCP_IFACE, (const uint8_t *)buf, size, 100);
 }
 
 static void vcp_intr(void) { cli_abort(&g_cli); }
@@ -120,6 +138,8 @@ static void vcp_intr(void) { cli_abort(&g_cli); }
 #if defined(USE_USB_HS)
 #define VCP_PACKET_LEN 512
 #elif defined(USE_USB_FS)
+#define VCP_PACKET_LEN 64
+#elif defined(TREZOR_EMULATOR)
 #define VCP_PACKET_LEN 64
 #else
 #error "USB type not defined"
@@ -159,9 +179,13 @@ static void usb_init_all(void) {
       .rx_intr_byte = 3,  // Ctrl-C
       .iface_num = VCP_IFACE,
       .data_iface_num = 0x01,
+#ifdef TREZOR_EMULATOR
+      .emu_port = 21424,
+#else
       .ep_cmd = 0x02,
       .ep_in = 0x01,
       .ep_out = 0x01,
+#endif
       .polling_interval = 10,
       .max_packet_len = VCP_PACKET_LEN,
   };
@@ -171,26 +195,22 @@ static void usb_init_all(void) {
   ensure(usb_start(), NULL);
 }
 
-static void show_welcome_screen(void) {
-  char device_id[FLASH_OTP_BLOCK_SIZE];
-
-  if (sectrue == flash_otp_read(FLASH_OTP_BLOCK_DEVICE_ID, 0,
-                                (uint8_t *)device_id, sizeof(device_id)) &&
-      (device_id[0] != 0xFF)) {
-    screen_prodtest_info(device_id, strnlen(device_id, sizeof(device_id) - 1));
-  } else {
-    screen_prodtest_welcome();
-  }
-}
-
 // Set if the RGB LED must not be controlled by the main loop
 static bool g_rgbled_control_disabled = false;
 
 void prodtest_disable_rgbled_control(void) { g_rgbled_control_disabled = true; }
 
 static void drivers_init(void) {
-#ifdef USE_POWERCTL
-  powerctl_init();
+  parse_boardloader_capabilities();
+#ifdef USE_RTC
+  rtc_init();
+#endif
+#ifdef USE_BACKUP_RAM
+  backup_ram_init();
+#endif
+#ifdef USE_POWER_MANAGER
+  pm_init(true);
+  pm_set_soc_target(70);
 #endif
 
   display_init(DISPLAY_RESET_CONTENT);
@@ -234,33 +254,43 @@ static void drivers_init(void) {
 #endif
 }
 
-#define BACKLIGHT_NORMAL 150
+void prodtest_show_homescreen(void) {
+  memset(&g_layout, 0, sizeof(g_layout));
+  g_layout.set = true;
 
+  static char device_sn[FLASH_OTP_BLOCK_SIZE] = {0};
+
+  if (sectrue == flash_otp_read(FLASH_OTP_BLOCK_DEVICE_SN, 0,
+                                (uint8_t *)device_sn, sizeof(device_sn)) &&
+      (device_sn[0] != 0xFF)) {
+    screen_prodtest_welcome(&g_layout.layout, device_sn,
+                            strnlen(device_sn, sizeof(device_sn) - 1));
+  } else {
+    screen_prodtest_welcome(&g_layout.layout, NULL, 0);
+  }
+}
+
+#ifndef TREZOR_EMULATOR
 int main(void) {
+#else
+int prodtest_main(void) {
+#endif
   system_init(&rsod_panic_handler);
 
   drivers_init();
   usb_init_all();
 
-  show_welcome_screen();
-
   // Initialize command line interface
   cli_init(&g_cli, console_read, console_write, NULL);
 
-  extern cli_command_t _prodtest_cli_cmd_section_start;
-  extern cli_command_t _prodtest_cli_cmd_section_end;
-
-  cli_set_commands(
-      &g_cli, &_prodtest_cli_cmd_section_start,
-      &_prodtest_cli_cmd_section_end - &_prodtest_cli_cmd_section_start);
+  cli_set_commands(&g_cli, commands_get_ptr(), commands_count());
 
 #ifdef USE_OPTIGA
   optiga_init();
   optiga_open_application();
-  pair_optiga(&g_cli);
 #endif
 
-#if defined USE_BUTTON && defined USE_POWERCTL
+#if defined USE_BUTTON && defined USE_POWER_MANAGER
   uint32_t btn_deadline = 0;
 #endif
 
@@ -269,22 +299,49 @@ int main(void) {
   rgb_led_set_color(RGBLED_GREEN);
 #endif
 
+  display_set_backlight(150);
+  prodtest_show_homescreen();
+
   while (true) {
-    if (usb_vcp_can_read(VCP_IFACE)) {
-      cli_process_io(&g_cli);
+    sysevents_t awaited = {0};
+    awaited.read_ready |= 1 << VCP_IFACE;
+#ifdef USE_BUTTON
+    awaited.read_ready |= 1 << SYSHANDLE_BUTTON;
+#endif
+#ifdef USE_TOUCH
+    awaited.read_ready |= 1 << SYSHANDLE_TOUCH;
+#endif
+#ifdef USE_POWER_MANAGER
+    awaited.read_ready |= 1 << SYSHANDLE_POWER_MANAGER;
+#endif
+    sysevents_t signalled = {0};
+    sysevents_poll(&awaited, &signalled, ticks_timeout(100));
+
+    if (signalled.read_ready & (1 << VCP_IFACE)) {
+      const cli_command_t *cmd = cli_process_io(&g_cli);
+
+      if (cmd != NULL) {
+        screen_prodtest_bars("", 0);
+        memzero(&g_layout, sizeof(g_layout));
+        cli_process_command(&g_cli, cmd);
+      }
+
+      continue;
     }
 
-#if defined USE_BUTTON && defined USE_POWERCTL
-    button_event_t btn_event = {0};
-    if (button_get_event(&btn_event) && btn_event.button == BTN_POWER) {
-      if (btn_event.event_type == BTN_EVENT_DOWN) {
-        btn_deadline = ticks_timeout(1000);
-      } else if (btn_event.event_type == BTN_EVENT_UP) {
-        if (ticks_expired(btn_deadline)) {
-          powerctl_hibernate();
-          rgb_led_set_color(RGBLED_YELLOW);
-          systick_delay_ms(1000);
-          rgb_led_set_color(0);
+#if defined USE_BUTTON && defined USE_POWER_MANAGER
+    if (signalled.read_ready & (1 << SYSHANDLE_BUTTON)) {
+      button_event_t btn_event = {0};
+      if (button_get_event(&btn_event) && btn_event.button == BTN_POWER) {
+        if (btn_event.event_type == BTN_EVENT_DOWN) {
+          btn_deadline = ticks_timeout(1000);
+        } else if (btn_event.event_type == BTN_EVENT_UP) {
+          if (ticks_expired(btn_deadline)) {
+            pm_hibernate();
+            rgb_led_set_color(RGBLED_YELLOW);
+            systick_delay_ms(1000);
+            rgb_led_set_color(0);
+          }
         }
       }
     }
@@ -295,9 +352,21 @@ int main(void) {
 
 #ifdef USE_RGB_LED
     if (ticks_expired(led_start_deadline) && !g_rgbled_control_disabled) {
+      g_rgbled_control_disabled = true;
       rgb_led_set_color(0);
     }
 #endif
+
+    if (signalled.read_ready == 0) {
+      // timeout, let's wait again
+      continue;
+    }
+
+    // proceed to UI
+
+    if (g_layout.set) {
+      screen_prodtest_event(&g_layout.layout, &signalled);
+    }
   }
 
   return 0;

@@ -7,23 +7,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from enum import IntEnum
 
-    class BinanceOrderType(IntEnum):
-        OT_UNKNOWN = 0
-        MARKET = 1
-        LIMIT = 2
-        OT_RESERVED = 3
-
-    class BinanceOrderSide(IntEnum):
-        SIDE_UNKNOWN = 0
-        BUY = 1
-        SELL = 2
-
-    class BinanceTimeInForce(IntEnum):
-        TIF_UNKNOWN = 0
-        GTE = 1
-        TIF_RESERVED = 2
-        IOC = 3
-
     class FailureType(IntEnum):
         UnexpectedMessage = 1
         ButtonExpected = 2
@@ -39,6 +22,10 @@ if TYPE_CHECKING:
         PinMismatch = 12
         WipeCodeMismatch = 13
         InvalidSession = 14
+        Busy = 15
+        ThpUnallocatedSession = 16
+        InvalidProtocol = 17
+        BufferError = 18
         FirmwareError = 99
 
     class ButtonRequestType(IntEnum):
@@ -245,6 +232,8 @@ if TYPE_CHECKING:
         Translations = 19
         Brightness = 20
         Haptic = 21
+        BLE = 22
+        NFC = 23
 
     class SdProtectOperationType(IntEnum):
         DISABLE = 0
@@ -280,14 +269,20 @@ if TYPE_CHECKING:
         MIDDLE_BTN = 1
         RIGHT_BTN = 2
 
+    class DebugTouchEventType(IntEnum):
+        TOUCH_FULL_CLICK = 0
+        TOUCH_START = 1
+        TOUCH_END = 2
+
     class DebugWaitType(IntEnum):
         IMMEDIATE = 0
         NEXT_LAYOUT = 1
         CURRENT_LAYOUT = 2
 
-    class EthereumDefinitionType(IntEnum):
-        NETWORK = 0
-        TOKEN = 1
+    class DefinitionType(IntEnum):
+        ETHEREUM_NETWORK = 0
+        ETHEREUM_TOKEN = 1
+        SOLANA_TOKEN = 2
 
     class EthereumDataType(IntEnum):
         UINT = 1
@@ -347,6 +342,34 @@ if TYPE_CHECKING:
         Nay = 1
         Pass = 2
 
+    class ThpMessageType(IntEnum):
+        Cancel = 20
+        ButtonRequest = 26
+        ButtonAck = 27
+        ThpPairingRequest = 1008
+        ThpPairingRequestApproved = 1009
+        ThpSelectMethod = 1010
+        ThpPairingPreparationsFinished = 1011
+        ThpCredentialRequest = 1016
+        ThpCredentialResponse = 1017
+        ThpEndRequest = 1018
+        ThpEndResponse = 1019
+        ThpCodeEntryCommitment = 1024
+        ThpCodeEntryChallenge = 1025
+        ThpCodeEntryCpaceTrezor = 1026
+        ThpCodeEntryCpaceHostTag = 1027
+        ThpCodeEntrySecret = 1028
+        ThpQrCodeTag = 1032
+        ThpQrCodeSecret = 1033
+        ThpNfcTagHost = 1040
+        ThpNfcTagTrezor = 1041
+
+    class ThpPairingMethod(IntEnum):
+        SkipPairing = 1
+        CodeEntry = 2
+        QrCode = 3
+        NFC = 4
+
     class MessageType(IntEnum):
         Initialize = 0
         Ping = 1
@@ -373,6 +396,7 @@ if TYPE_CHECKING:
         BackupDevice = 34
         EntropyRequest = 35
         EntropyAck = 36
+        PaymentRequest = 37
         EntropyCheckReady = 994
         EntropyCheckContinue = 995
         PassphraseRequest = 41
@@ -397,8 +421,8 @@ if TYPE_CHECKING:
         AuthenticateDevice = 97
         AuthenticityProof = 98
         ChangeLanguage = 990
-        TranslationDataRequest = 991
-        TranslationDataAck = 992
+        DataChunkRequest = 991
+        DataChunkAck = 992
         SetBrightness = 993
         SetU2FCounter = 63
         GetNextU2FCounter = 80
@@ -417,7 +441,6 @@ if TYPE_CHECKING:
         TxAck = 22
         GetAddress = 29
         Address = 30
-        TxAckPaymentRequest = 37
         SignMessage = 38
         VerifyMessage = 39
         MessageSignature = 40
@@ -432,6 +455,7 @@ if TYPE_CHECKING:
         SignedIdentity = 54
         GetECDHSessionKey = 61
         ECDHSessionKey = 62
+        PaymentNotification = 52
         DebugLinkDecision = 100
         DebugLinkGetState = 101
         DebugLinkState = 102
@@ -448,6 +472,10 @@ if TYPE_CHECKING:
         DebugLinkWatchLayout = 9006
         DebugLinkResetDebugEvents = 9007
         DebugLinkOptigaSetSecMax = 9008
+        DebugLinkGetGcInfo = 9009
+        DebugLinkGcInfo = 9010
+        DebugLinkGetPairingInfo = 9011
+        DebugLinkPairingInfo = 9012
         EthereumGetPublicKey = 450
         EthereumPublicKey = 451
         EthereumGetAddress = 56
@@ -572,16 +600,6 @@ if TYPE_CHECKING:
         EosTxActionRequest = 603
         EosTxActionAck = 604
         EosSignedTx = 605
-        BinanceGetAddress = 700
-        BinanceAddress = 701
-        BinanceGetPublicKey = 702
-        BinancePublicKey = 703
-        BinanceSignTx = 704
-        BinanceTxRequest = 705
-        BinanceTransferMsg = 706
-        BinanceOrderMsg = 707
-        BinanceCancelMsg = 708
-        BinanceSignedTx = 709
         WebAuthnListResidentCredentials = 800
         WebAuthnCredentials = 801
         WebAuthnAddResidentCredential = 802
@@ -592,6 +610,9 @@ if TYPE_CHECKING:
         SolanaAddress = 903
         SolanaSignTx = 904
         SolanaTxSignature = 905
+        ThpCreateNewSession = 1000
+        ThpCredentialRequest = 1016
+        ThpCredentialResponse = 1017
         NostrGetPubkey = 2001
         NostrPubkey = 2002
         NostrSignEvent = 2003

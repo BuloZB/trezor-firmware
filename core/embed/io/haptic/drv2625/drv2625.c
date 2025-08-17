@@ -37,6 +37,10 @@
 #define PRESS_EFFECT_AMPLITUDE 25
 // Duration of the button press effect
 #define PRESS_EFFECT_DURATION 10
+// Amplitude of the bootloader entry effect
+#define BOOTLOADER_ENTRY_EFFECT_AMPLITUDE 100
+// Duration of the bootloader entry effect
+#define BOOTLOADER_ENTRY_EFFECT_DURATION 300
 
 // Actuator configuration
 #include HAPTIC_ACTUATOR
@@ -346,6 +350,10 @@ bool haptic_play(haptic_effect_t effect) {
     case HAPTIC_HOLD_TO_CONFIRM:
       return haptic_play_lib(DOUBLE_CLICK_60);
       break;
+    case HAPTIC_BOOTLOADER_ENTRY:
+      return haptic_play_rtp(BOOTLOADER_ENTRY_EFFECT_AMPLITUDE,
+                             BOOTLOADER_ENTRY_EFFECT_DURATION);
+      break;
     default:
       break;
   }
@@ -354,6 +362,15 @@ bool haptic_play(haptic_effect_t effect) {
 }
 
 bool haptic_play_custom(int8_t amplitude_pct, uint16_t duration_ms) {
+  haptic_driver_t *driver = &g_haptic_driver;
+
+  if (!driver->initialized) {
+    return false;
+  }
+
+  if (!driver->enabled) {
+    return true;
+  }
   if (amplitude_pct < 0) {
     amplitude_pct = 0;
   } else if (amplitude_pct > 100) {

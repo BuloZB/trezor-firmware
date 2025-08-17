@@ -2,7 +2,7 @@ import utime
 from typing import TYPE_CHECKING
 
 import storage.cache as storage_cache
-from trezor import log, loop
+from trezor import log, loop, utils
 from trezor.enums import MessageType
 
 if TYPE_CHECKING:
@@ -15,20 +15,29 @@ if __debug__:
 
     import micropython
 
-    from trezor import utils
-
-
-ALLOW_WHILE_LOCKED = (
-    MessageType.Initialize,
-    MessageType.EndSession,
-    MessageType.GetFeatures,
-    MessageType.Cancel,
-    MessageType.LockDevice,
-    MessageType.DoPreauthorized,
-    MessageType.WipeDevice,
-    MessageType.SetBusy,
-    MessageType.Ping,
-)
+if utils.USE_THP:
+    ALLOW_WHILE_LOCKED = (
+        MessageType.EndSession,
+        MessageType.GetFeatures,
+        MessageType.Cancel,
+        MessageType.LockDevice,
+        MessageType.DoPreauthorized,
+        MessageType.WipeDevice,
+        MessageType.SetBusy,
+        MessageType.Ping,
+    )
+else:
+    ALLOW_WHILE_LOCKED = (
+        MessageType.Initialize,
+        MessageType.EndSession,
+        MessageType.GetFeatures,
+        MessageType.Cancel,
+        MessageType.LockDevice,
+        MessageType.DoPreauthorized,
+        MessageType.WipeDevice,
+        MessageType.SetBusy,
+        MessageType.Ping,
+    )
 
 
 # Set of workflow tasks.  Multiple workflows can be running at the same time.
@@ -82,6 +91,16 @@ def spawn(workflow: loop.Task) -> loop.spawn:
     _on_start(task)
     task.set_finalizer(_on_close)
     return task
+
+
+async def join_all() -> None:
+    """Block until all workflows are over."""
+    if __debug__:
+        log.debug(__name__, "joining %d workflows", len(tasks))
+
+    # Don't iterate over `tasks` since it will be modified by its finalizers
+    while tasks:
+        await next(iter(tasks))
 
 
 def start_default() -> None:

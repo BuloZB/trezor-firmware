@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .. import get_hw_model_as_number
+from ..unix_common import unix_common_files
 
 
 def configure(
@@ -17,6 +18,8 @@ def configure(
     hw_revision = 0
     mcu = "STM32U585xx"
 
+    unix_common_files(env, defines, sources, paths)
+
     features_available.append("framebuffer")
     features_available.append("display_rgb565")
     defines += [
@@ -25,6 +28,7 @@ def configure(
         ("USE_RGB_COLORS", "1"),
         ("DISPLAY_RESX", "240"),
         ("DISPLAY_RESY", "240"),
+        ("LOCKABLE_BOOTLOADER", "1"),
     ]
 
     defines += [
@@ -62,7 +66,7 @@ def configure(
 
     if "input" in features_wanted:
         sources += ["embed/io/touch/unix/touch.c"]
-        sources += ["embed/io/touch/touch_fsm.c"]
+        sources += ["embed/io/touch/touch_poll.c"]
         paths += ["embed/io/touch/inc"]
         features_available.append("touch")
         defines += [("USE_TOUCH", "1")]

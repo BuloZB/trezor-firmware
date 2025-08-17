@@ -7,7 +7,7 @@ use crate::{
         component::{
             swipe_detect::SwipeSettings,
             text::paragraphs::{Paragraph, ParagraphSource, ParagraphVecShort, Paragraphs},
-            ButtonRequestExt, ComponentExt, EventCtx, PaginateFull as _,
+            ButtonRequestExt, ComponentExt, EventCtx, Paginate as _,
         },
         flow::{
             base::{Decision, DecisionBuilder as _},
@@ -82,8 +82,9 @@ pub fn new_show_share_words(
     instructions_paragraphs: ParagraphVecShort<'static>,
     text_footer: Option<TString<'static>>,
     text_confirm: TString<'static>,
+    text_check: TString<'static>,
 ) -> Result<SwipeFlow, error::Error> {
-    let nwords = share_words_vec.len();
+    let nwords = share_words_vec.len() as u16;
     let paragraphs_spacing = 8;
     let title = TR::reset__recovery_wallet_backup_title.into();
 
@@ -126,7 +127,7 @@ pub fn new_show_share_words(
         TR::reset__check_wallet_backup_title.into(),
         SwipeContent::new(Paragraphs::new(Paragraph::new(
             &theme::TEXT_MAIN_GREY_LIGHT,
-            TR::reset__check_backup_instructions,
+            text_check,
         ))),
     )
     .with_swipeup_footer(None)

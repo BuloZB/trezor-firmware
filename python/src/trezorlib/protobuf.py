@@ -1,6 +1,6 @@
 # This file is part of the Trezor project.
 #
-# Copyright (C) 2012-2022 SatoshiLabs and contributors
+# Copyright (C) SatoshiLabs and contributors
 #
 # This library is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License version 3
@@ -166,7 +166,7 @@ class Field:
         if self._py_type is None:
             self._py_type = self._resolve_type()
         # pyright issue https://github.com/microsoft/pyright/issues/8136
-        return self._py_type  # type: ignore [Type ["Unknown | None"]]
+        return self._py_type  # type: ignore [Type "Unknown | None"]
 
     def _resolve_type(self) -> type:
         # look for a type in the builtins

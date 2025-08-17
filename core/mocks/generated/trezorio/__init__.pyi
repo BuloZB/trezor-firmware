@@ -166,12 +166,14 @@ class WebUSB:
     """Length of one USB RX packet."""
     TX_PACKET_LEN: ClassVar[int]
     """Length of one USB TX packet."""
-from . import fatfs, haptic, sdcard, ble
+from . import fatfs, haptic, sdcard, ble, pm
 POLL_READ: int  # wait until interface is readable and return read data
 POLL_WRITE: int  # wait until interface is writable
 
 BLE: int  # interface id of the BLE events
 BLE_EVENT: int # interface id for BLE events
+
+PM_EVENT: int  # interface id for power manager events
 
 TOUCH: int  # interface id of the touch events
 TOUCH_START: int  # event id of touch start event

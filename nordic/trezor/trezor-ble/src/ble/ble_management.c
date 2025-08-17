@@ -45,9 +45,12 @@ void ble_management_send_status_event(void) {
       connection_is_connected(), advertising_is_advertising(),
       advertising_is_advertising_whitelist(), bonds_get_count());
 
+  struct bt_conn *conn = connection_get_current();
+  bool connected = conn != NULL;
+
   event_status_msg_t msg = {0};
   msg.msg_id = INTERNAL_EVENT_STATUS;
-  msg.connected = connection_is_connected();
+  msg.connected = connected;
   msg.advertising = advertising_is_advertising();
   msg.advertising_whitelist = advertising_is_advertising_whitelist();
   msg.peer_count = bonds_get_count();
@@ -56,6 +59,15 @@ void ble_management_send_status_event(void) {
   msg.sd_subversion_number = 0;
   msg.app_version = 0;
   msg.bld_version = 0;
+  msg.busy_flag = ble_get_busy_flag();
+
+  if (connected) {
+    memcpy(msg.connected_addr, bt_conn_get_dst(conn)->a.val, BT_ADDR_SIZE);
+    msg.connected_addr_type = bt_conn_get_dst(conn)->type;
+  } else {
+    memset(msg.connected_addr, 0, BT_ADDR_SIZE);
+    msg.connected_addr_type = 0;
+  }
 
   trz_comm_send_msg(NRF_SERVICE_BLE_MANAGER, (uint8_t *)&msg, sizeof(msg));
 }
@@ -96,6 +108,14 @@ void ble_management_send_pairing_request_event(uint8_t *data, uint16_t len) {
   trz_comm_send_msg(NRF_SERVICE_BLE_MANAGER, tx_data, sizeof(tx_data));
 }
 
+void ble_management_send_pairing_completed(void) {
+  uint8_t tx_data[1] = {0};
+
+  tx_data[0] = INTERNAL_EVENT_PAIRING_COMPLETED;
+
+  trz_comm_send_msg(NRF_SERVICE_BLE_MANAGER, tx_data, sizeof(tx_data));
+}
+
 static void management_send_mac(uint8_t *mac) {
   uint8_t tx_data[1 + BT_ADDR_SIZE] = {0};
   tx_data[0] = INTERNAL_EVENT_MAC;
@@ -116,6 +136,11 @@ static void process_command(uint8_t *data, uint16_t len) {
       cmd_advertising_on_t *cmd = (cmd_advertising_on_t *)data;
 
       int name_len = strnlen(cmd->name, BLE_ADV_NAME_LEN);
+
+      if (cmd->whitelist != 0) {
+        pairing_num_comp_reply(false, NULL);
+      }
+
       advertising_start(cmd->whitelist != 0, cmd->color, cmd->device_code,
                         cmd->static_addr, (char *)cmd->name, name_len);
     } break;
@@ -130,11 +155,11 @@ static void process_command(uint8_t *data, uint16_t len) {
     case INTERNAL_CMD_ACK:
       // pb_msg_ack();
       break;
-    case INTERNAL_CMD_ALLOW_PAIRING:
+    case INTERNAL_CMD_ALLOW_PAIRING: {
       cmd_allow_pairing_t *cmd = (cmd_allow_pairing_t *)data;
 
       pairing_num_comp_reply(true, cmd->code);
-      break;
+    } break;
     case INTERNAL_CMD_REJECT_PAIRING:
       pairing_num_comp_reply(false, NULL);
       break;
@@ -147,6 +172,9 @@ static void process_command(uint8_t *data, uint16_t len) {
       management_send_mac(mac);
       send_response = false;
     } break;
+    case INTERNAL_CMD_SET_BUSY: {
+      ble_set_busy_flag(data[1]);
+    }
     default:
       break;
   }

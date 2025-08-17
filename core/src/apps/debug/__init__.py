@@ -1,3 +1,5 @@
+from trezor.wire import message_handler
+
 if not __debug__:
     from trezor.utils import halt
 
@@ -11,7 +13,7 @@ if __debug__:
     import trezorui_api
     from storage import debug as storage
     from trezor import io, log, loop, ui, utils, wire, workflow
-    from trezor.enums import DebugWaitType, MessageType
+    from trezor.enums import DebugTouchEventType, DebugWaitType, MessageType
     from trezor.messages import Success
     from trezor.ui import display
 
@@ -22,35 +24,32 @@ if __debug__:
         from trezor.messages import (
             DebugLinkDecision,
             DebugLinkEraseSdCard,
+            DebugLinkGcInfo,
+            DebugLinkGetGcInfo,
+            DebugLinkGetPairingInfo,
             DebugLinkGetState,
             DebugLinkOptigaSetSecMax,
+            DebugLinkPairingInfo,
             DebugLinkRecordScreen,
             DebugLinkReseedRandom,
             DebugLinkState,
+            WipeDevice,
         )
         from trezor.ui import Layout
-        from trezor.wire import WireInterface, context
+        from trezor.wire import WireInterface
+        from trezor.wire.protocol_common import Context
 
         Handler = Callable[[Any], Awaitable[Any]]
 
     layout_change_box = loop.mailbox()
 
-    DEBUG_CONTEXT: context.Context | None = None
-
-    REFRESH_INDEX = 0
+    DEBUG_CONTEXT: Context | None = None
 
     _DEADLOCK_SLEEP_MS = const(3000)
     _DEADLOCK_DETECT_SLEEP = loop.sleep(_DEADLOCK_SLEEP_MS)
 
-    def screenshot() -> bool:
-        if storage.save_screen:
-            # Starting with "refresh00", allowing for 100 emulator restarts
-            # without losing the order of the screenshots based on filename.
-            display.save(
-                f"{storage.save_screen_directory.decode()}/refresh{REFRESH_INDEX:0>2}-"
-            )
-            return True
-        return False
+    class RestartEventLoop(Exception):
+        pass
 
     def notify_layout_change(layout: Layout | None) -> None:
         layout_change_box.put(layout, replace=True)
@@ -71,7 +70,9 @@ if __debug__:
                 )
 
     async def return_layout_change(
-        ctx: wire.protocol_common.Context, detect_deadlock: bool = False
+        ctx: Context,
+        detect_deadlock: bool = False,
+        return_empty_state: bool = False,
     ) -> None:
         # set up the wait
         storage.layout_watcher = True
@@ -100,7 +101,7 @@ if __debug__:
 
         # send the message and reset the wait
         storage.layout_watcher = False
-        await ctx.write(_state())
+        await ctx.write(_state(return_empty_state))
 
     async def _layout_click(x: int, y: int, hold_ms: int = 0) -> None:
         assert isinstance(ui.CURRENT_LAYOUT, ui.Layout)
@@ -220,7 +221,17 @@ if __debug__:
         try:
             # click on specific coordinates, with possible hold
             if x is not None and y is not None:
-                await _layout_click(x, y, msg.hold_ms or 0)
+                if msg.touch_event_type == DebugTouchEventType.TOUCH_START:
+                    ui.CURRENT_LAYOUT._event(
+                        ui.CURRENT_LAYOUT.layout.touch_event, io.TOUCH_START, x, y
+                    )
+                elif msg.touch_event_type == DebugTouchEventType.TOUCH_END:
+                    ui.CURRENT_LAYOUT._event(
+                        ui.CURRENT_LAYOUT.layout.touch_event, io.TOUCH_END, x, y
+                    )
+                else:
+                    # fallback: full click
+                    await _layout_click(x, y, msg.hold_ms or 0)
             # press specific button
             elif msg.physical_button is not None:
                 await _layout_press_button(msg.physical_button, msg.hold_ms or 0)
@@ -244,8 +255,11 @@ if __debug__:
         # If no exception was raised, the layout did not shut down. That means that it
         # just updated itself. The update is already live for the caller to retrieve.
 
-    def _state() -> DebugLinkState:
+    def _state(return_empty_state: bool = False) -> DebugLinkState:
         from trezor.messages import DebugLinkState
+
+        if return_empty_state:
+            return DebugLinkState()
 
         from apps.common import mnemonic, passphrase
 
@@ -265,27 +279,61 @@ if __debug__:
             tokens=tokens,
         )
 
+    async def dispatch_DebugLinkGetPairingInfo(
+        msg: DebugLinkGetPairingInfo,
+    ) -> DebugLinkPairingInfo | None:
+        if not utils.USE_THP:
+            raise RuntimeError("Trezor does not support THP")
+        if msg.channel_id is None:
+            raise RuntimeError("Invalid DebugLinkGetPairingInfo message")
+
+        from trezor.wire import find_thp_channel
+        from trezor.wire.thp.pairing_context import PairingContext
+
+        channel = find_thp_channel(msg.channel_id)
+        if channel is None:
+            raise RuntimeError("Channel not found")
+
+        ctx = channel.connection_context
+        if not isinstance(ctx, PairingContext):
+            raise RuntimeError("Trezor is not in pairing mode")
+
+        ctx.nfc_secret_host = msg.nfc_secret_host
+        ctx.handshake_hash_host = msg.handshake_hash
+        from trezor.messages import DebugLinkPairingInfo
+
+        return DebugLinkPairingInfo(
+            channel_id=ctx.channel_id,
+            handshake_hash=ctx.channel_ctx.get_handshake_hash(),
+            code_entry_code=ctx.code_code_entry,
+            code_qr_code=ctx.code_qr_code,
+            nfc_secret_trezor=ctx.nfc_secret,
+        )
+
     async def dispatch_DebugLinkGetState(
         msg: DebugLinkGetState,
     ) -> DebugLinkState | None:
-        if msg.return_empty_state:
-            from trezor.messages import DebugLinkState
-
-            return DebugLinkState()
-
         if msg.wait_layout == DebugWaitType.IMMEDIATE:
-            return _state()
+            return _state(msg.return_empty_state)
 
         assert DEBUG_CONTEXT is not None
         if msg.wait_layout == DebugWaitType.NEXT_LAYOUT:
             layout_change_box.clear()
-            return await return_layout_change(DEBUG_CONTEXT, detect_deadlock=False)
+            return await return_layout_change(
+                DEBUG_CONTEXT,
+                detect_deadlock=False,
+                return_empty_state=msg.return_empty_state,
+            )
 
         # default behavior: msg.wait_layout == DebugWaitType.CURRENT_LAYOUT
         if not layout_is_ready():
-            return await return_layout_change(DEBUG_CONTEXT, detect_deadlock=True)
+            return await return_layout_change(
+                DEBUG_CONTEXT,
+                detect_deadlock=True,
+                return_empty_state=msg.return_empty_state,
+            )
         else:
-            return _state()
+            return _state(msg.return_empty_state)
 
     async def dispatch_DebugLinkRecordScreen(msg: DebugLinkRecordScreen) -> Success:
         if msg.target_directory:
@@ -296,10 +344,7 @@ if __debug__:
             # In case emulator is restarted but we still want to record screenshots
             # into the same directory as before, we need to increment the refresh index,
             # so that the screenshots are not overwritten.
-            global REFRESH_INDEX
-            REFRESH_INDEX = msg.refresh_index
-            storage.save_screen_directory[:] = msg.target_directory.encode()
-            storage.save_screen = True
+            display.record_start(msg.target_directory.encode(), msg.refresh_index)
 
             # force repaint current layout, in order to take an initial screenshot
             # (doing it this way also clears the red square, because the repaint is
@@ -309,14 +354,17 @@ if __debug__:
             ui.CURRENT_LAYOUT._paint()
 
         else:
-            storage.save_screen = False
-            display.clear_save()  # clear C buffers
+            print("stopping recording")
+            display.record_stop()
 
         return Success()
 
     async def dispatch_DebugLinkReseedRandom(msg: DebugLinkReseedRandom) -> Success:
         if msg.value is not None:
             from trezor.crypto import random
+
+            if not utils.EMULATOR:
+                raise wire.UnexpectedMessage("reseed only supported on emulator")
 
             random.reseed(msg.value)
         return Success()
@@ -354,6 +402,29 @@ if __debug__:
         else:
             raise wire.UnexpectedMessage("Optiga not supported")
 
+    async def dispatch_DebugLinkGetGcInfo(
+        msg: DebugLinkGetGcInfo,
+    ) -> DebugLinkGcInfo:
+        from trezor.messages import DebugLinkGcInfo, DebugLinkGcInfoItem
+
+        return DebugLinkGcInfo(
+            items=[
+                DebugLinkGcInfoItem(name=name, value=value)
+                for name, value in utils.get_gc_info().items()
+            ]
+        )
+
+    async def dispatch_WipeDevice(msg: WipeDevice) -> None:
+        """Wipe the device and restart the event loop."""
+        from storage import wipe
+
+        try:
+            wipe(clear_cache=True)
+            assert DEBUG_CONTEXT is not None
+            await DEBUG_CONTEXT.write(Success())
+        finally:
+            raise RestartEventLoop
+
     async def _no_op(_msg: Any) -> Success:
         return Success()
 
@@ -364,7 +435,7 @@ if __debug__:
 
         global DEBUG_CONTEXT
 
-        DEBUG_CONTEXT = ctx = CodecContext(iface, wire.BufferProvider(1024))
+        DEBUG_CONTEXT = ctx = CodecContext(iface, wire.Provider(bytearray(1024)))
 
         if storage.layout_watcher:
             try:
@@ -383,7 +454,9 @@ if __debug__:
 
                 req_type = None
                 try:
-                    req_type = protobuf.type_for_wire(msg.type)
+                    req_type = protobuf.type_for_wire(
+                        ctx.message_type_enum_name, msg.type
+                    )
                     msg_type = req_type.MESSAGE_NAME
                 except Exception:
                     msg_type = f"{msg.type} - unknown message type"
@@ -406,9 +479,12 @@ if __debug__:
                     await ctx.write(Success())
                     continue
 
-                req_msg = wire.message_handler.wrap_protobuf_load(msg.data, req_type)
+                req_msg = message_handler.wrap_protobuf_load(msg.data, req_type)
                 try:
                     res_msg = await WORKFLOW_HANDLERS[msg.type](req_msg)
+                except RestartEventLoop:
+                    loop.clear()
+                    return
                 except Exception as exc:
                     # Log and ignore, never die.
                     log.exception(__name__, exc)
@@ -425,12 +501,15 @@ if __debug__:
     WORKFLOW_HANDLERS: dict[int, Handler] = {
         MessageType.DebugLinkDecision: dispatch_DebugLinkDecision,
         MessageType.DebugLinkGetState: dispatch_DebugLinkGetState,
+        MessageType.DebugLinkGetPairingInfo: dispatch_DebugLinkGetPairingInfo,
         MessageType.DebugLinkReseedRandom: dispatch_DebugLinkReseedRandom,
         MessageType.DebugLinkRecordScreen: dispatch_DebugLinkRecordScreen,
         MessageType.DebugLinkEraseSdCard: dispatch_DebugLinkEraseSdCard,
         MessageType.DebugLinkOptigaSetSecMax: dispatch_DebugLinkOptigaSetSecMax,
         MessageType.DebugLinkWatchLayout: _no_op,
         MessageType.DebugLinkResetDebugEvents: _no_op,
+        MessageType.DebugLinkGetGcInfo: dispatch_DebugLinkGetGcInfo,
+        MessageType.WipeDevice: dispatch_WipeDevice,
     }
 
     def boot() -> None:

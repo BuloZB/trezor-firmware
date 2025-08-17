@@ -121,7 +121,17 @@ STATIC mp_obj_t mod_trezorio_WebUSB_write(mp_obj_t self, mp_obj_t msg) {
   mp_obj_WebUSB_t *o = MP_OBJ_TO_PTR(self);
   mp_buffer_info_t buf = {0};
   mp_get_buffer_raise(msg, &buf, MP_BUFFER_READ);
+
+  if (buf.len != USB_PACKET_LEN) {
+    mp_raise_msg(&mp_type_ValueError, MP_ERROR_TEXT("Invalid buffer length"));
+  }
+
   ssize_t r = usb_webusb_write(o->info.iface_num, buf.buf, buf.len);
+
+  if (r != buf.len) {
+    mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("Write failed"));
+  }
+
   return MP_OBJ_NEW_SMALL_INT(r);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_trezorio_WebUSB_write_obj,
@@ -142,24 +152,25 @@ STATIC mp_obj_t mod_trezorio_WebUSB_read(size_t n_args, const mp_obj_t *args) {
   }
 
   if (offset < 0) {
-    mp_raise_ValueError("Negative offset not allowed");
+    mp_raise_ValueError(MP_ERROR_TEXT("Negative offset not allowed"));
   }
 
   if (offset > buf.len) {
-    mp_raise_ValueError("Offset out of bounds");
+    mp_raise_ValueError(MP_ERROR_TEXT("Offset out of bounds"));
   }
 
   uint32_t buffer_space = buf.len - offset;
 
   if (buffer_space < USB_PACKET_LEN) {
-    mp_raise_ValueError("Buffer too small");
+    mp_raise_ValueError(MP_ERROR_TEXT("Buffer too small"));
   }
 
   ssize_t r = usb_webusb_read(o->info.iface_num, &((uint8_t *)buf.buf)[offset],
                               USB_PACKET_LEN);
 
   if (r != USB_PACKET_LEN) {
-    mp_raise_msg(&mp_type_RuntimeError, "Unexpected read length");
+    mp_raise_msg(&mp_type_RuntimeError,
+                 MP_ERROR_TEXT("Unexpected read length"));
   }
 
   return MP_OBJ_NEW_SMALL_INT(r);

@@ -4,11 +4,13 @@ use crate::{
     error::{value_error, Error},
     io::BinaryData,
     micropython::{gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
+    storage,
     strutil::TString,
     translations::TR,
     ui::{
         component::{
             connect::Connect,
+            swipe_detect::SwipeSettings,
             text::{
                 op::OpTextLayout,
                 paragraphs::{
@@ -17,16 +19,17 @@ use crate::{
                 },
                 TextStyle,
             },
-            Border, CachedJpeg, ComponentExt, Empty, FormattedText, Never, Timeout,
+            Border, CachedJpeg, ComponentExt, Empty, FormattedText, MsgMap, Never, Timeout,
         },
-        geometry::{self, Offset},
+        flow::FlowMsg,
+        geometry::{self, Direction, Offset},
         layout::{
             obj::{LayoutMaybeTrace, LayoutObj, RootComponent},
-            util::{PropsList, RecoveryType},
+            util::{ContentType, PropsList, RecoveryType, StrOrBytes},
         },
         ui_firmware::{
             FirmwareUI, ERROR_NOT_IMPLEMENTED, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES,
-            MAX_WORD_QUIZ_ITEMS,
+            MAX_MENU_ITEMS, MAX_WORD_QUIZ_ITEMS,
         },
         ModelUI,
     },
@@ -34,9 +37,10 @@ use crate::{
 
 use super::{
     component::{
-        check_homescreen_format, Bip39Input, CoinJoinProgress, Frame, Homescreen, Lockscreen,
-        MnemonicKeyboard, PinKeyboard, Progress, SelectWordCount, SelectWordCountLayout,
-        Slip39Input, StatusScreen, SwipeContent, SwipeUpScreen, VerticalMenu,
+        check_homescreen_format, Bip39Input, CoinJoinProgress, Frame, FrameMsg, Homescreen,
+        Lockscreen, MnemonicKeyboard, PinKeyboard, Progress, ScrolledVerticalMenu, SelectWordCount,
+        SelectWordCountLayout, Slip39Input, StatusScreen, SwipeContent, SwipeUpScreen, TradeScreen,
+        VerticalMenu, VerticalMenuChoiceMsg, VerticalMenuItem, VerticalMenuItems,
     },
     flow::{
         self, new_confirm_action_simple, ConfirmActionExtra, ConfirmActionMenuStrings,
@@ -58,17 +62,19 @@ impl FirmwareUI for UIDelizia {
         reverse: bool,
         prompt_screen: bool,
         prompt_title: Option<TString<'static>>,
+        external_menu: bool, // TODO: will eventually replace the internal menu
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let flow = flow::confirm_action::new_confirm_action(
             title,
             action,
             description,
             subtitle,
-            verb_cancel,
+            if external_menu { None } else { verb_cancel },
             reverse,
             hold,
             prompt_screen,
             prompt_title.unwrap_or(TString::empty()),
+            external_menu,
         )?;
         Ok(flow)
     }
@@ -83,6 +89,24 @@ impl FirmwareUI for UIDelizia {
     ) -> Result<Gc<LayoutObj>, Error> {
         // confirm_value is used instead
         Err::<Gc<LayoutObj>, Error>(ERROR_NOT_IMPLEMENTED)
+    }
+
+    fn confirm_trade(
+        title: TString<'static>,
+        subtitle: TString<'static>,
+        sell_amount: TString<'static>,
+        buy_amount: TString<'static>,
+        _back_button: bool,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        new_confirm_action_simple(
+            TradeScreen::new(sell_amount, buy_amount),
+            ConfirmActionExtra::ExternalMenu,
+            ConfirmActionStrings::new(title, Some(subtitle), None, None),
+            false,
+            None,
+            0,
+            false,
+        )
     }
 
     fn confirm_value(
@@ -100,8 +124,10 @@ impl FirmwareUI for UIDelizia {
         page_counter: bool,
         prompt_screen: bool,
         cancel: bool,
+        _warning_footer: Option<TString<'static>>,
+        external_menu: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
-        ConfirmValue::new(title, value, description)
+        ConfirmValue::new(title, value.try_into()?, description)
             .with_description_font(&theme::TEXT_SUB_GREY)
             .with_text_mono(is_data)
             .with_subtitle(subtitle)
@@ -117,10 +143,10 @@ impl FirmwareUI for UIDelizia {
             .with_page_counter(page_counter)
             .with_cancel(cancel)
             .with_prompt(prompt_screen)
+            .with_external_menu(external_menu)
             .with_hold(hold)
             .into_flow()
             .and_then(LayoutObj::new_root)
-            .map(Into::into)
     }
 
     fn confirm_value_intro(
@@ -133,21 +159,24 @@ impl FirmwareUI for UIDelizia {
         chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
         const CONFIRM_VALUE_INTRO_MARGIN: usize = 24;
-        ConfirmValue::new(title, value, Some(TR::instructions__view_all_data.into()))
-            .with_verb(verb)
-            .with_verb_info(Some(TR::buttons__view_all_data.into()))
-            .with_description_font(&theme::TEXT_SUB_GREEN_LIME)
-            .with_subtitle(subtitle)
-            .with_verb_cancel(verb_cancel)
-            .with_footer_description(verb)
-            .with_chunkify(chunkify)
-            .with_page_limit(Some(1))
-            .with_classic_ellipsis(true)
-            .with_frame_margin(CONFIRM_VALUE_INTRO_MARGIN)
-            .with_hold(hold)
-            .into_flow()
-            .and_then(LayoutObj::new_root)
-            .map(Into::into)
+        ConfirmValue::new(
+            title,
+            value.try_into()?,
+            Some(TR::instructions__view_all_data.into()),
+        )
+        .with_verb(verb)
+        .with_verb_info(Some(TR::buttons__view_all_data.into()))
+        .with_description_font(&theme::TEXT_SUB_GREEN_LIME)
+        .with_subtitle(subtitle)
+        .with_verb_cancel(verb_cancel)
+        .with_footer_description(verb)
+        .with_chunkify(chunkify)
+        .with_page_limit(Some(1))
+        .with_classic_ellipsis(true)
+        .with_frame_margin(CONFIRM_VALUE_INTRO_MARGIN)
+        .with_hold(hold)
+        .into_flow()
+        .and_then(LayoutObj::new_root)
     }
 
     fn confirm_homescreen(
@@ -224,12 +253,12 @@ impl FirmwareUI for UIDelizia {
         let mut ops = OpTextLayout::new(theme::TEXT_NORMAL);
         for item in IterBuf::new().try_iterate(items)? {
             if item.is_str() {
-                ops = ops.text(TString::try_from(item)?, fonts::FONT_DEMIBOLD)
+                ops.add_text(TString::try_from(item)?, fonts::FONT_DEMIBOLD);
             } else {
                 let [_emphasis, text]: [Obj; 2] = util::iter_into_array(item)?;
                 let text: TString = text.try_into()?;
                 // emphasis not implemented on Delizia
-                ops = ops.text(text, fonts::FONT_DEMIBOLD);
+                ops.add_text(text, fonts::FONT_DEMIBOLD);
             }
         }
 
@@ -358,29 +387,36 @@ impl FirmwareUI for UIDelizia {
     }
 
     fn confirm_summary(
-        amount: TString<'static>,
-        amount_label: TString<'static>,
+        amount: Option<TString<'static>>,
+        amount_label: Option<TString<'static>>,
         fee: TString<'static>,
         fee_label: TString<'static>,
         title: Option<TString<'static>>,
         account_items: Option<Obj>,
+        account_title: Option<TString<'static>>,
         extra_items: Option<Obj>,
         extra_title: Option<TString<'static>>,
         verb_cancel: Option<TString<'static>>,
+        _back_button: bool,
+        _external_menu: bool, // TODO: will eventually replace the internal menu
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut summary_params = ShowInfoParams::new(title.unwrap_or(TString::empty()))
             .with_menu_button()
             .with_swipeup_footer(None);
-        summary_params = unwrap!(summary_params.add(amount_label, amount));
+        if let Some(amount) = amount {
+            if let Some(amount_label) = amount_label {
+                summary_params = unwrap!(summary_params.add(amount_label, amount));
+            }
+        }
         summary_params = unwrap!(summary_params.add(fee_label, fee));
 
         // collect available info
         let account_params = if let Some(items) = account_items {
-            let mut account_params =
-                ShowInfoParams::new(TR::send__send_from.into()).with_cancel_button();
+            let account_title = account_title.unwrap_or(TR::send__send_from.into());
+            let mut account_params = ShowInfoParams::new(account_title).with_cancel_button();
             for pair in IterBuf::new().try_iterate(items)? {
-                let [label, value]: [TString; 2] = util::iter_into_array(pair)?;
-                account_params = unwrap!(account_params.add(label, value));
+                let [key, value, _is_data]: [Obj; 3] = util::iter_into_array(pair)?;
+                account_params = unwrap!(account_params.add(key.try_into()?, value.try_into()?));
             }
             Some(account_params)
         } else {
@@ -390,8 +426,8 @@ impl FirmwareUI for UIDelizia {
             let extra_title = extra_title.unwrap_or(TR::buttons__more_info.into());
             let mut extra_params = ShowInfoParams::new(extra_title).with_cancel_button();
             for pair in IterBuf::new().try_iterate(items)? {
-                let [label, value]: [TString; 2] = util::iter_into_array(pair)?;
-                extra_params = unwrap!(extra_params.add(label, value));
+                let [label, value, _is_data]: [Obj; 3] = util::iter_into_array(pair)?;
+                extra_params = unwrap!(extra_params.add(label.try_into()?, value.try_into()?));
             }
             Some(extra_params)
         } else {
@@ -410,20 +446,18 @@ impl FirmwareUI for UIDelizia {
 
     fn confirm_properties(
         title: TString<'static>,
+        subtitle: Option<TString<'static>>,
         items: Obj,
         hold: bool,
+        _verb: Option<TString<'static>>,
+        _external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let paragraphs = PropsList::new(
-            items,
-            &theme::TEXT_NORMAL,
-            &theme::TEXT_MONO,
-            &theme::TEXT_MONO,
-        )?;
+        let paragraphs = PropsList::new(items)?;
 
         let flow = flow::new_confirm_action_simple(
             paragraphs.into_paragraphs(),
             ConfirmActionExtra::Menu(ConfirmActionMenuStrings::new()),
-            ConfirmActionStrings::new(title, None, None, hold.then_some(title)),
+            ConfirmActionStrings::new(title, subtitle, None, hold.then_some(title)),
             hold,
             None,
             0,
@@ -434,10 +468,12 @@ impl FirmwareUI for UIDelizia {
 
     fn confirm_with_info(
         title: TString<'static>,
+        _subtitle: Option<TString<'static>>,
         items: Obj,
         verb: TString<'static>,
         verb_info: TString<'static>,
         _verb_cancel: Option<TString<'static>>,
+        _external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut paragraphs = ParagraphVecShort::new();
 
@@ -509,8 +545,8 @@ impl FirmwareUI for UIDelizia {
         subtitle: Option<TString<'static>>,
         description: Option<TString<'static>>,
         extra: Option<TString<'static>>,
-        message: Obj,
-        amount: Option<Obj>,
+        message: TString<'static>,
+        amount: Option<TString<'static>>,
         chunkify: bool,
         text_mono: bool,
         account_title: TString<'static>,
@@ -518,8 +554,8 @@ impl FirmwareUI for UIDelizia {
         account_path: Option<TString<'static>>,
         br_code: u16,
         br_name: TString<'static>,
-        address_item: Option<(TString<'static>, Obj)>,
-        extra_item: Option<(TString<'static>, Obj)>,
+        address_item: Option<Obj>,
+        extra_item: Option<Obj>,
         summary_items: Option<Obj>,
         fee_items: Option<Obj>,
         summary_title: Option<TString<'static>>,
@@ -527,19 +563,22 @@ impl FirmwareUI for UIDelizia {
         summary_br_name: Option<TString<'static>>,
         cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let confirm_main =
-            ConfirmValue::new(title.unwrap_or(TString::empty()), message, description)
-                .with_description_font(&theme::TEXT_MAIN_GREY_LIGHT)
-                .with_subtitle(subtitle)
-                .with_extra(extra)
-                .with_extra_font(&theme::TEXT_SUB_GREY)
-                .with_menu_button()
-                .with_swipeup_footer(None)
-                .with_chunkify(chunkify)
-                .with_text_mono(text_mono);
+        let confirm_main = ConfirmValue::new(
+            title.unwrap_or(TString::empty()),
+            message.into(),
+            description,
+        )
+        .with_description_font(&theme::TEXT_MAIN_GREY_LIGHT)
+        .with_subtitle(subtitle)
+        .with_extra(extra)
+        .with_extra_font(&theme::TEXT_SUB_GREY)
+        .with_menu_button()
+        .with_swipeup_footer(None)
+        .with_chunkify(chunkify)
+        .with_text_mono(text_mono);
 
         let confirm_amount = amount.map(|amount| {
-            ConfirmValue::new(TR::words__amount.into(), amount, None)
+            ConfirmValue::new(TR::words__amount.into(), amount.into(), None)
                 .with_subtitle(subtitle)
                 .with_menu_button()
                 .with_swipeup_footer(None)
@@ -547,28 +586,37 @@ impl FirmwareUI for UIDelizia {
                 .with_swipe_down()
         });
 
-        let confirm_address = address_item.map(|(address_title, address)| {
-            ConfirmValue::new(address_title, address, None)
-                .with_cancel_button()
-                .with_chunkify(true)
-                .with_text_mono(true)
-                .with_swipe_right()
+        let confirm_address = address_item.map(|address_item| {
+            let [key, value, _is_data]: [Obj; 3] = unwrap!(util::iter_into_array(address_item));
+            ConfirmValue::new(
+                key.try_into().unwrap_or(TString::empty()),
+                value.try_into().unwrap_or(StrOrBytes::Str("".into())),
+                None,
+            )
+            .with_cancel_button()
+            .with_chunkify(true)
+            .with_text_mono(true)
         });
 
-        let confirm_extra = extra_item.map(|(extra_title, extra)| {
-            ConfirmValue::new(extra_title, extra, None)
-                .with_cancel_button()
-                .with_chunkify(true)
-                .with_text_mono(true)
-                .with_swipe_right()
+        let confirm_extra = extra_item.map(|extra_item| {
+            let [key, value, _is_data]: [Obj; 3] = unwrap!(util::iter_into_array(extra_item));
+            ConfirmValue::new(
+                key.try_into().unwrap_or(TString::empty()),
+                value.try_into().unwrap_or(StrOrBytes::Str("".into())),
+                None,
+            )
+            .with_cancel_button()
+            .with_chunkify(true)
+            .with_text_mono(true)
         });
 
         let mut fee_items_params =
             ShowInfoParams::new(TR::confirm_total__title_fee.into()).with_cancel_button();
         if fee_items.is_some() {
             for pair in IterBuf::new().try_iterate(fee_items.unwrap())? {
-                let [label, value]: [TString; 2] = util::iter_into_array(pair)?;
-                fee_items_params = unwrap!(fee_items_params.add(label, value));
+                let [key, value, _is_data]: [Obj; 3] = util::iter_into_array(pair)?;
+                fee_items_params =
+                    unwrap!(fee_items_params.add(key.try_into()?, value.try_into()?));
             }
         }
 
@@ -578,9 +626,9 @@ impl FirmwareUI for UIDelizia {
                     .with_menu_button()
                     .with_swipeup_footer(None)
                     .with_swipe_down();
-            for pair in IterBuf::new().try_iterate(summary_items.unwrap())? {
-                let [label, value]: [TString; 2] = util::iter_into_array(pair)?;
-                summary = unwrap!(summary.add(label, value));
+            for property in IterBuf::new().try_iterate(summary_items.unwrap())? {
+                let [key, value, _is_data]: [Obj; 3] = util::iter_into_array(property)?;
+                summary = unwrap!(summary.add(key.try_into()?, value.try_into()?));
             }
             Some(summary)
         } else {
@@ -615,32 +663,57 @@ impl FirmwareUI for UIDelizia {
     }
 
     fn flow_get_address(
-        address: Obj,
+        address: TString<'static>,
         title: TString<'static>,
+        _subtitle: Option<TString<'static>>,
         description: Option<TString<'static>>,
-        extra: Option<TString<'static>>,
+        _hint: Option<TString<'static>>,
         chunkify: bool,
         address_qr: TString<'static>,
         case_sensitive: bool,
         account: Option<TString<'static>>,
         path: Option<TString<'static>>,
         xpubs: Obj,
-        title_success: TString<'static>,
         br_code: u16,
         br_name: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let flow = flow::get_address::new_get_address(
+        let flow = flow::receive::new_receive(
             title,
             description,
-            extra,
-            address,
+            ContentType::Address(address),
             chunkify,
             address_qr,
             case_sensitive,
             account,
             path,
             xpubs,
-            title_success,
+            br_code,
+            br_name,
+        )?;
+        Ok(flow)
+    }
+
+    fn flow_get_pubkey(
+        pubkey: TString<'static>,
+        title: TString<'static>,
+        _subtitle: Option<TString<'static>>,
+        _hint: Option<TString<'static>>,
+        pubkey_qr: TString<'static>,
+        account: Option<TString<'static>>,
+        path: Option<TString<'static>>,
+        br_code: u16,
+        br_name: TString<'static>,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        let flow = flow::receive::new_receive(
+            title,
+            None,
+            ContentType::PublicKey(pubkey),
+            false,
+            pubkey_qr,
+            true,
+            account,
+            path,
+            Obj::const_none(),
             br_code,
             br_name,
         )?;
@@ -714,6 +787,16 @@ impl FirmwareUI for UIDelizia {
         Ok(flow)
     }
 
+    fn request_duration(
+        _title: TString<'static>,
+        _duration_ms: u32,
+        _min_ms: u32,
+        _max_ms: u32,
+        _description: Option<TString<'static>>,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+    }
+
     fn request_pin(
         prompt: TString<'static>,
         subprompt: TString<'static>,
@@ -736,6 +819,36 @@ impl FirmwareUI for UIDelizia {
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let flow = flow::request_passphrase::new_request_passphrase()?;
         Ok(flow)
+    }
+
+    fn select_menu(
+        items: heapless::Vec<TString<'static>, MAX_MENU_ITEMS>,
+        mut current: usize,
+        cancel: Option<TString<'static>>,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        let mut menu_items = VerticalMenuItems::new();
+        if let Some(text) = cancel {
+            unwrap!(menu_items.push(VerticalMenuItem::Cancel(text)));
+            current += 1;
+        }
+        for text in items {
+            unwrap!(menu_items.push(VerticalMenuItem::Item(text)));
+        }
+        let menu = ScrolledVerticalMenu::new(menu_items, current);
+        let frame = Frame::left_aligned(TString::empty(), menu).with_cancel_button();
+        let layout = MsgMap::new(frame, move |msg| {
+            let choice = match msg {
+                FrameMsg::Content(VerticalMenuChoiceMsg::Selected(i)) => i,
+                // `FlowMsg::Cancelled` should be sent only if `cancel` is not `None`
+                FrameMsg::Button(_) => return Some(FlowMsg::Confirmed),
+            };
+            Some(match (choice, cancel) {
+                (0, Some(_)) => FlowMsg::Cancelled,
+                (1.., Some(_)) => FlowMsg::Choice(choice - 1),
+                (_, None) => FlowMsg::Choice(choice),
+            })
+        });
+        flow::util::single_page(layout)
     }
 
     fn select_word(
@@ -765,7 +878,16 @@ impl FirmwareUI for UIDelizia {
     }
 
     fn set_brightness(current_brightness: Option<u8>) -> Result<impl LayoutMaybeTrace, Error> {
-        let flow = flow::set_brightness::new_set_brightness(current_brightness)?;
+        let brightness = match current_brightness {
+            Some(value) => {
+                // Set the brightness immediately so it is applied in the `_first_paint` UI
+                // layout function
+                unwrap!(storage::set_brightness(value));
+                value
+            }
+            None => theme::backlight::get_backlight_normal(),
+        };
+        let flow = flow::set_brightness::new_set_brightness(brightness)?;
         Ok(flow)
     }
 
@@ -825,6 +947,7 @@ impl FirmwareUI for UIDelizia {
         title: TString<'static>,
         description: TString<'static>,
         value: TString<'static>,
+        _menu_title: Option<TString<'static>>,
         verb_cancel: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let flow = flow::show_danger::new_show_danger(title, description, value, verb_cancel)?;
@@ -874,13 +997,65 @@ impl FirmwareUI for UIDelizia {
 
     fn show_homescreen(
         label: TString<'static>,
-        hold: bool,
         notification: Option<TString<'static>>,
         notification_level: u8,
+        lockable: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let notification = notification.map(|w| (w, notification_level));
-        let layout = RootComponent::new(Homescreen::new(label, notification, hold)?);
+        let layout = RootComponent::new(Homescreen::new(label, notification, lockable)?);
         Ok(layout)
+    }
+
+    fn show_device_menu(
+        _failed_backup: bool,
+        _firmware_version: TString<'static>,
+        _device_name: TString<'static>,
+        _paired_devices: heapless::Vec<TString<'static>, 1>,
+        _auto_lock_delay: TString<'static>,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
+            c"show_device_menu not supported",
+        ))
+    }
+
+    fn show_pairing_device_name(
+        _device_name: TString<'static>,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
+            c"show_pairing_device_name not supported",
+        ))
+    }
+
+    #[cfg(feature = "ble")]
+    fn show_ble_pairing_code(
+        _title: TString<'static>,
+        _description: TString<'static>,
+        _code: TString<'static>,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
+            c"show_ble_pairing_code not supported",
+        ))
+    }
+
+    fn show_thp_pairing_code(
+        title: TString<'static>,
+        description: TString<'static>,
+        code: TString<'static>,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        Self::confirm_action(
+            title,
+            Some(code),
+            Some(description),
+            None,
+            None,
+            None,
+            false,
+            false,
+            false,
+            false,
+            None,
+            false,
+        )
     }
 
     fn show_info(
@@ -905,7 +1080,7 @@ impl FirmwareUI for UIDelizia {
         let mut paragraphs = ParagraphVecShort::new();
 
         for para in IterBuf::new().try_iterate(items)? {
-            let [key, value]: [Obj; 2] = util::iter_into_array(para)?;
+            let [key, value, _]: [Obj; 3] = util::iter_into_array(para)?;
             let key: TString = key.try_into()?;
             let value: TString = value.try_into()?;
             paragraphs.add(Paragraph::new(&theme::TEXT_SUB_GREY, key).no_break());
@@ -915,7 +1090,7 @@ impl FirmwareUI for UIDelizia {
                     value,
                 ));
             } else {
-                paragraphs.add(Paragraph::new(&theme::TEXT_MONO, value));
+                paragraphs.add(Paragraph::new(&theme::TEXT_MONO_DATA, value));
             }
         }
 
@@ -959,6 +1134,7 @@ impl FirmwareUI for UIDelizia {
         description: TString<'static>,
         indeterminate: bool,
         title: Option<TString<'static>>,
+        _danger: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let (title, description) = if let Some(title) = title {
             (title, description)
@@ -989,21 +1165,50 @@ impl FirmwareUI for UIDelizia {
         Ok(obj)
     }
 
+    fn show_properties(
+        title: TString<'static>,
+        value: Obj,
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        if Obj::is_str(value) {
+            let confirm = ConfirmValue::new(title, value.try_into()?, None)
+                .with_cancel_button()
+                .with_text_mono(true);
+            let layout = confirm.into_layout()?;
+            return flow::util::single_page(layout.map(|_| Some(FlowMsg::Confirmed)));
+        }
+
+        let mut params = ShowInfoParams::new(title).with_cancel_button();
+        for property in IterBuf::new().try_iterate(value)? {
+            let [header, text, _is_data]: [Obj; 3] = util::iter_into_array(property)?;
+            let header = header
+                .try_into_option::<TString>()?
+                .unwrap_or_else(TString::empty);
+            let text = text
+                .try_into_option::<TString>()?
+                .unwrap_or_else(TString::empty);
+            params = unwrap!(params.add(header, text));
+        }
+        let layout = params.into_layout()?;
+        flow::util::single_page(layout.map(|_| Some(FlowMsg::Confirmed)))
+    }
+
     fn show_share_words(
         _words: heapless::Vec<TString<'static>, 33>,
         _title: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"use show_share_words_delizia instead",
+            c"use show_share_words_extended instead",
         ))
     }
 
-    fn show_share_words_delizia(
+    fn show_share_words_extended(
         words: heapless::Vec<TString<'static>, 33>,
         subtitle: Option<TString<'static>>,
         instructions: Obj,
+        _instructions_verb: Option<TString<'static>>,
         text_footer: Option<TString<'static>>,
         text_confirm: TString<'static>,
+        text_check: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut instructions_paragraphs = ParagraphVecShort::new();
         for item in IterBuf::new().try_iterate(instructions)? {
@@ -1017,6 +1222,7 @@ impl FirmwareUI for UIDelizia {
             instructions_paragraphs,
             text_footer,
             text_confirm,
+            text_check,
         )?;
         Ok(flow)
     }
@@ -1040,24 +1246,34 @@ impl FirmwareUI for UIDelizia {
 
     fn show_success(
         title: TString<'static>,
-        _button: TString<'static>,
+        button: TString<'static>,
         description: TString<'static>,
         _allow_cancel: bool,
-        _time_ms: u32,
+        time_ms: u32,
     ) -> Result<Gc<LayoutObj>, Error> {
+        let instruction = if button.is_empty() {
+            TR::instructions__tap_to_continue.into()
+        } else {
+            button
+        };
         // description used in the Footer
         let description = if description.is_empty() {
             None
         } else {
             Some(description)
         };
-        let content = StatusScreen::new_success(title);
+        let content = if time_ms > 0 {
+            StatusScreen::new_success_timeout(title, time_ms)
+        } else {
+            StatusScreen::new_success(title)
+        };
         let layout = LayoutObj::new(SwipeUpScreen::new(
             Frame::left_aligned(
                 TR::words__title_success.into(),
                 SwipeContent::new(content).with_no_attach_anim(),
             )
-            .with_swipeup_footer(description)
+            .with_footer(instruction, description)
+            .with_swipe(Direction::Up, SwipeSettings::default())
             .with_result_icon(theme::ICON_BULLET_CHECKMARK, theme::GREEN_LIGHT),
         ))?;
         Ok(layout)
@@ -1092,16 +1308,14 @@ impl FirmwareUI for UIDelizia {
         ])
         .into_paragraphs();
 
-        let frame =
-            Frame::left_aligned(title, SwipeContent::new(content)).with_swipeup_footer(action);
-
-        let frame_with_icon = if danger {
-            frame.with_danger_icon()
+        let frame = Frame::left_aligned(title, SwipeContent::new(content));
+        let frame = if danger {
+            frame.with_danger_icon().with_tap_footer(action)
         } else {
-            frame.with_warning_low_icon()
+            frame.with_warning_low_icon().with_swipeup_footer(action)
         };
 
-        let layout = LayoutObj::new(SwipeUpScreen::new(frame_with_icon))?;
+        let layout = LayoutObj::new(SwipeUpScreen::new(frame))?;
         Ok(layout)
     }
 

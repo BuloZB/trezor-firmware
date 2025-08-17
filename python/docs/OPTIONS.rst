@@ -38,7 +38,7 @@ on one page here.
 
   Commands:
     benchmark          Benchmark commands.
-    binance            Binance Chain commands.
+    ble                BLE commands.
     btc                Bitcoin and Bitcoin-like coins commands.
     cardano            Cardano commands.
     clear-session      Clear session (remove cached PIN, passphrase, etc.).
@@ -54,6 +54,7 @@ on one page here.
     list               List connected Trezor devices.
     monero             Monero commands.
     nem                NEM commands.
+    nostr              Nostr commands.
     ping               Send ping message.
     ripple             Ripple commands.
     set                Device settings.
@@ -84,26 +85,24 @@ Benchmark commands.
     list-names  List names of all supported benchmarks
     run         Run benchmark
 
-Binance Chain commands.
-~~~~~~~~~~~~~~~~~~~~~~~
+BLE commands.
+~~~~~~~~~~~~~
 
 .. code::
 
-  trezorctl binance --help
+  trezorctl ble --help
 
 .. code::
 
-  Usage: trezorctl binance [OPTIONS] COMMAND [ARGS]...
+  Usage: trezorctl ble [OPTIONS] COMMAND [ARGS]...
 
-    Binance Chain commands.
+    BLE commands.
 
   Options:
     --help  Show this message and exit.
 
   Commands:
-    get-address     Get Binance address for specified path.
-    get-public-key  Get Binance public key.
-    sign-tx         Sign Binance transaction.
+    unpair  Erase bond of currently connected device, or all devices (on device side)
 
 Bitcoin and Bitcoin-like coins commands.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -192,7 +191,6 @@ Miscellaneous debug features.
     optiga-set-sec-max  Set Optiga's security event counter to maximum.
     prodtest-t1         Perform a prodtest on Model One.
     record              Record screen changes into a specified directory.
-    send-bytes          Send raw bytes to Trezor.
 
 Device management commands - setup, recover seed, wipe, etc.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -367,6 +365,26 @@ NEM commands.
   Commands:
     get-address  Get NEM address for specified path.
     sign-tx      Sign (and optionally broadcast) NEM transaction.
+
+Nostr commands.
+~~~~~~~~~~~~~~~
+
+.. code::
+
+  trezorctl nostr --help
+
+.. code::
+
+  Usage: trezorctl nostr [OPTIONS] COMMAND [ARGS]...
+
+    Nostr commands.
+
+  Options:
+    --help  Show this message and exit.
+
+  Commands:
+    get-pubkey  Return the pubkey derived by the given path.
+    sign-event  Sign an event using the key derived by the given path.
 
 Ripple commands.
 ~~~~~~~~~~~~~~~~

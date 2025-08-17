@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef SYSCALL_DISPATCH
+#ifdef KERNEL
 
 #include <trezor_rtl.h>
 
@@ -27,12 +27,10 @@
 #include <io/usb_hid.h>
 #include <io/usb_vcp.h>
 #include <io/usb_webusb.h>
-#include <sec/entropy.h>
 #include <sec/rng.h>
 #include <sec/secret.h>
 #include <sys/bootutils.h>
 #include <sys/irq.h>
-#include <sys/mpu.h>
 #include <sys/sysevent.h>
 #include <sys/systask.h>
 #include <sys/system.h>
@@ -43,6 +41,10 @@
 
 #ifdef USE_BLE
 #include <io/ble.h>
+#endif
+
+#ifdef USE_NRF
+#include <io/nrf.h>
 #endif
 
 #ifdef USE_BUTTON
@@ -61,8 +63,8 @@
 #include <sec/optiga.h>
 #endif
 
-#ifdef USE_POWERCTL
-#include <sys/powerctl.h>
+#ifdef USE_POWER_MANAGER
+#include <sys/power_manager.h>
 #endif
 
 #ifdef USE_RGB_LED
@@ -77,35 +79,26 @@
 #include <io/touch.h>
 #endif
 
+#if PRODUCTION || BOOTLOADER_QA
+#include <util/boot_image.h>
+#endif
+
+#include "syscall_context.h"
 #include "syscall_internal.h"
 #include "syscall_verifiers.h"
 
-bool g_in_app_callback = false;
-
-static PIN_UI_WAIT_CALLBACK storage_init_callback = NULL;
-
-static secbool storage_init_callback_wrapper(
-    uint32_t wait, uint32_t progress, enum storage_ui_message_t message) {
-  secbool result;
-  g_in_app_callback = true;
-  result = invoke_app_callback(wait, progress, message, storage_init_callback);
-  g_in_app_callback = false;
-  return result;
-}
-
-static firmware_hash_callback_t firmware_hash_callback = NULL;
-
-static void firmware_hash_callback_wrapper(void *context, uint32_t progress,
-                                           uint32_t total) {
-  g_in_app_callback = true;
-  invoke_app_callback((uint32_t)context, progress, total,
-                      firmware_hash_callback);
-  g_in_app_callback = false;
-}
-
 __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
-                                                       uint32_t syscall) {
+                                                       uint32_t syscall,
+                                                       void *applet) {
+  syscall_set_context((applet_t *)applet);
+
   switch (syscall) {
+    case SYSCALL_RETURN_FROM_CALLBACK: {
+      syscall_get_context()->task.in_callback = false;
+      systask_yield_to(systask_kernel());
+      break;
+    }
+
     case SYSCALL_SYSTEM_EXIT: {
       int exit_code = (int)args[0];
       system_exit__verified(exit_code);
@@ -158,9 +151,19 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       const sysevents_t *awaited = (sysevents_t *)args[0];
       sysevents_t *signalled = (sysevents_t *)args[1];
       uint32_t deadline = args[2];
-      if (!g_in_app_callback) {
+      if (!syscall_get_context()->task.in_callback) {
         sysevents_poll__verified(awaited, signalled, deadline);
       }
+    } break;
+
+    case SYSCALL_BOOT_IMAGE_CHECK: {
+      const boot_image_t *image = (const boot_image_t *)args[0];
+      args[0] = boot_image_check__verified(image);
+    } break;
+
+    case SYSCALL_BOOT_IMAGE_REPLACE: {
+      const boot_image_t *image = (const boot_image_t *)args[0];
+      boot_image_replace__verified(image);
     } break;
 
     case SYSCALL_REBOOT_DEVICE: {
@@ -431,9 +434,11 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       unit_properties_get__verified(props);
     } break;
 
+#ifdef LOCKABLE_BOOTLOADER
     case SYSCALL_SECRET_BOOTLOADER_LOCKED: {
       args[0] = secret_bootloader_locked();
     } break;
+#endif
 
 #ifdef USE_BUTTON
     case SYSCALL_BUTTON_GET_EVENT: {
@@ -527,26 +532,20 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
 #endif
 #endif
 
-    case SYSCALL_STORAGE_INIT: {
-      storage_init_callback = (PIN_UI_WAIT_CALLBACK)args[0];
-      const uint8_t *salt = (const uint8_t *)args[1];
-      uint16_t salt_len = args[2];
-      mpu_reconfig(MPU_MODE_STORAGE);
-      storage_init__verified(storage_init_callback_wrapper, salt, salt_len);
+    case SYSCALL_STORAGE_SETUP: {
+      PIN_UI_WAIT_CALLBACK callback = (PIN_UI_WAIT_CALLBACK)args[0];
+      storage_setup__verified(callback);
     } break;
 
     case SYSCALL_STORAGE_WIPE: {
-      mpu_reconfig(MPU_MODE_STORAGE);
       storage_wipe();
     } break;
 
     case SYSCALL_STORAGE_IS_UNLOCKED: {
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_is_unlocked();
     } break;
 
     case SYSCALL_STORAGE_LOCK: {
-      mpu_reconfig(MPU_MODE_STORAGE);
       storage_lock();
     } break;
 
@@ -554,22 +553,18 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       const uint8_t *pin = (const uint8_t *)args[0];
       size_t pin_len = args[1];
       const uint8_t *ext_salt = (const uint8_t *)args[2];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_unlock__verified(pin, pin_len, ext_salt);
     } break;
 
     case SYSCALL_STORAGE_HAS_PIN: {
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_has_pin();
     } break;
 
     case SYSCALL_STORAGE_PIN_FAILS_INCREASE: {
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_pin_fails_increase();
     } break;
 
     case SYSCALL_STORAGE_GET_PIN_REM: {
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_get_pin_rem();
     } break;
 
@@ -580,7 +575,6 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       size_t newpin_len = args[3];
       const uint8_t *old_ext_salt = (const uint8_t *)args[4];
       const uint8_t *new_ext_salt = (const uint8_t *)args[5];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_change_pin__verified(
           oldpin, oldpin_len, newpin, newpin_len, old_ext_salt, new_ext_salt);
     } break;
@@ -588,12 +582,10 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
     case SYSCALL_STORAGE_ENSURE_NOT_WIPE_CODE: {
       const uint8_t *pin = (const uint8_t *)args[0];
       size_t pin_len = args[1];
-      mpu_reconfig(MPU_MODE_STORAGE);
       storage_ensure_not_wipe_code__verified(pin, pin_len);
     } break;
 
     case SYSCALL_STORAGE_HAS_WIPE_CODE: {
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_has_wipe_code();
     } break;
 
@@ -603,14 +595,12 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       const uint8_t *ext_salt = (const uint8_t *)args[2];
       const uint8_t *wipe_code = (const uint8_t *)args[3];
       size_t wipe_code_len = args[4];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_change_wipe_code__verified(pin, pin_len, ext_salt,
                                                    wipe_code, wipe_code_len);
     } break;
 
     case SYSCALL_STORAGE_HAS: {
       uint16_t key = (uint16_t)args[0];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_has(key);
     } break;
 
@@ -619,7 +609,6 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       void *val = (void *)args[1];
       uint16_t max_len = (uint16_t)args[2];
       uint16_t *len = (uint16_t *)args[3];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_get__verified(key, val, max_len, len);
     } break;
 
@@ -627,33 +616,24 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       uint16_t key = (uint16_t)args[0];
       const void *val = (const void *)args[1];
       uint16_t len = (uint16_t)args[2];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_set__verified(key, val, len);
     } break;
 
     case SYSCALL_STORAGE_DELETE: {
       uint16_t key = (uint16_t)args[0];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_delete(key);
     } break;
 
     case SYSCALL_STORAGE_SET_COUNTER: {
       uint16_t key = (uint16_t)args[0];
       uint32_t count = args[1];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_set_counter(key, count);
     } break;
 
     case SYSCALL_STORAGE_NEXT_COUNTER: {
       uint16_t key = (uint16_t)args[0];
       uint32_t *count = (uint32_t *)args[1];
-      mpu_reconfig(MPU_MODE_STORAGE);
       args[0] = storage_next_counter__verified(key, count);
-    } break;
-
-    case SYSCALL_ENTROPY_GET: {
-      uint8_t *buf = (uint8_t *)args[0];
-      entropy_get__verified(buf);
     } break;
 
     case SYSCALL_TRANSLATIONS_WRITE: {
@@ -687,17 +667,16 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       args[0] = firmware_get_vendor__verified(buff, buff_size);
     } break;
 
-    case SYSCALL_FIRMWARE_CALC_HASH: {
+    case SYSCALL_FIRMWARE_HASH_START: {
       const uint8_t *challenge = (const uint8_t *)args[0];
       size_t challenge_len = args[1];
-      uint8_t *hash = (uint8_t *)args[2];
-      size_t hash_len = args[3];
-      firmware_hash_callback = (firmware_hash_callback_t)args[4];
-      void *callback_context = (void *)args[5];
+      args[0] = firmware_hash_start__verified(challenge, challenge_len);
+    } break;
 
-      args[0] = firmware_calc_hash__verified(
-          challenge, challenge_len, hash, hash_len,
-          firmware_hash_callback_wrapper, callback_context);
+    case SYSCALL_FIRMWARE_HASH_CONTINUE: {
+      uint8_t *hash = (uint8_t *)args[0];
+      size_t hash_len = args[1];
+      args[0] = firmware_hash_continue__verified(hash, hash_len);
     } break;
 
 #ifdef USE_BLE
@@ -739,21 +718,49 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       size_t len = args[1];
       args[0] = ble_read__verified(data, len);
     } break;
+
+    case SYSCALL_BLE_SET_NAME: {
+      const uint8_t *name = (const uint8_t *)args[0];
+      size_t len = args[1];
+      ble_set_name__verified(name, len);
+    } break;
 #endif
 
-#ifdef USE_POWERCTL
-    case SYSCALL_POWERCTL_SUSPEND: {
-      powerctl_suspend();
+#ifdef USE_NRF
+
+    case SYSCALL_NRF_UPDATE_REQUIRED: {
+      const uint8_t *data = (const uint8_t *)args[0];
+      size_t len = args[1];
+      args[0] = nrf_update_required__verified(data, len);
     } break;
 
-    case SYSCALL_POWERCTL_HIBERNATE: {
-      args[0] = powerctl_hibernate();
-    }
+    case SYSCALL_NRF_UPDATE: {
+      const uint8_t *data = (const uint8_t *)args[0];
+      size_t len = args[1];
+      args[0] = nrf_update__verified(data, len);
+    } break;
 
-    case SYSCALL_POWERCTL_GET_STATUS: {
-      powerctl_status_t *status = (powerctl_status_t *)args[0];
-      args[0] = powerctl_get_status__verified(status);
-    }
+#endif
+
+#ifdef USE_POWER_MANAGER
+    case SYSCALL_POWER_MANAGER_SUSPEND: {
+      wakeup_flags_t *wakeup_flags = (wakeup_flags_t *)args[0];
+      args[0] = pm_suspend__verified(wakeup_flags);
+    } break;
+
+    case SYSCALL_POWER_MANAGER_HIBERNATE: {
+      args[0] = pm_hibernate();
+    } break;
+
+    case SYSCALL_POWER_MANAGER_GET_STATE: {
+      pm_state_t *status = (pm_state_t *)args[0];
+      args[0] = pm_get_state__verified(status);
+    } break;
+
+    case SYSCALL_POWER_MANAGER_GET_EVENTS: {
+      pm_event_t *status = (pm_event_t *)args[0];
+      args[0] = pm_get_events__verified(status);
+    } break;
 #endif
 
 #ifdef USE_HW_JPEG_DECODER
@@ -885,4 +892,4 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
   }
 }
 
-#endif  // SYSCALL_DISPATCH
+#endif  // KERNEL

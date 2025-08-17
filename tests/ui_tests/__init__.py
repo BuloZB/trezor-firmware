@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import logging
 import shutil
+import time
+import typing as t
 from contextlib import contextmanager
-from typing import Callable, Generator
 
 import pytest
 from _pytest.nodes import Node
 from _pytest.outcomes import Failed
+from noise.exceptions import NoiseInvalidMessage
 
+from trezorlib.client import ProtocolVersion
 from trezorlib.debuglink import TrezorClientDebugLink as Client
+from trezorlib.exceptions import ThpError
+from trezorlib.transport import Timeout
+
+LOG = logging.getLogger(__name__)
 
 from . import common
 from .common import SCREENS_DIR, UI_TESTS_DIR, TestCase, TestResult
@@ -37,8 +45,10 @@ def _process_tested(result: TestResult, item: Node) -> None:
 
 @contextmanager
 def screen_recording(
-    client: Client, request: pytest.FixtureRequest
-) -> Generator[None, None, None]:
+    client: Client,
+    request: pytest.FixtureRequest,
+    client_callback: t.Callable[[], Client] | None = None,
+) -> t.Generator[None, None, None]:
     test_ui = request.config.getoption("ui")
     if not test_ui:
         yield
@@ -51,16 +61,34 @@ def screen_recording(
     shutil.rmtree(testcase.actual_dir, ignore_errors=True)
     testcase.actual_dir.mkdir()
 
+    if client.protocol_version is ProtocolVersion.V2:
+        # In case of an event loop restart, it's possible that the first
+        # packet(s) of `DebugLinkRecordScreen` will be lost, resulting in
+        # `TrezorFailure: FirmwareError: Invalid magic` error responses
+        # during test setup.
+        # This issue will be resolved as part of THP event loop restart refactoring,
+        # but till then let's wait a bit here, to reduce the packet loss probability.
+        # TODO: remove after THP event loop restart refactoring
+        time.sleep(0.1)
     try:
         client.debug.start_recording(str(testcase.actual_dir))
         yield
     finally:
-        client.ensure_open()
+        if client_callback:
+            client = client_callback()
         client.sync_responses()
         # Wait for response to Initialize, which gives the emulator time to catch up
         # and redraw the homescreen. Otherwise there's a race condition between that
         # and stopping recording.
-        client.init_device()
+
+        # Instead of client.init_device() we create a new management session
+        # `Ping` is sent to make sure the device is available.
+        try:
+            client.get_seedless_session().ping(message="", timeout=1)
+        except (ThpError, NoiseInvalidMessage, Timeout):
+            # Do not raise for unsuccessful ping
+            LOG.exception("Ping failed")
+            pass
         client.debug.stop_recording()
 
     result = testcase.build_result(request)
@@ -110,7 +138,7 @@ def _should_write_ui_report(exitstatus: pytest.ExitCode) -> bool:
 
 
 def terminal_summary(
-    println: Callable[[str], None],
+    println: t.Callable[[str], None],
     ui_option: str,
     check_missing: bool,
     exitstatus: pytest.ExitCode,
