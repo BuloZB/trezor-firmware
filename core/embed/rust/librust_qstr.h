@@ -30,6 +30,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_DONE;
   MP_QSTR_DeviceDisconnect;
   MP_QSTR_DeviceMenuResult;
+  MP_QSTR_DeviceName;
   MP_QSTR_DevicePair;
   MP_QSTR_INFO;
   MP_QSTR_INITIAL;
@@ -97,6 +98,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_address_label;
   MP_QSTR_address_qr;
   MP_QSTR_allow_cancel;
+  MP_QSTR_allow_empty;
   MP_QSTR_allow_pairing;
   MP_QSTR_amount;
   MP_QSTR_amount_change;
@@ -266,6 +268,8 @@ static void _librust_qstrs(void) {
   MP_QSTR_details_title;
   MP_QSTR_device_name;
   MP_QSTR_device_name__change_template;
+  MP_QSTR_device_name__continue_with_empty_label;
+  MP_QSTR_device_name__enter;
   MP_QSTR_device_name__title;
   MP_QSTR_disable_animation;
   MP_QSTR_disconnect;
@@ -480,6 +484,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_plurals__x_groups_needed;
   MP_QSTR_plurals__x_shares_needed;
   MP_QSTR_pm_event;
+  MP_QSTR_prefill;
   MP_QSTR_prefill_word;
   MP_QSTR_progress__authenticity_check;
   MP_QSTR_progress__done;
@@ -494,6 +499,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_progress_event;
   MP_QSTR_prompt;
   MP_QSTR_prompt_backup;
+  MP_QSTR_prompt_empty;
   MP_QSTR_prompt_screen;
   MP_QSTR_prompt_title;
   MP_QSTR_pubkey;
@@ -556,6 +562,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_recovery__x_of_y_entered_template;
   MP_QSTR_recovery__you_have_entered;
   MP_QSTR_recovery_type;
+  MP_QSTR_regulatory_certification__title;
   MP_QSTR_reject_pairing;
   MP_QSTR_remaining_shares;
   MP_QSTR_request_bip39;
@@ -565,6 +572,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_request_passphrase;
   MP_QSTR_request_pin;
   MP_QSTR_request_slip39;
+  MP_QSTR_request_string;
   MP_QSTR_reset__advanced_group_threshold_info;
   MP_QSTR_reset__all_x_of_y_template;
   MP_QSTR_reset__any_x_of_y_template;
@@ -812,6 +820,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_tutorial__suite_restart;
   MP_QSTR_tutorial__sure_you_want_skip;
   MP_QSTR_tutorial__swipe_up_and_down;
+  MP_QSTR_tutorial__tap_to_start;
   MP_QSTR_tutorial__title_easy_navigation;
   MP_QSTR_tutorial__title_handy_menu;
   MP_QSTR_tutorial__title_hello;
@@ -821,10 +830,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_tutorial__title_skip;
   MP_QSTR_tutorial__title_tutorial_complete;
   MP_QSTR_tutorial__title_well_done;
-  MP_QSTR_tutorial__tropic;
-  MP_QSTR_tutorial__tropic_info1;
-  MP_QSTR_tutorial__tropic_info2;
-  MP_QSTR_tutorial__tropic_info3;
+  MP_QSTR_tutorial__tropic_info;
   MP_QSTR_tutorial__use_trezor;
   MP_QSTR_tutorial__welcome_press_right;
   MP_QSTR_tutorial__welcome_safe5;
@@ -894,6 +900,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__keep_it_safe;
   MP_QSTR_words__know_what_your_doing;
   MP_QSTR_words__my_trezor;
+  MP_QSTR_words__name;
   MP_QSTR_words__no;
   MP_QSTR_words__not_recommended;
   MP_QSTR_words__operation_cancelled;
@@ -1278,9 +1285,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_stellar__clear_flags;
   MP_QSTR_stellar__confirm_issuer;
   MP_QSTR_stellar__confirm_memo;
-  MP_QSTR_stellar__confirm_network;
   MP_QSTR_stellar__confirm_operation;
-  MP_QSTR_stellar__confirm_stellar;
   MP_QSTR_stellar__confirm_timebounds;
   MP_QSTR_stellar__create_account;
   MP_QSTR_stellar__debited_amount;
@@ -1294,8 +1299,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_stellar__high;
   MP_QSTR_stellar__home_domain;
   MP_QSTR_stellar__inflation;
-  MP_QSTR_stellar__initial_balance;
-  MP_QSTR_stellar__initialize_signing_with;
   MP_QSTR_stellar__issuer_template;
   MP_QSTR_stellar__key;
   MP_QSTR_stellar__limit;
@@ -1306,14 +1309,12 @@ static void _librust_qstrs(void) {
   MP_QSTR_stellar__new_passive_offer;
   MP_QSTR_stellar__no_memo_set;
   MP_QSTR_stellar__no_restriction;
-  MP_QSTR_stellar__on_network_template;
   MP_QSTR_stellar__path_pay;
   MP_QSTR_stellar__path_pay_at_least;
   MP_QSTR_stellar__pay;
   MP_QSTR_stellar__pay_at_most;
   MP_QSTR_stellar__preauth_transaction;
   MP_QSTR_stellar__price_per_template;
-  MP_QSTR_stellar__private_network;
   MP_QSTR_stellar__remove_signer;
   MP_QSTR_stellar__revoke_trust;
   MP_QSTR_stellar__selling;
@@ -1322,15 +1323,18 @@ static void _librust_qstrs(void) {
   MP_QSTR_stellar__set_sequence_to_template;
   MP_QSTR_stellar__sign_tx_count_template;
   MP_QSTR_stellar__sign_tx_fee_template;
+  MP_QSTR_stellar__sign_with;
   MP_QSTR_stellar__source_account;
-  MP_QSTR_stellar__testnet_network;
+  MP_QSTR_stellar__timebounds;
+  MP_QSTR_stellar__token_info;
+  MP_QSTR_stellar__transaction_source;
+  MP_QSTR_stellar__transaction_source_diff_warning;
   MP_QSTR_stellar__trusted_account;
   MP_QSTR_stellar__update;
   MP_QSTR_stellar__valid_from;
   MP_QSTR_stellar__valid_to;
   MP_QSTR_stellar__value_sha256;
   MP_QSTR_stellar__wanna_clean_value_key_template;
-  MP_QSTR_stellar__your_account;
   MP_QSTR_tezos__baker_address;
   MP_QSTR_tezos__balance;
   MP_QSTR_tezos__ballot;

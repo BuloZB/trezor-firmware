@@ -30,6 +30,9 @@ ACK_MESSAGE = const(0x20)
 CHANNEL_ALLOCATION_REQ = const(0x40)
 _CHANNEL_ALLOCATION_RES = const(0x41)
 _ERROR = const(0x42)
+PING = const(0x43)
+_PONG = const(0x44)
+
 CONTINUATION_PACKET = const(0x80)
 
 
@@ -41,15 +44,7 @@ class ThpDecryptionError(ThpError):
     pass
 
 
-class ThpInvalidDataError(ThpError):
-    pass
-
-
 class ThpDeviceLockedError(ThpError):
-    pass
-
-
-class ThpUnallocatedChannelError(ThpError):
     pass
 
 
@@ -168,6 +163,13 @@ class PacketHeader:
         """
         return cls(_CHANNEL_ALLOCATION_RES, BROADCAST_CHANNEL_ID, length)
 
+    @classmethod
+    def get_pong_header(cls, length: int) -> Self:
+        """
+        Returns header for pong message.
+        """
+        return cls(_PONG, BROADCAST_CHANNEL_ID, length)
+
 
 _DEFAULT_ENABLED_PAIRING_METHODS = [
     ThpPairingMethod.CodeEntry,
@@ -190,11 +192,15 @@ def get_enabled_pairing_methods(
 
 
 def _get_device_properties(iface: WireInterface) -> ThpDeviceProperties:
-    # TODO define model variants
+    model_variant = (
+        (utils.unit_color() or 0)
+        | (int(utils.unit_btconly() or False) << 8)
+        | ((utils.unit_packaging() or 0) << 16)
+    )
     return ThpDeviceProperties(
         pairing_methods=get_enabled_pairing_methods(iface),
         internal_model=utils.INTERNAL_MODEL,
-        model_variant=None,
+        model_variant=model_variant,
         protocol_version_major=2,
         protocol_version_minor=0,
     )

@@ -37,6 +37,8 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_SESSION_ID: int = 0
 
+MAX_RETRANSMISSION_COUNT = 50
+
 if t.TYPE_CHECKING:
     pass
 MT = t.TypeVar("MT", bound=protobuf.MessageType)
@@ -66,10 +68,11 @@ class ProtocolV2Channel(Channel):
         prepare_channel_without_pairing: bool = True,
     ) -> None:
         super().__init__(transport, mapping)
+        self._reset_sync_bits()
         if prepare_channel_without_pairing:
-            self.trezor_state = self.prepare_channel_without_pairing(
-                credential=credential
-            )
+            # allow skipping unrelated response packets (e.g. in case of retransmissions)
+            self._do_channel_allocation(retries=MAX_RETRANSMISSION_COUNT)
+            self.trezor_state = self._do_handshake(credential=credential)
 
     def get_channel(self) -> ProtocolV2Channel:
         if not self._has_valid_channel:
@@ -125,15 +128,26 @@ class ProtocolV2Channel(Channel):
         assert isinstance(msg, message_type)
         return msg
 
-    def prepare_channel_without_pairing(self, credential: bytes | None = None) -> int:
-        self._reset_sync_bits()
-        # allow skipping unrelated response packets (e.g. in case of retransmissions)
-        self._do_channel_allocation(retries=50)
-        return self._do_handshake(credential=credential)
-
     def _reset_sync_bits(self) -> None:
         self.sync_bit_send = 0
         self.sync_bit_receive = 0
+
+    def sync_responses(
+        self, retries: int = MAX_RETRANSMISSION_COUNT, timeout: float = 10.0
+    ) -> None:
+        """Make sure the event loop is running and ready."""
+        nonce = os.urandom(8)
+        thp_io.write_payload_to_wire_and_add_checksum(
+            self.transport,
+            MessageHeader.get_ping_header(len(nonce) + CHECKSUM_LENGTH),
+            nonce,
+        )
+        for _ in range(1 + retries):
+            header, payload = self._read_until_valid_crc_check(timeout=timeout)
+            if self._is_valid_pong(header, payload, nonce):
+                break
+        else:
+            raise RuntimeError("Invalid ping response")
 
     def _do_channel_allocation(self, retries: int = 0) -> None:
         channel_allocation_nonce = os.urandom(8)
@@ -147,7 +161,9 @@ class ProtocolV2Channel(Channel):
     def _send_channel_allocation_request(self, nonce: bytes):
         thp_io.write_payload_to_wire_and_add_checksum(
             self.transport,
-            MessageHeader.get_channel_allocation_request_header(12),
+            MessageHeader.get_channel_allocation_request_header(
+                len(nonce) + CHECKSUM_LENGTH
+            ),
             nonce,
         )
 
@@ -329,13 +345,15 @@ class ProtocolV2Channel(Channel):
                     + ")"
                 )
 
+            seq_bit = control_byte.get_seq_bit(header.ctrl_byte)
+            assert seq_bit is not None
             LOG.debug(
                 "--> Get sequence bit %d %s %s",
-                control_byte.get_seq_bit(header.ctrl_byte),
+                seq_bit,
                 "from control byte",
                 hexlify(header.ctrl_byte.to_bytes(1, "big")).decode(),
             )
-            self._send_ack_bit(bit=control_byte.get_seq_bit(header.ctrl_byte))
+            self._send_ack_bit(bit=seq_bit)
 
             message = self._noise.decrypt(bytes(raw_payload))
             session_id = message[0]
@@ -353,18 +371,28 @@ class ProtocolV2Channel(Channel):
         if timeout is None:
             timeout = self._DEFAULT_READ_TIMEOUT
 
-        is_valid = False
-        header, payload, chksum = thp_io.read(self.transport, timeout)
-        while not is_valid:
-            is_valid = checksum.is_valid(chksum, header.to_bytes_init() + payload)
-            if not is_valid:
+        while True:
+            header, payload, chksum = thp_io.read(self.transport, timeout)
+            if not checksum.is_valid(chksum, header.to_bytes_init() + payload):
                 LOG.error(
                     "Received a message with an invalid checksum:"
                     + hexlify(header.to_bytes_init() + payload + chksum).decode()
                 )
-                header, payload, chksum = thp_io.read(self.transport, timeout)
+                continue
 
-        return header, payload
+            seq_bit = control_byte.get_seq_bit(header.ctrl_byte)
+            if seq_bit is not None:
+                if seq_bit != self.sync_bit_receive:
+                    LOG.warning(
+                        "Received unexpected message: sync bit=%d, expected=%d",
+                        seq_bit,
+                        self.sync_bit_receive,
+                    )
+                    continue
+
+                self.sync_bit_receive = 1 - self.sync_bit_receive
+
+            return header, payload
 
     def _is_valid_channel_allocation_response(
         self, header: MessageHeader, payload: bytes, original_nonce: bytes
@@ -377,6 +405,17 @@ class ProtocolV2Channel(Channel):
             return False
         if payload[:8] != original_nonce:
             LOG.error("Invalid channel allocation response payload (nonce mismatch)")
+            return False
+        return True
+
+    def _is_valid_pong(
+        self, header: MessageHeader, payload: bytes, original_nonce: bytes
+    ) -> bool:
+        if not header.is_pong():
+            LOG.error("Received message is not a pong")
+            return False
+        if payload != original_nonce:
+            LOG.error("Invalid pong payload (nonce mismatch)")
             return False
         return True
 

@@ -307,6 +307,9 @@ class TrezorConnection:
             sys.exit(1)
         except exceptions.FailedSessionResumption:
             sys.exit(1)
+        except exceptions.DerivationOnUninitaizedDeviceError:
+            click.echo("Device is not initialized.")
+            sys.exit(1)
         except Exception:
             click.echo("Failed to find a Trezor device.")
             if self.path is not None:
@@ -360,7 +363,11 @@ def with_session(
                     return func(session, *args, **kwargs)
 
                 finally:
-                    if not is_resume_mandatory and not session.features.bootloader_mode:
+                    if (
+                        not is_resume_mandatory
+                        and not session.features.bootloader_mode
+                        and not session.client.is_invalidated
+                    ):
                         session.end()
 
         return function_with_session

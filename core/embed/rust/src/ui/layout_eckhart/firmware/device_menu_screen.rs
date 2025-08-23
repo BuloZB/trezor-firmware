@@ -24,8 +24,8 @@ use super::{
         component::{Button, ButtonStyleSheet, FuelGauge},
         constant::SCREEN,
         firmware::{
-            Header, HeaderMsg, TextScreen, TextScreenMsg, VerticalMenu, VerticalMenuScreen,
-            VerticalMenuScreenMsg, SHORT_MENU_ITEMS,
+            Header, HeaderMsg, RegulatoryMsg, RegulatoryScreen, TextScreen, TextScreenMsg,
+            VerticalMenu, VerticalMenuScreen, VerticalMenuScreenMsg, SHORT_MENU_ITEMS,
         },
     },
     theme, ShortMenuVec,
@@ -33,7 +33,7 @@ use super::{
 use heapless::Vec;
 
 const MAX_DEPTH: usize = 3;
-const MAX_SUBSCREENS: usize = 8;
+const MAX_SUBSCREENS: usize = 10;
 const MAX_SUBMENUS: usize = MAX_SUBSCREENS - 2 /* (about and device screen) */;
 
 const DISCONNECT_DEVICE_MENU_INDEX: usize = 1;
@@ -62,6 +62,7 @@ pub enum DeviceMenuMsg {
     WipeDevice,
 
     // Device menu
+    DeviceName,
     ScreenBrightness,
     AutoLockDelay,
 
@@ -133,6 +134,8 @@ enum Subscreen {
 
     // The about screen
     AboutScreen,
+    // A screen showing the regulatory information
+    RegulatoryScreen,
 }
 
 // Used to preallocate memory for the largest enum variant
@@ -140,6 +143,7 @@ enum Subscreen {
 enum ActiveScreen<'a> {
     Menu(VerticalMenuScreen<ShortMenuVec>),
     About(TextScreen<Paragraphs<[Paragraph<'a>; 2]>>),
+    Regulatory(RegulatoryScreen),
 
     // used only during `DeviceMenuScreen::new`
     Empty,
@@ -166,7 +170,7 @@ impl<'a> DeviceMenuScreen<'a> {
     pub fn new(
         failed_backup: bool,
         firmware_version: TString<'static>,
-        device_name: TString<'static>,
+        device_name: Option<TString<'static>>,
         // NB: we currently only support one device at a time.
         paired_devices: Vec<TString<'static>, 1>,
         auto_lock_delay: TString<'static>,
@@ -182,8 +186,9 @@ impl<'a> DeviceMenuScreen<'a> {
         };
 
         let about = screen.add_subscreen(Subscreen::AboutScreen);
+        let regulatory = screen.add_subscreen(Subscreen::RegulatoryScreen);
         let security = screen.add_security_menu();
-        let device = screen.add_device_menu(device_name, about, auto_lock_delay);
+        let device = screen.add_device_menu(device_name, regulatory, about, auto_lock_delay);
         let settings = screen.add_settings_menu(security, device);
 
         let is_connected = !paired_devices.is_empty(); // FIXME after BLE API has this
@@ -282,14 +287,21 @@ impl<'a> DeviceMenuScreen<'a> {
 
     fn add_device_menu(
         &mut self,
-        device_name: TString<'static>,
+        device_name: Option<TString<'static>>,
+        regulatory_index: usize,
         about_index: usize,
         auto_lock_delay: TString<'static>,
     ) -> usize {
         let mut items: Vec<MenuItem, SHORT_MENU_ITEMS> = Vec::new();
-        let mut item_device_name = MenuItem::new("Name".into(), None);
-        item_device_name.with_subtext(Some((device_name, None)));
-        unwrap!(items.push(item_device_name));
+        if let Some(device_name) = device_name {
+            let mut item_device_name = MenuItem::new(
+                TR::words__name.into(),
+                Some(Action::Return(DeviceMenuMsg::DeviceName)),
+            );
+            item_device_name.with_subtext(Some((device_name, None)));
+            unwrap!(items.push(item_device_name));
+        }
+
         unwrap!(items.push(MenuItem::new(
             "Screen brightness".into(),
             Some(Action::Return(DeviceMenuMsg::ScreenBrightness)),
@@ -303,6 +315,11 @@ impl<'a> DeviceMenuScreen<'a> {
             autolock_delay_item.with_subtext(Some((auto_lock_delay, None)));
             unwrap!(items.push(autolock_delay_item));
         }
+
+        unwrap!(items.push(MenuItem::new(
+            TR::regulatory_certification__title.into(),
+            Some(Action::GoTo(regulatory_index))
+        )));
 
         unwrap!(items.push(MenuItem::new(
             "About".into(),
@@ -424,6 +441,9 @@ impl<'a> DeviceMenuScreen<'a> {
                         .with_header(Header::new("About".into()).with_close_button()),
                 );
             }
+            Subscreen::RegulatoryScreen => {
+                *self.active_screen.deref_mut() = ActiveScreen::Regulatory(RegulatoryScreen::new());
+            }
         }
     }
 
@@ -483,6 +503,9 @@ impl<'a> Component for DeviceMenuScreen<'a> {
             ActiveScreen::About(about) => {
                 about.place(bounds);
             }
+            ActiveScreen::Regulatory(regulatory) => {
+                regulatory.place(bounds);
+            }
             ActiveScreen::Empty => {}
         };
 
@@ -518,6 +541,11 @@ impl<'a> Component for DeviceMenuScreen<'a> {
                     return self.go_back(ctx);
                 }
             }
+            (Subscreen::RegulatoryScreen, ActiveScreen::Regulatory(regulatory)) => {
+                if let Some(RegulatoryMsg::Cancelled) = regulatory.event(ctx, event) {
+                    return self.go_back(ctx);
+                }
+            }
             _ => {}
         }
 
@@ -528,6 +556,7 @@ impl<'a> Component for DeviceMenuScreen<'a> {
         match self.active_screen.deref() {
             ActiveScreen::Menu(menu) => menu.render(target),
             ActiveScreen::About(about) => about.render(target),
+            ActiveScreen::Regulatory(regulatory) => regulatory.render(target),
             ActiveScreen::Empty => {}
         };
     }

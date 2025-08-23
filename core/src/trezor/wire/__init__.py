@@ -82,9 +82,10 @@ def setup(iface: WireInterface) -> None:
 
 
 if utils.USE_THP:
-    # memory_manager is imported to create READ/WRITE buffers
-    # in more stable area of memory
-    from .thp import memory_manager  # noqa: F401
+    from .thp.memory_manager import ThpBuffer
+
+    # Allocate THP read/write buffers in more stable area of memory
+    THP_BUFFERS_PROVIDER = Provider((ThpBuffer(), ThpBuffer()))
 
     if __debug__:
         _THP_CHANNELS = []
@@ -99,17 +100,21 @@ if utils.USE_THP:
             return None
 
     async def handle_session(iface: WireInterface) -> None:
-        ctx = ThpContext.load_from_cache(iface)
+        ctx = ThpContext(iface)
         if __debug__:
             _THP_CHANNELS.append(ctx._channels)
+        try:
+            channel = await ctx.get_next_message()
+            while await received_message_handler.handle_received_message(channel):
+                pass
+        finally:
+            # Wait for all active workflows to finish.
+            await workflow.join_all()
+            if __debug__:
+                import apps.debug
 
-        while True:
-            try:
-                (channel, message) = await ctx.get_next_message()
-                await received_message_handler.handle_received_message(channel, message)
-            except Exception:
-                loop.clear()  # restart event loop in case of error
-                raise  # the traceback will be printed by `loop._step()`
+                await apps.debug.close_session()
+            loop.clear()
 
 else:
 
@@ -165,9 +170,11 @@ else:
                     if not do_not_restart:
                         # Wait for all active workflows to finish.
                         await workflow.join_all()
-                        # Let the session be restarted from `main`.
                         if __debug__:
-                            log.debug(__name__, "loop.clear()", iface=iface)
+                            import apps.debug
+
+                            await apps.debug.close_session()
+                        # Let the session be restarted from `main`.
                         loop.clear()
                         return  # pylint: disable=lost-exception
 
