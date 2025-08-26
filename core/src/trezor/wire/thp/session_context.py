@@ -35,7 +35,7 @@ class GenericSessionContext(Context):
         self.channel: Channel = channel
         self.session_id: int = session_id
 
-    async def handle(self, message: Message | None = None) -> None:
+    async def handle(self, message: Message) -> None:
         if __debug__:
             log.debug(
                 __name__,
@@ -47,33 +47,33 @@ class GenericSessionContext(Context):
 
         while True:
             try:
-                if message is None:
-                    message = await self._read_next_message()
                 await handle_single_message(self, message)
-                self.channel._log("session loop is over")
-                return
+                if __debug__:
+                    self.channel._log("session loop is over")
             except protocol_common.WireError as e:
                 if __debug__:
                     log.exception(__name__, e, iface=self.iface)
                 await self.write(failure(e))
-                return
             except UnexpectedMessageException as unexpected:
-                # The workflow was interrupted by an unexpected message. We need to
-                # process it as if it was a new message...
-                message = unexpected.msg
+                if unexpected.msg is not None:
+                    # The workflow was interrupted by an unexpected message. We need to
+                    # process it as if it was a new message...
+                    message = unexpected.msg
+                    continue
             except Exception as exc:
                 if __debug__:
                     log.exception(__name__, exc, iface=self.iface)
-                return
+            return
 
     async def _read_next_message(self) -> Message:
         while True:
             session_id, message = await self.channel.decrypt_message()
             if session_id == self.session_id:
                 return message
-            self.channel._log(
-                "Ignored message for unexpected session", logger=log.warning
-            )
+            if __debug__:
+                self.channel._log(
+                    "Ignored message for unexpected session", logger=log.warning
+                )
 
     async def read(
         self,

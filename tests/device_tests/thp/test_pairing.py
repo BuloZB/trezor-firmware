@@ -101,7 +101,7 @@ def test_pairing_qr_code(client: Client) -> None:
     protocol._send_message(ThpEndRequest())
     protocol._read_message(ThpEndResponse)
 
-    protocol._has_valid_channel = True
+    protocol._is_paired = True
 
 
 @pytest.mark.filterwarnings(
@@ -172,7 +172,7 @@ def test_pairing_code_entry(
     protocol._send_message(ThpEndRequest())
     protocol._read_message(ThpEndResponse)
 
-    protocol._has_valid_channel = True
+    protocol._is_paired = True
 
 
 @pytest.mark.filterwarnings(
@@ -241,7 +241,7 @@ def test_pairing_nfc(client: Client) -> None:
 
     protocol._send_message(ThpEndRequest())
     protocol._read_message(ThpEndResponse)
-    protocol._has_valid_channel = True
+    protocol._is_paired = True
 
 
 def _nfc_pairing(client: Client, protocol: ProtocolV2Channel) -> None:
@@ -406,9 +406,8 @@ def test_credential_phase(client: Client) -> None:
     protocol._noise.noise_protocol.cipher_state_encrypt.n = 250
 
     protocol._send_message(ButtonAck())
-    with pytest.raises(exceptions.ThpError) as e:
+    with pytest.raises(exceptions.DecryptionFailed):
         protocol.read(1)
-    assert e.value.args[0] == "DECRYPTION FAILED"
 
     # Connect using credential with confirmation and ask for autoconnect credential.
     protocol = prepare_protocol_for_handshake(client)
@@ -457,9 +456,8 @@ def test_credential_phase(client: Client) -> None:
     protocol._noise.noise_protocol.cipher_state_encrypt.n = 100
 
     protocol._send_message(ButtonAck())
-    with pytest.raises(exceptions.ThpError) as e:
+    with pytest.raises(exceptions.DecryptionFailed):
         protocol.read(1)
-    assert e.value.args[0] == "DECRYPTION FAILED"
 
     # Connect using autoconnect credential - should work the same as above
     protocol = prepare_protocol_for_handshake(client)
@@ -488,9 +486,9 @@ def test_credential_request_in_encrypted_transport_phase(client: Client) -> None
     credential = credential_response.credential
     protocol._send_message(ThpEndRequest())
     protocol._read_message(ThpEndResponse)
+    protocol._is_paired = True  # pairing has been done above
 
     session = client.get_seedless_session()
-
     session.call(
         ThpCredentialRequest(
             host_static_public_key=host_static_public_key,

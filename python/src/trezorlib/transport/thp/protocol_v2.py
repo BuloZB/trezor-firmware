@@ -20,7 +20,6 @@ import logging
 import os
 import typing as t
 from binascii import hexlify
-from enum import IntEnum
 
 from noise.connection import Keypair, NoiseConnection
 
@@ -44,11 +43,6 @@ if t.TYPE_CHECKING:
 MT = t.TypeVar("MT", bound=protobuf.MessageType)
 
 
-class TrezorState(IntEnum):
-    UNPAIRED = 0x00
-    PAIRED = 0x01
-
-
 class ProtocolV2Channel(Channel):
     channel_id: int
     sync_bit_send: int
@@ -56,9 +50,8 @@ class ProtocolV2Channel(Channel):
     handshake_hash: bytes
     device_properties: bytes
 
-    _has_valid_channel: bool = False
     _features: messages.Features | None = None
-    trezor_state: int = TrezorState.UNPAIRED
+    _is_paired: bool = False
 
     def __init__(
         self,
@@ -72,11 +65,13 @@ class ProtocolV2Channel(Channel):
         if prepare_channel_without_pairing:
             # allow skipping unrelated response packets (e.g. in case of retransmissions)
             self._do_channel_allocation(retries=MAX_RETRANSMISSION_COUNT)
-            self.trezor_state = self._do_handshake(credential=credential)
+            LOG.debug("THP channel allocated: %04x", self.channel_id)
+            self._do_handshake(credential=credential)
+            LOG.debug("THP handshake done: is_paired=%s", self._is_paired)
 
     def get_channel(self) -> ProtocolV2Channel:
-        if not self._has_valid_channel:
-            raise RuntimeError("Channel is invalidated")
+        if not self._is_paired:
+            raise RuntimeError("Channel is not paired")
         return self
 
     def read(self, session_id: int, timeout: float | None = None) -> t.Any:
@@ -92,8 +87,8 @@ class ProtocolV2Channel(Channel):
         self._encrypt_and_write(session_id, msg_type, msg_data)
 
     def get_features(self) -> messages.Features:
-        if not self._has_valid_channel:
-            raise RuntimeError("Channel is invalidated")
+        if not self._is_paired:
+            raise RuntimeError("Channel is not paired")
         if self._features is None:
             self.update_features()
         assert self._features is not None
@@ -205,7 +200,7 @@ class ProtocolV2Channel(Channel):
         credential: bytes | None = None,
         host_static_randomness: bytes | None = None,
         host_ephemeral_randomness: bytes | None = None,
-    ) -> int:
+    ) -> None:
 
         randomness_static = host_static_randomness or os.urandom(32)
         if host_ephemeral_randomness is not None:
@@ -231,11 +226,6 @@ class ProtocolV2Channel(Channel):
 
     def _read_handshake_init_response(self) -> bytes:
         header, payload = self._read_until_valid_crc_check()
-        if control_byte.is_error(header.ctrl_byte):
-            if payload == b"\x05":
-                raise exceptions.DeviceLockedException()
-            else:
-                raise exceptions.ThpError(_get_error_from_int(payload[0]))
 
         if not header.is_handshake_init_response():
             LOG.error("Received message is not a valid handshake init response message")
@@ -273,24 +263,20 @@ class ProtocolV2Channel(Channel):
         )
         self.handshake_hash = self._noise.get_handshake_hash()
 
-    def _read_handshake_completion_response(self) -> int:
-        # Read handshake completion response, ignore payload as we do not care about the state
+    def _read_handshake_completion_response(self) -> None:
+        # Read handshake completion response
         header, data = self._read_until_valid_crc_check()
         if not header.is_handshake_comp_response():
             LOG.error("Received message is not a valid handshake completion response")
-            if control_byte.is_error(header.ctrl_byte):
-                raise exceptions.ThpError(_get_error_from_int(data[0]))
         trezor_state = self._noise.decrypt(bytes(data))
         assert trezor_state == b"\x00" or trezor_state == b"\x01"
         self._send_ack_bit(bit=1)
-        return int.from_bytes(trezor_state, "big")
+        self._is_paired = bool(int.from_bytes(trezor_state, "big"))
 
     def _read_ack(self):
         header, payload = self._read_until_valid_crc_check()
         if not header.is_ack() or len(payload) > 0:
             LOG.error("Received message is not a valid ACK")
-            if control_byte.is_error(header.ctrl_byte):
-                raise exceptions.ThpError(_get_error_from_int(payload[0]))
 
     def _send_ack_bit(self, bit: int):
         if bit not in (0, 1):
@@ -336,8 +322,6 @@ class ProtocolV2Channel(Channel):
                 continue
             if control_byte.is_ack(header.ctrl_byte):
                 continue
-            if control_byte.is_error(header.ctrl_byte):
-                raise exceptions.ThpError(_get_error_from_int(raw_payload[0]))
             if not header.is_encrypted_transport():
                 LOG.error(
                     "Trying to decrypt not encrypted message! ("
@@ -392,6 +376,10 @@ class ProtocolV2Channel(Channel):
 
                 self.sync_bit_receive = 1 - self.sync_bit_receive
 
+            if control_byte.is_error(header.ctrl_byte):
+                code = payload[0]
+                raise _ERRORS_MAP.get(code) or exceptions.ThpUnknownError(code)
+
             return header, payload
 
     def _is_valid_channel_allocation_response(
@@ -420,16 +408,10 @@ class ProtocolV2Channel(Channel):
         return True
 
 
-def _get_error_from_int(error_code: int) -> str:
-    # TODO FIXME improve this (ThpErrorType)
-    if error_code == 1:
-        return "TRANSPORT BUSY"
-    if error_code == 2:
-        return "UNALLOCATED CHANNEL"
-    if error_code == 3:
-        return "DECRYPTION FAILED"
-    if error_code == 4:
-        return "INVALID DATA"
-    if error_code == 5:
-        return "DEVICE LOCKED"
-    raise Exception("Not Implemented error case")
+_ERRORS_MAP = {
+    1: exceptions.TransportBusy,
+    2: exceptions.UnallocatedChannel,
+    3: exceptions.DecryptionFailed,
+    4: exceptions.InvalidData,
+    5: exceptions.DeviceLocked,
+}

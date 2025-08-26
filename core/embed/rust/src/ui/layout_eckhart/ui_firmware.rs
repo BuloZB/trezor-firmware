@@ -27,7 +27,7 @@ use crate::{
         },
         ui_firmware::{
             FirmwareUI, ERROR_NOT_IMPLEMENTED, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES,
-            MAX_MENU_ITEMS, MAX_WORD_QUIZ_ITEMS,
+            MAX_MENU_ITEMS, MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
         },
         ModelUI,
     },
@@ -50,8 +50,6 @@ use super::{
     },
     UIEckhart,
 };
-
-use heapless::Vec;
 
 impl FirmwareUI for UIEckhart {
     fn confirm_action(
@@ -188,10 +186,12 @@ impl FirmwareUI for UIEckhart {
             }
         }
         let text = FormattedText::new(ops);
-        let action_bar = ActionBar::new_double(
-            Button::with_icon(theme::ICON_CROSS),
-            Button::with_text(verb.unwrap_or(TR::buttons__confirm.into())),
-        );
+        let right_button = if let Some(verb) = verb {
+            Button::with_text(verb)
+        } else {
+            Button::with_text(TR::buttons__confirm.into()).styled(button_confirm())
+        };
+        let action_bar = ActionBar::new_double(Button::with_icon(theme::ICON_CROSS), right_button);
         let screen = TextScreen::new(text)
             .with_header(Header::new(title))
             .with_action_bar(action_bar);
@@ -984,7 +984,7 @@ impl FirmwareUI for UIEckhart {
         _current: usize,
         cancel: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let mut menu = VerticalMenu::<ShortMenuVec>::empty().with_separators();
+        let mut menu = VerticalMenu::<ShortMenuVec>::empty();
         for text in &items {
             menu.item(Button::new_menu_item(*text, theme::menu_item_title()));
         }
@@ -1195,17 +1195,33 @@ impl FirmwareUI for UIEckhart {
 
     fn show_device_menu(
         failed_backup: bool,
-        firmware_version: TString<'static>,
+        paired_devices: heapless::Vec<TString<'static>, MAX_PAIRED_DEVICES>,
+        connected_idx: Option<usize>,
+        bluetooth: Option<bool>,
+        pin_code: Option<bool>,
+        auto_lock_delay: Option<TString<'static>>,
+        wipe_code: Option<bool>,
+        check_backup: bool,
         device_name: Option<TString<'static>>,
-        paired_devices: Vec<TString<'static>, 1>,
-        auto_lock_delay: TString<'static>,
+        screen_brightness: Option<TString<'static>>,
+        haptic_feedback: Option<bool>,
+        led_enabled: Option<bool>,
+        about_items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let layout = RootComponent::new(DeviceMenuScreen::new(
             failed_backup,
-            firmware_version,
-            device_name,
             paired_devices,
+            connected_idx,
+            bluetooth,
+            pin_code,
             auto_lock_delay,
+            wipe_code,
+            check_backup,
+            device_name,
+            screen_brightness,
+            haptic_feedback,
+            led_enabled,
+            about_items,
         )?);
         Ok(layout)
     }

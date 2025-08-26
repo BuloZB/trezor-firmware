@@ -29,7 +29,7 @@ from .transport import Transport, get_transport
 from .transport.thp.channel import Channel
 from .transport.thp.cpace import Cpace
 from .transport.thp.protocol_v1 import ProtocolV1Channel, UnexpectedMagicError
-from .transport.thp.protocol_v2 import ProtocolV2Channel, TrezorState
+from .transport.thp.protocol_v2 import ProtocolV2Channel
 
 if t.TYPE_CHECKING:
     from .transport.session import Session, SessionV1, SessionV2
@@ -120,6 +120,7 @@ class TrezorClient:
                 raise RuntimeError(
                     "Connected Trezor does not support any trezorlib-compatible pairing method."
                 )
+        LOG.debug("Starting pairing: %r", pairing_method)
         session = SessionV2.seedless(self)
         session.call(
             messages.ThpPairingRequest(host_name="Trezorlib"),
@@ -142,7 +143,7 @@ class TrezorClient:
             skip_firmware_version_check=True,
         )
         assert isinstance(self.protocol, ProtocolV2Channel)
-        self.protocol._has_valid_channel = True
+        self.protocol._is_paired = True
 
     def _handle_code_entry(self, session: SessionV2) -> None:
         from .cli import get_code_entry_code
@@ -172,20 +173,14 @@ class TrezorClient:
         sha_ctx = sha256(cpace.shared_secret)
         tag = sha_ctx.digest()
 
-        try:
-            secret_msg = session.call(
-                messages.ThpCodeEntryCpaceHostTag(
-                    cpace_host_public_key=cpace.host_public_key,
-                    tag=tag,
-                ),
-                expect=messages.ThpCodeEntrySecret,
-                skip_firmware_version_check=True,
-            )
-        except exceptions.TrezorFailure as e:
-            if e.message == "Unexpected Code Entry Tag":
-                raise exceptions.UnexpectedCodeEntryTagException
-            else:
-                raise e
+        secret_msg = session.call(
+            messages.ThpCodeEntryCpaceHostTag(
+                cpace_host_public_key=cpace.host_public_key,
+                tag=tag,
+            ),
+            expect=messages.ThpCodeEntrySecret,
+            skip_firmware_version_check=True,
+        )
 
         # Check `commitment` and `code`
         assert secret_msg.secret is not None
@@ -209,7 +204,7 @@ class TrezorClient:
         )
 
         assert isinstance(self.protocol, ProtocolV2Channel)
-        self.protocol._has_valid_channel = True
+        self.protocol._is_paired = True
 
     def get_session(
         self,
@@ -218,14 +213,7 @@ class TrezorClient:
     ) -> Session:
         """
         Returns a new session.
-
-        In the case of seed derivation, the function will fail if the device is not initialized.
         """
-        if self.features.initialized is False and passphrase is not SEEDLESS:
-            raise exceptions.DerivationOnUninitaizedDeviceError(
-                "Calling uninitialized device with a passphrase. Call get_seedless_session instead."
-            )
-
         if isinstance(self.protocol, ProtocolV1Channel):
             from .transport.session import SessionV1, derive_seed
 
@@ -240,7 +228,7 @@ class TrezorClient:
         if isinstance(self.protocol, ProtocolV2Channel):
             from .transport.session import SessionV2
 
-            if self.protocol.trezor_state is TrezorState.UNPAIRED:
+            if not self.protocol._is_paired:
                 self.do_pairing()
 
             if passphrase is SEEDLESS:
@@ -273,10 +261,7 @@ class TrezorClient:
 
     def _get_features(self) -> messages.Features:
         if isinstance(self.protocol, ProtocolV2Channel):
-            if (
-                self.protocol.trezor_state is TrezorState.UNPAIRED
-                or not self.protocol._has_valid_channel
-            ):
+            if not self.protocol._is_paired:
                 self.do_pairing()
         return self.protocol.get_features()
 

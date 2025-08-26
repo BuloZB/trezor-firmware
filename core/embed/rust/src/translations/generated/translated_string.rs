@@ -704,7 +704,7 @@ pub enum TranslatedString {
     passphrase__title_source = 444,  // "Passphrase source"
     passphrase__turn_off = 445,  // "Turn off passphrase protection?"
     passphrase__turn_on = 446,  // "Turn on passphrase protection?"
-    pin__change = 447,  // "Change PIN?"
+    pin__change = 447,  // "Change PIN"
     pin__changed = 448,  // "PIN changed."
     pin__cursor_will_change = 449,  // "Position of the cursor will change between entries for enhanced security."
     pin__diff_from_wipe_code = 450,  // "The new PIN must be different from your wipe code."
@@ -1107,7 +1107,7 @@ pub enum TranslatedString {
     wipe__info = 771,  // "All data will be erased."
     wipe__title = 772,  // "Wipe device"
     wipe__want_to_wipe = 773,  // "Do you really want to wipe the device?\n"
-    wipe_code__change = 774,  // "Change wipe code?"
+    wipe_code__change = 774,  // "Change wipe code"
     wipe_code__changed = 775,  // "Wipe code changed."
     wipe_code__diff_from_pin = 776,  // "The wipe code must be different from your PIN."
     wipe_code__disabled = 777,  // "Wipe code disabled."
@@ -1461,6 +1461,54 @@ pub enum TranslatedString {
     device_name__enter = 1077,  // "Enter device name"
     regulatory_certification__title = 1078,  // "Regulatory certification"
     words__name = 1079,  // "Name"
+    device_name__changed = 1080,  // "Device name changed."
+    #[cfg(feature = "universal_fw")]
+    cardano__confirm_message = 1081,  // "Confirm message"
+    #[cfg(feature = "universal_fw")]
+    cardano__empty_message = 1082,  // "Empty message"
+    #[cfg(feature = "universal_fw")]
+    cardano__message_hash = 1083,  // "Message hash:"
+    #[cfg(feature = "universal_fw")]
+    cardano__message_hex = 1084,  // "Message hex"
+    #[cfg(feature = "universal_fw")]
+    cardano__message_text = 1085,  // "Message text"
+    #[cfg(feature = "universal_fw")]
+    cardano__sign_message_hash_path_template = 1086,  // "Sign message hash with {0}"
+    #[cfg(feature = "universal_fw")]
+    cardano__sign_message_path_template = 1087,  // "Sign message with {0}"
+    ble__manage_paired = 1088,  // "Manage paired devices"
+    ble__pair_new = 1089,  // "Pair new device"
+    ble__pair_title = 1090,  // "Pair & connect"
+    ble__version = 1091,  // "Bluetooth version"
+    homescreen__firmware_type = 1092,  // "Firmware type"
+    homescreen__firmware_version = 1093,  // "Firmware version"
+    led__disable = 1094,  // "Disable LED?"
+    led__enable = 1095,  // "Enable LED?"
+    led__title = 1096,  // "LED"
+    words__about = 1097,  // "About"
+    words__connected = 1098,  // "Connected"
+    words__device = 1099,  // "Device"
+    words__disconnect = 1100,  // "Disconnect"
+    words__led = 1101,  // "LED"
+    words__manage = 1102,  // "Manage"
+    words__off = 1103,  // "OFF"
+    words__on = 1104,  // "ON"
+    words__review = 1105,  // "Review"
+    words__security = 1106,  // "Security"
+    pin__change_question = 1107,  // "Change PIN?"
+    pin__remove = 1108,  // "Remove PIN"
+    pin__title = 1109,  // "PIN code"
+    wipe_code__change_question = 1110,  // "Change wipe code?"
+    wipe_code__remove = 1111,  // "Remove wipe code"
+    wipe_code__title = 1112,  // "Wipe code"
+    words__disabled = 1113,  // "Disabled"
+    words__enabled = 1114,  // "Enabled"
+    ble__disable = 1115,  // "Turn Bluetooth off?"
+    ble__enable = 1116,  // "Turn Bluetooth on?"
+    words__bluetooth = 1117,  // "Bluetooth"
+    wipe__start_again = 1118,  // "Wipe your Trezor and start the setup process again."
+    words__set = 1119,  // "Set"
+    words__wipe = 1120,  // "Wipe"
 }
 
 impl TranslatedString {
@@ -2265,7 +2313,7 @@ impl TranslatedString {
             (Self::passphrase__title_source, "Passphrase source"),
             (Self::passphrase__turn_off, "Turn off passphrase protection?"),
             (Self::passphrase__turn_on, "Turn on passphrase protection?"),
-            (Self::pin__change, "Change PIN?"),
+            (Self::pin__change, "Change PIN"),
             (Self::pin__changed, "PIN changed."),
             (Self::pin__cursor_will_change, "Position of the cursor will change between entries for enhanced security."),
             (Self::pin__diff_from_wipe_code, "The new PIN must be different from your wipe code."),
@@ -2780,7 +2828,7 @@ impl TranslatedString {
             (Self::wipe__info, "All data will be erased."),
             (Self::wipe__title, "Wipe device"),
             (Self::wipe__want_to_wipe, "Do you really want to wipe the device?\n"),
-            (Self::wipe_code__change, "Change wipe code?"),
+            (Self::wipe_code__change, "Change wipe code"),
             (Self::wipe_code__changed, "Wipe code changed."),
             (Self::wipe_code__diff_from_pin, "The wipe code must be different from your PIN."),
             (Self::wipe_code__disabled, "Wipe code disabled."),
@@ -3241,6 +3289,54 @@ impl TranslatedString {
             (Self::device_name__enter, "Enter device name"),
             (Self::regulatory_certification__title, "Regulatory certification"),
             (Self::words__name, "Name"),
+            (Self::device_name__changed, "Device name changed."),
+            #[cfg(feature = "universal_fw")]
+            (Self::cardano__confirm_message, "Confirm message"),
+            #[cfg(feature = "universal_fw")]
+            (Self::cardano__empty_message, "Empty message"),
+            #[cfg(feature = "universal_fw")]
+            (Self::cardano__message_hash, "Message hash:"),
+            #[cfg(feature = "universal_fw")]
+            (Self::cardano__message_hex, "Message hex"),
+            #[cfg(feature = "universal_fw")]
+            (Self::cardano__message_text, "Message text"),
+            #[cfg(feature = "universal_fw")]
+            (Self::cardano__sign_message_hash_path_template, "Sign message hash with {0}"),
+            #[cfg(feature = "universal_fw")]
+            (Self::cardano__sign_message_path_template, "Sign message with {0}"),
+            (Self::ble__manage_paired, "Manage paired devices"),
+            (Self::ble__pair_new, "Pair new device"),
+            (Self::ble__pair_title, "Pair & connect"),
+            (Self::ble__version, "Bluetooth version"),
+            (Self::homescreen__firmware_type, "Firmware type"),
+            (Self::homescreen__firmware_version, "Firmware version"),
+            (Self::led__disable, "Disable LED?"),
+            (Self::led__enable, "Enable LED?"),
+            (Self::led__title, "LED"),
+            (Self::words__about, "About"),
+            (Self::words__connected, "Connected"),
+            (Self::words__device, "Device"),
+            (Self::words__disconnect, "Disconnect"),
+            (Self::words__led, "LED"),
+            (Self::words__manage, "Manage"),
+            (Self::words__off, "OFF"),
+            (Self::words__on, "ON"),
+            (Self::words__review, "Review"),
+            (Self::words__security, "Security"),
+            (Self::pin__change_question, "Change PIN?"),
+            (Self::pin__remove, "Remove PIN"),
+            (Self::pin__title, "PIN code"),
+            (Self::wipe_code__change_question, "Change wipe code?"),
+            (Self::wipe_code__remove, "Remove wipe code"),
+            (Self::wipe_code__title, "Wipe code"),
+            (Self::words__disabled, "Disabled"),
+            (Self::words__enabled, "Enabled"),
+            (Self::ble__disable, "Turn Bluetooth off?"),
+            (Self::ble__enable, "Turn Bluetooth on?"),
+            (Self::words__bluetooth, "Bluetooth"),
+            (Self::wipe__start_again, "Wipe your Trezor and start the setup process again."),
+            (Self::words__set, "Set"),
+            (Self::words__wipe, "Wipe"),
     ];
 
     #[cfg(feature = "micropython")]
@@ -3318,9 +3414,15 @@ impl TranslatedString {
         (Qstr::MP_QSTR_bitcoin__unverified_external_inputs, Self::bitcoin__unverified_external_inputs),
         (Qstr::MP_QSTR_bitcoin__valid_signature, Self::bitcoin__valid_signature),
         (Qstr::MP_QSTR_bitcoin__voting_rights, Self::bitcoin__voting_rights),
+        (Qstr::MP_QSTR_ble__disable, Self::ble__disable),
+        (Qstr::MP_QSTR_ble__enable, Self::ble__enable),
+        (Qstr::MP_QSTR_ble__manage_paired, Self::ble__manage_paired),
+        (Qstr::MP_QSTR_ble__pair_new, Self::ble__pair_new),
+        (Qstr::MP_QSTR_ble__pair_title, Self::ble__pair_title),
         (Qstr::MP_QSTR_ble__unpair_all, Self::ble__unpair_all),
         (Qstr::MP_QSTR_ble__unpair_current, Self::ble__unpair_current),
         (Qstr::MP_QSTR_ble__unpair_title, Self::ble__unpair_title),
+        (Qstr::MP_QSTR_ble__version, Self::ble__version),
         (Qstr::MP_QSTR_brightness__change_title, Self::brightness__change_title),
         (Qstr::MP_QSTR_brightness__changed_title, Self::brightness__changed_title),
         (Qstr::MP_QSTR_brightness__title, Self::brightness__title),
@@ -3414,6 +3516,8 @@ impl TranslatedString {
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__collateral_return, Self::cardano__collateral_return),
         #[cfg(feature = "universal_fw")]
+        (Qstr::MP_QSTR_cardano__confirm_message, Self::cardano__confirm_message),
+        #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__confirm_signing_stake_pool, Self::cardano__confirm_signing_stake_pool),
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__confirm_transaction, Self::cardano__confirm_transaction),
@@ -3440,6 +3544,8 @@ impl TranslatedString {
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__deposit, Self::cardano__deposit),
         #[cfg(feature = "universal_fw")]
+        (Qstr::MP_QSTR_cardano__empty_message, Self::cardano__empty_message),
+        #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__for_account_and_index_template, Self::cardano__for_account_and_index_template),
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__for_account_template, Self::cardano__for_account_template),
@@ -3463,6 +3569,12 @@ impl TranslatedString {
         (Qstr::MP_QSTR_cardano__key_hash, Self::cardano__key_hash),
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__margin, Self::cardano__margin),
+        #[cfg(feature = "universal_fw")]
+        (Qstr::MP_QSTR_cardano__message_hash, Self::cardano__message_hash),
+        #[cfg(feature = "universal_fw")]
+        (Qstr::MP_QSTR_cardano__message_hex, Self::cardano__message_hex),
+        #[cfg(feature = "universal_fw")]
+        (Qstr::MP_QSTR_cardano__message_text, Self::cardano__message_text),
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__multisig_path, Self::cardano__multisig_path),
         #[cfg(feature = "universal_fw")]
@@ -3531,6 +3643,10 @@ impl TranslatedString {
         (Qstr::MP_QSTR_cardano__sending, Self::cardano__sending),
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__show_simple, Self::cardano__show_simple),
+        #[cfg(feature = "universal_fw")]
+        (Qstr::MP_QSTR_cardano__sign_message_hash_path_template, Self::cardano__sign_message_hash_path_template),
+        #[cfg(feature = "universal_fw")]
+        (Qstr::MP_QSTR_cardano__sign_message_path_template, Self::cardano__sign_message_path_template),
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_cardano__sign_tx_path_template, Self::cardano__sign_tx_path_template),
         #[cfg(feature = "universal_fw")]
@@ -3608,6 +3724,7 @@ impl TranslatedString {
         #[cfg(feature = "debug")]
         (Qstr::MP_QSTR_debug__loading_seed_not_recommended, Self::debug__loading_seed_not_recommended),
         (Qstr::MP_QSTR_device_name__change_template, Self::device_name__change_template),
+        (Qstr::MP_QSTR_device_name__changed, Self::device_name__changed),
         (Qstr::MP_QSTR_device_name__continue_with_empty_label, Self::device_name__continue_with_empty_label),
         (Qstr::MP_QSTR_device_name__enter, Self::device_name__enter),
         (Qstr::MP_QSTR_device_name__title, Self::device_name__title),
@@ -3853,6 +3970,8 @@ impl TranslatedString {
         (Qstr::MP_QSTR_haptic_feedback__title, Self::haptic_feedback__title),
         (Qstr::MP_QSTR_homescreen__click_to_connect, Self::homescreen__click_to_connect),
         (Qstr::MP_QSTR_homescreen__click_to_unlock, Self::homescreen__click_to_unlock),
+        (Qstr::MP_QSTR_homescreen__firmware_type, Self::homescreen__firmware_type),
+        (Qstr::MP_QSTR_homescreen__firmware_version, Self::homescreen__firmware_version),
         (Qstr::MP_QSTR_homescreen__set_default, Self::homescreen__set_default),
         (Qstr::MP_QSTR_homescreen__settings_subtitle, Self::homescreen__settings_subtitle),
         (Qstr::MP_QSTR_homescreen__settings_title, Self::homescreen__settings_title),
@@ -3898,6 +4017,9 @@ impl TranslatedString {
         (Qstr::MP_QSTR_language__changed, Self::language__changed),
         (Qstr::MP_QSTR_language__progress, Self::language__progress),
         (Qstr::MP_QSTR_language__title, Self::language__title),
+        (Qstr::MP_QSTR_led__disable, Self::led__disable),
+        (Qstr::MP_QSTR_led__enable, Self::led__enable),
+        (Qstr::MP_QSTR_led__title, Self::led__title),
         (Qstr::MP_QSTR_lockscreen__tap_to_connect, Self::lockscreen__tap_to_connect),
         (Qstr::MP_QSTR_lockscreen__tap_to_unlock, Self::lockscreen__tap_to_unlock),
         (Qstr::MP_QSTR_lockscreen__title_locked, Self::lockscreen__title_locked),
@@ -4081,6 +4203,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_pin__cancel_info, Self::pin__cancel_info),
         (Qstr::MP_QSTR_pin__cancel_setup, Self::pin__cancel_setup),
         (Qstr::MP_QSTR_pin__change, Self::pin__change),
+        (Qstr::MP_QSTR_pin__change_question, Self::pin__change_question),
         (Qstr::MP_QSTR_pin__changed, Self::pin__changed),
         (Qstr::MP_QSTR_pin__cursor_will_change, Self::pin__cursor_will_change),
         (Qstr::MP_QSTR_pin__diff_from_wipe_code, Self::pin__diff_from_wipe_code),
@@ -4098,8 +4221,10 @@ impl TranslatedString {
         (Qstr::MP_QSTR_pin__reenter, Self::pin__reenter),
         (Qstr::MP_QSTR_pin__reenter_new, Self::pin__reenter_new),
         (Qstr::MP_QSTR_pin__reenter_to_confirm, Self::pin__reenter_to_confirm),
+        (Qstr::MP_QSTR_pin__remove, Self::pin__remove),
         (Qstr::MP_QSTR_pin__setup_completed, Self::pin__setup_completed),
         (Qstr::MP_QSTR_pin__should_be_long, Self::pin__should_be_long),
+        (Qstr::MP_QSTR_pin__title, Self::pin__title),
         (Qstr::MP_QSTR_pin__title_check_pin, Self::pin__title_check_pin),
         (Qstr::MP_QSTR_pin__title_settings, Self::pin__title_settings),
         (Qstr::MP_QSTR_pin__title_wrong_pin, Self::pin__title_wrong_pin),
@@ -4608,9 +4733,11 @@ impl TranslatedString {
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_u2f__title_set, Self::u2f__title_set),
         (Qstr::MP_QSTR_wipe__info, Self::wipe__info),
+        (Qstr::MP_QSTR_wipe__start_again, Self::wipe__start_again),
         (Qstr::MP_QSTR_wipe__title, Self::wipe__title),
         (Qstr::MP_QSTR_wipe__want_to_wipe, Self::wipe__want_to_wipe),
         (Qstr::MP_QSTR_wipe_code__change, Self::wipe_code__change),
+        (Qstr::MP_QSTR_wipe_code__change_question, Self::wipe_code__change_question),
         (Qstr::MP_QSTR_wipe_code__changed, Self::wipe_code__changed),
         (Qstr::MP_QSTR_wipe_code__diff_from_pin, Self::wipe_code__diff_from_pin),
         (Qstr::MP_QSTR_wipe_code__disabled, Self::wipe_code__disabled),
@@ -4621,6 +4748,8 @@ impl TranslatedString {
         (Qstr::MP_QSTR_wipe_code__mismatch, Self::wipe_code__mismatch),
         (Qstr::MP_QSTR_wipe_code__reenter, Self::wipe_code__reenter),
         (Qstr::MP_QSTR_wipe_code__reenter_to_confirm, Self::wipe_code__reenter_to_confirm),
+        (Qstr::MP_QSTR_wipe_code__remove, Self::wipe_code__remove),
+        (Qstr::MP_QSTR_wipe_code__title, Self::wipe_code__title),
         (Qstr::MP_QSTR_wipe_code__title_check, Self::wipe_code__title_check),
         (Qstr::MP_QSTR_wipe_code__title_invalid, Self::wipe_code__title_invalid),
         (Qstr::MP_QSTR_wipe_code__title_settings, Self::wipe_code__title_settings),
@@ -4628,6 +4757,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_wipe_code__turn_on, Self::wipe_code__turn_on),
         (Qstr::MP_QSTR_wipe_code__wipe_code_mismatch, Self::wipe_code__wipe_code_mismatch),
         (Qstr::MP_QSTR_word_count__title, Self::word_count__title),
+        (Qstr::MP_QSTR_words__about, Self::words__about),
         (Qstr::MP_QSTR_words__account, Self::words__account),
         (Qstr::MP_QSTR_words__account_colon, Self::words__account_colon),
         (Qstr::MP_QSTR_words__address, Self::words__address),
@@ -4638,16 +4768,22 @@ impl TranslatedString {
         (Qstr::MP_QSTR_words__assets, Self::words__assets),
         (Qstr::MP_QSTR_words__authenticate, Self::words__authenticate),
         (Qstr::MP_QSTR_words__blockhash, Self::words__blockhash),
+        (Qstr::MP_QSTR_words__bluetooth, Self::words__bluetooth),
         (Qstr::MP_QSTR_words__buying, Self::words__buying),
         (Qstr::MP_QSTR_words__cancel_and_exit, Self::words__cancel_and_exit),
         (Qstr::MP_QSTR_words__cancel_question, Self::words__cancel_question),
         (Qstr::MP_QSTR_words__chain, Self::words__chain),
         (Qstr::MP_QSTR_words__confirm, Self::words__confirm),
         (Qstr::MP_QSTR_words__confirm_fee, Self::words__confirm_fee),
+        (Qstr::MP_QSTR_words__connected, Self::words__connected),
         (Qstr::MP_QSTR_words__contains, Self::words__contains),
         (Qstr::MP_QSTR_words__continue_anyway, Self::words__continue_anyway),
         (Qstr::MP_QSTR_words__continue_anyway_question, Self::words__continue_anyway_question),
         (Qstr::MP_QSTR_words__continue_with, Self::words__continue_with),
+        (Qstr::MP_QSTR_words__device, Self::words__device),
+        (Qstr::MP_QSTR_words__disabled, Self::words__disabled),
+        (Qstr::MP_QSTR_words__disconnect, Self::words__disconnect),
+        (Qstr::MP_QSTR_words__enabled, Self::words__enabled),
         (Qstr::MP_QSTR_words__error, Self::words__error),
         (Qstr::MP_QSTR_words__fee, Self::words__fee),
         (Qstr::MP_QSTR_words__from, Self::words__from),
@@ -4656,10 +4792,14 @@ impl TranslatedString {
         (Qstr::MP_QSTR_words__instructions, Self::words__instructions),
         (Qstr::MP_QSTR_words__keep_it_safe, Self::words__keep_it_safe),
         (Qstr::MP_QSTR_words__know_what_your_doing, Self::words__know_what_your_doing),
+        (Qstr::MP_QSTR_words__led, Self::words__led),
+        (Qstr::MP_QSTR_words__manage, Self::words__manage),
         (Qstr::MP_QSTR_words__my_trezor, Self::words__my_trezor),
         (Qstr::MP_QSTR_words__name, Self::words__name),
         (Qstr::MP_QSTR_words__no, Self::words__no),
         (Qstr::MP_QSTR_words__not_recommended, Self::words__not_recommended),
+        (Qstr::MP_QSTR_words__off, Self::words__off),
+        (Qstr::MP_QSTR_words__on, Self::words__on),
         (Qstr::MP_QSTR_words__operation_cancelled, Self::words__operation_cancelled),
         (Qstr::MP_QSTR_words__outputs, Self::words__outputs),
         (Qstr::MP_QSTR_words__pay_attention, Self::words__pay_attention),
@@ -4670,7 +4810,10 @@ impl TranslatedString {
         (Qstr::MP_QSTR_words__receive, Self::words__receive),
         (Qstr::MP_QSTR_words__recipient, Self::words__recipient),
         (Qstr::MP_QSTR_words__recovery_share, Self::words__recovery_share),
+        (Qstr::MP_QSTR_words__review, Self::words__review),
+        (Qstr::MP_QSTR_words__security, Self::words__security),
         (Qstr::MP_QSTR_words__send, Self::words__send),
+        (Qstr::MP_QSTR_words__set, Self::words__set),
         (Qstr::MP_QSTR_words__settings, Self::words__settings),
         (Qstr::MP_QSTR_words__sign, Self::words__sign),
         (Qstr::MP_QSTR_words__signer, Self::words__signer),
@@ -4693,6 +4836,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_words__unlocked, Self::words__unlocked),
         (Qstr::MP_QSTR_words__wallet, Self::words__wallet),
         (Qstr::MP_QSTR_words__warning, Self::words__warning),
+        (Qstr::MP_QSTR_words__wipe, Self::words__wipe),
         (Qstr::MP_QSTR_words__writable, Self::words__writable),
         (Qstr::MP_QSTR_words__yes, Self::words__yes),
     ];

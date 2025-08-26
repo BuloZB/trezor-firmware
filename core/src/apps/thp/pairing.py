@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING
-from ubinascii import hexlify
 
 from trezor import protobuf
 from trezor.crypto import random
@@ -35,7 +34,13 @@ from trezor.wire.errors import (
     SilentError,
     UnexpectedMessage,
 )
-from trezor.wire.thp import ChannelState, ThpError, crypto, get_enabled_pairing_methods
+from trezor.wire.thp import (
+    ChannelState,
+    ThpError,
+    crypto,
+    get_enabled_pairing_methods,
+    ui,
+)
 from trezor.wire.thp.pairing_context import PairingContext
 
 from .credential_manager import is_credential_autoconnect, issue_credential
@@ -112,11 +117,8 @@ async def handle_pairing_request(
 
     ctx.host_name = message.host_name
     ctx.app_name = message.app_name
-    if __debug__ and not ctx.channel_ctx.should_show_pairing_dialog:
-        await _skip_pairing_dialog(ctx)
-    else:
-        await ctx.show_pairing_dialog()
-        await ctx.write(ThpPairingRequestApproved())
+    await ui.show_pairing_dialog(ctx.host_name, ctx.app_name)
+    await ctx.write(ThpPairingRequestApproved())
     assert ThpSelectMethod.MESSAGE_WIRE_TYPE is not None
     select_method_msg = await ctx.read(
         [
@@ -141,7 +143,8 @@ async def handle_pairing_request(
             # Should raise UnexpectedMessageException
             result = await ctx.show_pairing_method_screen()
         except UnexpectedMessageException as e:
-            raw_response = e.msg
+            if (raw_response := e.msg) is None:
+                raise  # propagate stale channel preemption
             req_type = protobuf.type_for_wire(
                 ctx.message_type_enum_name, raw_response.type
             )
@@ -195,7 +198,7 @@ async def handle_credential_phase(
             raise DataError("Missing host/app name in credential")
 
     if show_connection_dialog and not autoconnect:
-        await ctx.show_connection_dialog()
+        await ui.show_connection_dialog(ctx.host_name, ctx.app_name)
 
     while ThpCredentialRequest.is_type_of(message):
         message = await _handle_credential_request(ctx, message)
@@ -305,13 +308,6 @@ async def _handle_code_entry_cpace(
     ctx.cpace.compute_shared_secret(message.cpace_host_public_key)
     expected_tag = sha256(ctx.cpace.shared_secret).digest()
     if expected_tag != message.tag:
-        print(
-            "expected code entry tag:", hexlify(expected_tag).decode()
-        )  # TODO remove after testing
-        print(
-            "expected code entry shared secret:",
-            hexlify(ctx.cpace.shared_secret).decode(),
-        )  # TODO remove after testing
         raise ThpError("Unexpected Code Entry Tag")
 
     if ctx.code_entry_secret is None:
@@ -425,7 +421,9 @@ async def _handle_credential_request(
                 "Cannot ask for autoconnect credential without a valid credential!"
             )
 
-        await ctx.show_autoconnect_credential_confirmation_screen()  # TODO add device name
+        await ui.show_autoconnect_credential_confirmation_screen(
+            host_name=ctx.host_name, app_name=ctx.app_name
+        )
 
     trezor_static_public_key = crypto.get_trezor_static_public_key()
     credential_metadata = ThpCredentialMetadata(
@@ -476,20 +474,3 @@ def _check_method_is_allowed(ctx: PairingContext, method: ThpPairingMethod) -> N
 def _check_method_is_selected(ctx: PairingContext, method: ThpPairingMethod) -> None:
     if method is not ctx.selected_method:
         raise ThpError("Not selected pairing method")
-
-
-if __debug__:
-
-    async def _skip_pairing_dialog(ctx: PairingContext) -> None:
-        from trezor.enums import ButtonRequestType
-        from trezor.messages import ButtonAck, ButtonRequest, ThpPairingRequestApproved
-        from trezor.wire.errors import ActionCancelled
-
-        resp = await ctx.call(
-            ButtonRequest(code=ButtonRequestType.Other, name="thp_pairing_request"),
-            expected_type=ButtonAck,
-        )
-        if isinstance(resp, ButtonAck):
-            await ctx.write(ThpPairingRequestApproved())
-        else:
-            raise ActionCancelled
