@@ -223,15 +223,12 @@ async def confirm_change_label(
     br_name: str, title: str, template: str, param: str
 ) -> None:
 
-    await confirm_single(
+    await confirm_action(
         br_name=br_name,
         title=title,
-        description=template,
-        description_param=param,
+        description=template.format(param),
         verb=None,
     )
-
-    show_continue_in_app(TR.device_name__changed)
 
 
 def confirm_change_passphrase(use: bool) -> Awaitable[None]:
@@ -1722,18 +1719,22 @@ def request_pin_on_device(
     from trezor.wire import PinCancelled
 
     if attempts_remaining is None:
-        subprompt = ""
+        attempts = ""
+        last_attempt = False
     elif attempts_remaining == 1:
-        subprompt = TR.pin__last_attempt
+        attempts = TR.pin__last_attempt
+        last_attempt = True
     else:
-        subprompt = f"{attempts_remaining} {TR.pin__tries_left}"
+        attempts = f"{attempts_remaining}\n{TR.pin__tries_left}"
+        last_attempt = False
 
     result = interact(
         trezorui_api.request_pin(
             prompt=prompt,
-            subprompt=subprompt,
+            attempts=attempts,
             allow_cancel=allow_cancel,
             wrong_pin=wrong_pin,
+            last_attempt=last_attempt,
         ),
         "pin_device",
         ButtonRequestType.PinEntry,
@@ -1775,15 +1776,40 @@ def wipe_code_same_as_pin_popup() -> Awaitable[ui.UiResult]:
     )
 
 
-def confirm_set_new_pin(
+async def wipe_code_pin_not_set_popup(
+    title: str, description: str, button: str
+) -> NoReturn:
+    await show_error_and_raise(
+        "warning_pin_not_set",
+        description,
+        TR.words__important,
+        button,
+    )
+
+
+async def pin_wipe_code_exists_popup(
+    title: str, description: str, button: str
+) -> NoReturn:
+    await show_error_and_raise(
+        "wipe_code_exists",
+        description,
+        TR.words__important,
+        button,
+    )
+
+
+def confirm_set_new_code(
     br_name: str,
     title: str,
     description: str,
     information: str,
+    is_wipe_code: bool,
     br_code: ButtonRequestType = BR_CODE_OTHER,
 ) -> Awaitable[None]:
     return raise_if_cancelled(
-        trezorui_api.flow_confirm_set_new_pin(title=title, description=information),
+        trezorui_api.flow_confirm_set_new_code(
+            title=title, description=information, is_wipe_code=is_wipe_code
+        ),
         br_name,
         br_code,
     )

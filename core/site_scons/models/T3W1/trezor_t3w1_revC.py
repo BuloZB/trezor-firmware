@@ -20,7 +20,9 @@ def configure(
     linker_script = """embed/sys/linker/stm32u5g/{target}.ld"""
     memory_layout = "memory.ld"
 
-    stm32u5_common_files(env, features_wanted, defines, sources, paths)
+    features_available += stm32u5_common_files(
+        env, features_wanted, defines, sources, paths
+    )
 
     env.get("ENV")[
         "CPU_ASFLAGS"
@@ -135,6 +137,8 @@ def configure(
             "vendor/stm32u5xx_hal_driver/Src/stm32u5xx_hal_uart.c",
             "vendor/stm32u5xx_hal_driver/Src/stm32u5xx_hal_uart_ex.c",
         ]
+    if "nrf_auth" in features_wanted or "ble" in features_wanted:
+        defines += [("USE_NRF_AUTH", "1")]
 
     if "ble" in features_wanted and "smp" in features_wanted:
         sources += ["embed/io/nrf/stm32u5/nrf_uart.c"]
@@ -214,6 +218,7 @@ def configure(
         paths += ["embed/sec/tropic/inc"]
         paths += ["vendor/libtropic/include"]
         paths += ["vendor/libtropic/src"]
+        features_available.append("tropic")
         defines += [("USE_TROPIC", "1")]
         defines += [("LT_USE_TREZOR_CRYPTO", "1")]
         defines += [("LT_HELPERS", "1")]
@@ -229,25 +234,10 @@ def configure(
 
     if "rgb_led" in features_wanted:
         sources += ["embed/io/rgb_led/stm32u5/rgb_led_lp.c"]
+        sources += ["embed/io/rgb_led/stm32u5/rgb_led_effects.c"]
         paths += ["embed/io/rgb_led/inc"]
         features_available.append("rgb_led")
         defines += [("USE_RGB_LED", "1")]
-
-    if "usb" in features_wanted:
-        sources += [
-            "embed/io/usb/stm32/usb_class_hid.c",
-            "embed/io/usb/stm32/usb_class_vcp.c",
-            "embed/io/usb/stm32/usb_class_webusb.c",
-            "embed/io/usb/stm32/usb.c",
-            "embed/io/usb/stm32/usbd_conf.c",
-            "embed/io/usb/stm32/usbd_core.c",
-            "embed/io/usb/stm32/usbd_ctlreq.c",
-            "embed/io/usb/stm32/usbd_ioreq.c",
-            "vendor/stm32u5xx_hal_driver/Src/stm32u5xx_ll_usb.c",
-        ]
-        features_available.append("usb")
-        paths += ["embed/io/usb/inc"]
-        defines += [("USE_USB", "1")]
 
     if "hw_revision" in features_wanted:
         defines += [("USE_HW_REVISION", "1")]

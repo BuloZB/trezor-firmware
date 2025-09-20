@@ -15,11 +15,26 @@ EVENT_SOC_UPDATED: int
 
 
 # upymod/modtrezorio/modtrezorio-pm.h
+def soc() -> int:
+   """
+   Returns the state of charge (SoC) in percent (0-100). Raises RuntimeError
+   on failure.
+   """
+
+
+# upymod/modtrezorio/modtrezorio-pm.h
 def suspend() -> int:
     """
     Suspends the device. Returns wakeup flag. Raises RuntimeError on
     failure.
     Wakeup flags: BUTTON=1, POWER=2, BLE=4, NFC=8, RTC=16
+    """
+
+
+# upymod/modtrezorio/modtrezorio-pm.h
+def hibernate() -> None:
+    """
+    Hibernates the device. Raises RuntimeError on failure.
     """
 
 

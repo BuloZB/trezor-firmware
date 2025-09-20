@@ -674,6 +674,8 @@ class MessageType(IntEnum):
     NostrPubkey = 2002
     NostrSignEvent = 2003
     NostrEventSignature = 2004
+    EvoluGetNode = 2100
+    EvoluNode = 2101
     BenchmarkListNames = 9100
     BenchmarkNames = 9101
     BenchmarkRun = 9102
@@ -959,15 +961,15 @@ class TextMemo(protobuf.MessageType):
 class TextDetailsMemo(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = None
     FIELDS = {
-        1: protobuf.Field("title", "string", repeated=False, required=False, default=''),
-        2: protobuf.Field("text", "string", repeated=False, required=False, default=''),
+        1: protobuf.Field("title", "string", repeated=False, required=True),
+        2: protobuf.Field("text", "string", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        title: Optional["str"] = '',
-        text: Optional["str"] = '',
+        title: "str",
+        text: "str",
     ) -> None:
         self.title = title
         self.text = text
@@ -2033,14 +2035,17 @@ class BleUnpair(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 8001
     FIELDS = {
         1: protobuf.Field("all", "bool", repeated=False, required=False, default=None),
+        2: protobuf.Field("addr", "bytes", repeated=False, required=False, default=None),
     }
 
     def __init__(
         self,
         *,
         all: Optional["bool"] = None,
+        addr: Optional["bytes"] = None,
     ) -> None:
         self.all = all
+        self.addr = addr
 
 
 class FirmwareErase(protobuf.MessageType):
@@ -3233,6 +3238,7 @@ class Features(protobuf.MessageType):
         52: protobuf.Field("haptic_feedback", "bool", repeated=False, required=False, default=None),
         53: protobuf.Field("recovery_type", "RecoveryType", repeated=False, required=False, default=None),
         54: protobuf.Field("optiga_sec", "uint32", repeated=False, required=False, default=None),
+        55: protobuf.Field("soc", "uint32", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -3290,6 +3296,7 @@ class Features(protobuf.MessageType):
         haptic_feedback: Optional["bool"] = None,
         recovery_type: Optional["RecoveryType"] = None,
         optiga_sec: Optional["int"] = None,
+        soc: Optional["int"] = None,
     ) -> None:
         self.capabilities: Sequence["Capability"] = capabilities if capabilities is not None else []
         self.major_version = major_version
@@ -3343,6 +3350,7 @@ class Features(protobuf.MessageType):
         self.haptic_feedback = haptic_feedback
         self.recovery_type = recovery_type
         self.optiga_sec = optiga_sec
+        self.soc = soc
 
 
 class LockDevice(protobuf.MessageType):
@@ -3383,6 +3391,7 @@ class ApplySettings(protobuf.MessageType):
         11: protobuf.Field("hide_passphrase_from_host", "bool", repeated=False, required=False, default=None),
         13: protobuf.Field("haptic_feedback", "bool", repeated=False, required=False, default=None),
         14: protobuf.Field("homescreen_length", "uint32", repeated=False, required=False, default=None),
+        15: protobuf.Field("auto_lock_delay_battery_ms", "uint32", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -3401,6 +3410,7 @@ class ApplySettings(protobuf.MessageType):
         hide_passphrase_from_host: Optional["bool"] = None,
         haptic_feedback: Optional["bool"] = None,
         homescreen_length: Optional["int"] = None,
+        auto_lock_delay_battery_ms: Optional["int"] = None,
     ) -> None:
         self.language = language
         self.label = label
@@ -3415,6 +3425,7 @@ class ApplySettings(protobuf.MessageType):
         self.hide_passphrase_from_host = hide_passphrase_from_host
         self.haptic_feedback = haptic_feedback
         self.homescreen_length = homescreen_length
+        self.auto_lock_delay_battery_ms = auto_lock_delay_battery_ms
 
 
 class ChangeLanguage(protobuf.MessageType):
@@ -3615,18 +3626,24 @@ class AuthenticateDevice(protobuf.MessageType):
 class AuthenticityProof(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 98
     FIELDS = {
-        1: protobuf.Field("certificates", "bytes", repeated=True, required=False, default=None),
-        2: protobuf.Field("signature", "bytes", repeated=False, required=True),
+        1: protobuf.Field("optiga_certificates", "bytes", repeated=True, required=False, default=None),
+        2: protobuf.Field("optiga_signature", "bytes", repeated=False, required=True),
+        3: protobuf.Field("tropic_certificates", "bytes", repeated=True, required=False, default=None),
+        4: protobuf.Field("tropic_signature", "bytes", repeated=False, required=False, default=None),
     }
 
     def __init__(
         self,
         *,
-        signature: "bytes",
-        certificates: Optional[Sequence["bytes"]] = None,
+        optiga_signature: "bytes",
+        optiga_certificates: Optional[Sequence["bytes"]] = None,
+        tropic_certificates: Optional[Sequence["bytes"]] = None,
+        tropic_signature: Optional["bytes"] = None,
     ) -> None:
-        self.certificates: Sequence["bytes"] = certificates if certificates is not None else []
-        self.signature = signature
+        self.optiga_certificates: Sequence["bytes"] = optiga_certificates if optiga_certificates is not None else []
+        self.tropic_certificates: Sequence["bytes"] = tropic_certificates if tropic_certificates is not None else []
+        self.optiga_signature = optiga_signature
+        self.tropic_signature = tropic_signature
 
 
 class WipeDevice(protobuf.MessageType):
@@ -5499,6 +5516,24 @@ class EthereumFieldType(protobuf.MessageType):
         self.struct_name = struct_name
 
 
+class EvoluGetNode(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2100
+
+
+class EvoluNode(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2101
+    FIELDS = {
+        1: protobuf.Field("data", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        data: "bytes",
+    ) -> None:
+        self.data = data
+
+
 class MoneroTransactionSourceEntry(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = None
     FIELDS = {
@@ -7257,6 +7292,7 @@ class StellarSignTx(protobuf.MessageType):
         12: protobuf.Field("memo_id", "uint64", repeated=False, required=False, default=None),
         13: protobuf.Field("memo_hash", "bytes", repeated=False, required=False, default=None),
         14: protobuf.Field("num_operations", "uint32", repeated=False, required=True),
+        15: protobuf.Field("payment_req", "PaymentRequest", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -7274,6 +7310,7 @@ class StellarSignTx(protobuf.MessageType):
         memo_text: Optional["str"] = None,
         memo_id: Optional["int"] = None,
         memo_hash: Optional["bytes"] = None,
+        payment_req: Optional["PaymentRequest"] = None,
     ) -> None:
         self.address_n: Sequence["int"] = address_n if address_n is not None else []
         self.network_passphrase = network_passphrase
@@ -7287,6 +7324,7 @@ class StellarSignTx(protobuf.MessageType):
         self.memo_text = memo_text
         self.memo_id = memo_id
         self.memo_hash = memo_hash
+        self.payment_req = payment_req
 
 
 class StellarTxOpRequest(protobuf.MessageType):
@@ -8103,15 +8141,15 @@ class ThpCreateNewSession(protobuf.MessageType):
 class ThpPairingRequest(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 1008
     FIELDS = {
-        1: protobuf.Field("host_name", "string", repeated=False, required=False, default=None),
-        2: protobuf.Field("app_name", "string", repeated=False, required=False, default=None),
+        1: protobuf.Field("host_name", "string", repeated=False, required=True),
+        2: protobuf.Field("app_name", "string", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        host_name: Optional["str"] = None,
-        app_name: Optional["str"] = None,
+        host_name: "str",
+        app_name: "str",
     ) -> None:
         self.host_name = host_name
         self.app_name = app_name
@@ -8365,6 +8403,37 @@ class ThpAuthenticatedCredentialData(protobuf.MessageType):
     ) -> None:
         self.host_static_public_key = host_static_public_key
         self.cred_metadata = cred_metadata
+
+
+class ThpPairedCache(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = None
+    FIELDS = {
+        1: protobuf.Field("entries", "ThpPairedCacheEntry", repeated=True, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        entries: Optional[Sequence["ThpPairedCacheEntry"]] = None,
+    ) -> None:
+        self.entries: Sequence["ThpPairedCacheEntry"] = entries if entries is not None else []
+
+
+class ThpPairedCacheEntry(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = None
+    FIELDS = {
+        1: protobuf.Field("mac_addr", "bytes", repeated=False, required=True),
+        2: protobuf.Field("host_name", "string", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        mac_addr: "bytes",
+        host_name: "str",
+    ) -> None:
+        self.mac_addr = mac_addr
+        self.host_name = host_name
 
 
 class WebAuthnListResidentCredentials(protobuf.MessageType):

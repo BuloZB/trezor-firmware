@@ -16,6 +16,7 @@
 # You should have received a copy of the License along with this library.
 # If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
 
+import importlib.metadata
 import json
 import logging
 import os
@@ -24,7 +25,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional, TypeVar, ca
 
 import click
 
-from .. import __version__, log, messages, protobuf
+from .. import log, messages, protobuf
 from ..transport import DeviceIsBusy, enumerate_devices
 from ..transport.session import Session
 from ..transport.udp import UdpTransport
@@ -40,6 +41,7 @@ from . import (
     device,
     eos,
     ethereum,
+    evolu,
     fido,
     firmware,
     monero,
@@ -140,7 +142,7 @@ class TrezorctlGroup(AliasedGroup):
         # This means that there is no reasonable way to use `hasattr` to detect where we
         # are, unless we want to look at the private `_result_callback` attribute.
         # Instead, we look at Click version and hope for the best.
-        from click import __version__ as click_version
+        click_version = importlib.metadata.version("click")
 
         if click_version.startswith("7."):
             return super().resultcallback()  # type: ignore [Cannot access attribute]
@@ -164,6 +166,13 @@ def configure_logging(verbose: int) -> None:
     "--path",
     help="Select device by specific path.",
     default=os.environ.get("TREZOR_PATH"),
+)
+@click.option(
+    "-B",
+    "--ble/--no-ble",
+    help="Enable/disable support for Bluetooth Low Energy.",
+    is_flag=True,
+    default=(os.environ.get("TREZOR_BLE") == "1"),
 )
 @click.option("-v", "--verbose", count=True, help="Show communication messages.")
 @click.option(
@@ -193,11 +202,12 @@ def configure_logging(verbose: int) -> None:
     "--record",
     help="Record screen changes into a specified directory.",
 )
-@click.version_option(version=__version__)
+@click.version_option(package_name="trezor")
 @click.pass_context
 def cli_main(
     ctx: click.Context,
     path: str,
+    ble: bool,
     verbose: int,
     is_json: bool,
     passphrase_on_host: bool,
@@ -214,7 +224,9 @@ def cli_main(
         except ValueError:
             raise click.ClickException(f"Not a valid session id: {session_id}")
 
-    ctx.obj = TrezorConnection(path, bytes_session_id, passphrase_on_host, script)
+    ctx.obj = TrezorConnection(
+        path, bytes_session_id, passphrase_on_host, script, ble_enabled=ble
+    )
 
     # Optionally record the screen into a specified directory.
     if record:
@@ -282,16 +294,19 @@ def format_device_name(features: messages.Features) -> str:
 
 @cli.command(name="list")
 @click.option("-n", "no_resolve", is_flag=True, help="Do not resolve Trezor names")
-def list_devices(no_resolve: bool) -> Optional[Iterable["Transport"]]:
+@click.pass_obj
+def list_devices(
+    obj: TrezorConnection, no_resolve: bool
+) -> Optional[Iterable["Transport"]]:
     """List connected Trezor devices."""
     if no_resolve:
-        for d in enumerate_devices():
+        for d in enumerate_devices(ble_enabled=obj.ble_enabled):
             click.echo(d.get_path())
         return
 
     from . import get_client
 
-    for transport in enumerate_devices():
+    for transport in enumerate_devices(ble_enabled=obj.ble_enabled):
         try:
             transport.open()
             client = get_client(transport)
@@ -309,7 +324,7 @@ def list_devices(no_resolve: bool) -> Optional[Iterable["Transport"]]:
 @cli.command()
 def version() -> str:
     """Show version of trezorctl/trezorlib."""
-    return __version__
+    return importlib.metadata.version("trezor")
 
 
 #
@@ -410,6 +425,7 @@ cli.add_command(crypto.cli)
 cli.add_command(device.cli)
 cli.add_command(eos.cli)
 cli.add_command(ethereum.cli)
+cli.add_command(evolu.cli)
 cli.add_command(fido.cli)
 cli.add_command(monero.cli)
 cli.add_command(nem.cli)

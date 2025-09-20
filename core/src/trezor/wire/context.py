@@ -151,7 +151,10 @@ def try_get_ctx_ids() -> tuple[bytes, bytes] | None:
     if utils.USE_THP:
         from trezor.wire.thp.session_context import GenericSessionContext
 
-        ctx = get_context()
+        try:
+            ctx = get_context()
+        except NoWireContext:
+            return None
         if isinstance(ctx, GenericSessionContext):
             ids = (ctx.channel_id, ctx.session_id.to_bytes(1, "big"))
     return ids
@@ -218,6 +221,6 @@ def cache_delete(key: int) -> None:
 def _get_cache_for_key(key: int) -> DataCache:
     if key & SESSIONLESS_FLAG:
         return cache.get_sessionless_cache()
-    if CURRENT_CONTEXT:
-        return CURRENT_CONTEXT.cache
-    raise Exception("No wire context")
+    if CURRENT_CONTEXT is None:
+        raise NoWireContext
+    return CURRENT_CONTEXT.cache

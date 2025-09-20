@@ -200,6 +200,30 @@ ble-erase-bonds
 OK
 ```
 
+### ble-get-bonds
+Retrieves all BLE bonds from the device.
+
+Example:
+```
+ble-get-bonds
+# Initializing the BLE...
+# Got 1 bonds.
+# Bond 1: 5c:dc:49:d1:8d:35
+OK
+```
+
+### ble-unpair
+Unpairs a BLE device. It accepts one parameter, which is index returned by the `ble-get-bonds` command.
+
+`ble-unpair <index>`
+
+Example:
+```
+ble-unpair 1
+# Initializing the BLE...
+# Unpaired.
+OK
+```
 
 ### ble-radio-test
 Runs radio test proxy-client. It requires special nRF radio test firmware, see https://docs.nordicsemi.com/bundle/sdk_nrf5_v17.0.2/page/nrf_radio_test_example.html for usage.
@@ -338,8 +362,7 @@ Updates the nRF firmware. Use `core/tools/bin_update.py` script to update the nR
 
 ### nrf-pair
 Writes the pairing secret to the nRF chip to pair it with the MCU.
-The command `secrets-init` must be executed before calling this command.
-Pairing needs to be done before writing device serial number in the OTP memory and before locking the Optiga chip.
+This command may be called only after `secrets-init` was executed and before `secrets-lock` is executed.
 
 Example:
 ```
@@ -517,6 +540,28 @@ rgbled-set 255 0 0
 OK
 ```
 
+### rgbled-effect-start
+Start the rgb effect from the predefined list. Command takes two arguments, first argument defines a number of the rgbled effect, second argument then defines number of requested cycles for which the effect should run. `requested_cycles` argument is optional, calling the command without it will run effect indefinitely.
+
+`rgbled-effect-start <effect_num> <requested_cycles>`
+
+Example:
+```
+rgbled-effect-start 0 2
+# Start RGB LED effect #0 for 2 cycles
+OK
+```
+
+### rgbled-effect-stop
+Stop the ongoing rgbled effect.
+
+Examples:
+```
+rgbled-effect-stop
+# Stop ongoing RGB LED effect
+OK
+```
+
 ### otp-batch-read
 Retrieves the batch string from the device's OTP memory. The batch string identifies the model and production batch of the device.
 
@@ -676,7 +721,8 @@ OK 638c8a83ddc8fd84cddf5a0a4fa3d9615146cd341685dca942bab1132c2bc99b
 ```
 
 ### secrets-certdev-write
-Writes the X.509 device attestation certificate issued by the Trezor Company for the attestation key stored in MCU.
+Writes the X.509 device attestation certificate issued by the Trezor Company for the attestation key stored in the MCU.
+The `otp-device-sn-write` command must be executed before calling this command.
 
 Example:
 ```
@@ -685,7 +731,7 @@ OK
 ```
 
 ### secrets-certdev-read
-Retrieves the X.509 device attestation certificate issued by the Trezor Company for the attestation key stored in MCU.
+Retrieves the X.509 device attestation certificate issued by the Trezor Company for the attestation key stored in the MCU.
 
 Example:
 ```
@@ -722,6 +768,7 @@ OK <hexadecimal string>
 
 ### optiga-certdev-write
 Writes the X.509 certificate issued by the Trezor Company for the device attestation key stored in Optiga.
+The `otp-device-sn-write` command must be executed before calling this command.
 
 Example:
 ```
@@ -984,7 +1031,7 @@ OK 00000300
 
 ### tropic-get-chip-id
 
-Reads the Tropic chip ID. The command returns `OK` followed by the chip ID.
+Reads the Tropic chip ID. The command returns `OK` followed by the 128-byte serialization of `lt_chip_id_t`.
 
 Example:
 ```
@@ -1095,6 +1142,7 @@ OK <hexadecimal string>
 ### tropic-certdev-write
 
 Writes the X.509 certificate issued by the Trezor Company for the device attestation key stored in Tropic.
+The `otp-device-sn-write` command must be executed before calling this command.
 
 Example:
 ```
@@ -1119,6 +1167,18 @@ Writes the X.509 certificate issued by the Trezor Company for the FIDO attestati
 Example:
 ```
 tropic-certfido-write <hexadecimal string>
+OK <hexadecimal string>
+```
+
+### tropic-keyfido-read
+
+Retrieves the FIDO attestation public key stored in Tropic.
+
+This command can be used to verify that the FIDO attestation key was stored correctly by verifying that the returned string of bytes appears in the FIDO attestation certificate.
+
+Example:
+```
+tropic-keyfido-read
 OK <hexadecimal string>
 ```
 

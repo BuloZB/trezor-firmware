@@ -390,9 +390,10 @@ def test_safety_checks(session: Session):
 
     assert session.features.safety_checks == messages.SafetyCheckLevel.Strict
 
-    with pytest.raises(
-        exceptions.TrezorFailure, match="Forbidden key path"
-    ), session.client as client:
+    with (
+        pytest.raises(exceptions.TrezorFailure, match="Forbidden key path"),
+        session.client as client,
+    ):
         client.set_expected_responses([messages.Failure])
         get_bad_address()
 
@@ -419,9 +420,10 @@ def test_safety_checks(session: Session):
 
     assert session.features.safety_checks == messages.SafetyCheckLevel.Strict
 
-    with pytest.raises(
-        exceptions.TrezorFailure, match="Forbidden key path"
-    ), session.client as client:
+    with (
+        pytest.raises(exceptions.TrezorFailure, match="Forbidden key path"),
+        session.client as client,
+    ):
         client.set_expected_responses([messages.Failure])
         get_bad_address()
 
@@ -459,9 +461,10 @@ def test_experimental_features(session: Session):
 
     assert not session.features.experimental_features
 
-    with pytest.raises(
-        exceptions.TrezorFailure, match="DataError"
-    ), session.client as client:
+    with (
+        pytest.raises(exceptions.TrezorFailure, match="DataError"),
+        session.client as client,
+    ):
         client.set_expected_responses([messages.Failure])
         experimental_call()
 
@@ -488,6 +491,17 @@ def test_label_too_long(session: Session):
     with pytest.raises(exceptions.TrezorFailure), session.client as client:
         client.set_expected_responses([messages.Failure])
         device.apply_settings(session, label="A" * 33)
+
+
+@pytest.mark.setup_client(pin=None)
+@pytest.mark.parametrize(
+    "label",
+    ["", "A" * 32],
+    ids=["empty", "max_len"],
+)
+def test_set_label(session: Session, label: str):
+    with session.client:
+        device.apply_settings(session, label=label)
 
 
 U8_MIN = 0

@@ -8,6 +8,7 @@ use crate::micropython::qstr::Qstr;
 
 #[derive(Copy, Clone, FromPrimitive, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
+#[cfg_attr(test, derive(Debug))]
 #[repr(u16)]
 #[allow(non_camel_case_types)]
 pub enum TranslatedString {
@@ -419,7 +420,7 @@ pub enum TranslatedString {
     #[cfg(feature = "universal_fw")]
     ethereum__contract = 272,  // {"Bolt": "Contract", "Caesar": "Contract", "Delizia": "Contract", "Eckhart": "Call contract"}
     #[cfg(feature = "universal_fw")]
-    ethereum__data_size_template = 273,  // "Size: {0}\u{00a0}bytes"
+    ethereum__data_size_template = 273,  // "Size: {0} bytes"
     #[cfg(feature = "universal_fw")]
     ethereum__gas_limit = 274,  // "Gas limit"
     #[cfg(feature = "universal_fw")]
@@ -457,7 +458,7 @@ pub enum TranslatedString {
     #[cfg(feature = "universal_fw")]
     ethereum__title_signing_address = 291,  // "Signing address"
     #[cfg(feature = "universal_fw")]
-    ethereum__units_template = 292,  // "{0}\u{00a0}units"
+    ethereum__units_template = 292,  // "{0} units"
     #[cfg(feature = "universal_fw")]
     ethereum__unknown_token = 293,  // "Unknown token"
     #[cfg(feature = "universal_fw")]
@@ -785,7 +786,7 @@ pub enum TranslatedString {
     recovery__wanna_cancel_dry_run = 526,  // "Are you sure you want to cancel the backup check?"
     recovery__wanna_cancel_recovery = 527,  // "Are you sure you want to cancel the recovery process?"
     recovery__word_count_template = 528,  // "({0} words)"
-    recovery__word_x_of_y_template = 529,  // "Word {0} of {1}"
+    recovery__word_x_of_y_template = 529,  // {"Bolt": "Word {0} of {1}", "Caesar": "Word {0} of {1}", "Delizia": "Word {0} of {1}", "Eckhart": "Word {0}\nof {1}"}
     recovery__x_more_items_starting_template_plural = 530,  // {"Bolt": "{count} more {plural} starting", "Caesar": "{count} more {plural} starting", "Delizia": "{count} more {plural} starting", "Eckhart": "You need {count} more {plural} starting"}
     recovery__x_more_shares_needed_template_plural = 531,  // {"Bolt": "{count} more {plural} needed", "Caesar": "{count} more {plural} needed", "Delizia": "{count} more {plural} needed", "Eckhart": "{count} more {plural} needed."}
     recovery__x_of_y_entered_template = 532,  // {"Bolt": "{0} of {1} shares entered", "Caesar": "{0} of {1} shares entered", "Delizia": "{0} of {1} shares entered", "Eckhart": "{0} of {1} shares entered."}
@@ -913,7 +914,7 @@ pub enum TranslatedString {
     send__you_are_contributing = 655,  // "You are contributing:"
     share_words__words_in_order = 656,  // " words in order."
     share_words__wrote_down_all = 657,  // "I wrote down all "
-    sign_message__bytes_template = 658,  // "{0}\u{00a0}Bytes"
+    sign_message__bytes_template = 658,  // "{0} Bytes"
     sign_message__confirm_address = 659,  // "Signing address"
     sign_message__confirm_message = 660,  // "Confirm message"
     sign_message__message_size = 661,  // "Message size"
@@ -1289,7 +1290,7 @@ pub enum TranslatedString {
     tutorial__first_wallet = 944,  // "The Trezor Model One, created in 2013,\nwas the world's first hardware wallet."
     tutorial__restart_tutorial = 945,  // "Restart tutorial"
     tutorial__title_handy_menu = 946,  // "Handy menu"
-    tutorial__title_hold = 947,  // {"Bolt": "Hold to confirm important actions", "Caesar": "Hold to confirm important actions", "Delizia": "Hold to confirm important actions", "Eckhart": "Hold the button to confirm important actions."}
+    tutorial__title_hold = 947,  // {"Bolt": "Hold to confirm important actions", "Caesar": "Hold to confirm important actions", "Delizia": "Hold to confirm important actions", "Eckhart": "Hold the on-screen button at the bottom to confirm important actions."}
     tutorial__title_well_done = 948,  // "Well done!"
     tutorial__lets_begin = 949,  // "Learn how to use and navigate this device with ease."
     tutorial__get_started = 950,  // "Get started!"
@@ -1410,7 +1411,7 @@ pub enum TranslatedString {
     words__wallet = 1028,  // "Wallet"
     words__authenticate = 1029,  // "Authenticate"
     #[cfg(feature = "universal_fw")]
-    ethereum__title_all_input_data_template = 1031,  // "All input data ({0}\u{00a0}bytes)"
+    ethereum__title_all_input_data_template = 1031,  // "All input data ({0} bytes)"
     auto_lock__description = 1032,  // "Set the time before your Trezor locks automatically."
     plurals__lock_after_x_days = 1033,  // "day|days"
     firmware_update__restart = 1034,  // "Trezor will restart after update."
@@ -1441,7 +1442,7 @@ pub enum TranslatedString {
     instructions__menu_to_continue = 1058,  // "Use menu to continue"
     tutorial__last_one = 1059,  // "Last one"
     tutorial__menu_appendix = 1060,  // "View more info, quit flow, ..."
-    tutorial__navigation_ts7 = 1061,  // "Use buttons at the bottom to navigate and confirm your actions."
+    tutorial__navigation_ts7 = 1061,  // "Use the on-screen buttons to navigate and confirm your actions."
     tutorial__suite_restart = 1062,  // "Replay this tutorial anytime from the Trezor Suite app."
     tutorial__welcome_safe7 = 1067,  // "Welcome\nto Trezor\nSafe 7"
     tutorial__what_is_tropic = 1068,  // "What is TROPIC01?"
@@ -1509,6 +1510,45 @@ pub enum TranslatedString {
     wipe__start_again = 1118,  // "Wipe your Trezor and start the setup process again."
     words__set = 1119,  // "Set"
     words__wipe = 1120,  // "Wipe"
+    lockscreen__unlock = 1121,  // "Unlock"
+    recovery__start_entering = 1122,  // "Start entering"
+    words__disconnected = 1123,  // "Disconnected"
+    ble__forget_all = 1124,  // "Forget all"
+    words__connect = 1125,  // "Connect"
+    words__forget = 1126,  // "Forget"
+    words__power = 1127,  // "Power"
+    ble__limit_reached = 1128,  // "Limit of paired devices reached"
+    ble__forget_all_description = 1129,  // "They'll be removed, and you'll need to pair them again before use."
+    ble__forget_all_devices = 1130,  // "Forget all devices?"
+    ble__forget_all_success = 1131,  // "All hosts removed."
+    ble__forget_this_description = 1132,  // "It will be removed, and you'll need to pair it again before use."
+    ble__forget_this_device = 1133,  // "Forget this device?"
+    ble__forget_this_success = 1134,  // "Host removed."
+    thp__autoconnect = 1135,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Allow {0} to connect automatically to this Trezor?"}
+    thp__autoconnect_app = 1136,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Allow {0} on {1} to connect automatically to this Trezor?"}
+    thp__connect = 1137,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Allow {0} to connect with this Trezor?"}
+    thp__connect_app = 1138,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Allow {0} on {1} to connect with this Trezor?"}
+    thp__pair = 1139,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Allow {0} to pair with this Trezor?"}
+    thp__pair_app = 1140,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Allow {0} on {1} to pair with this Trezor?"}
+    thp__autoconnect_title = 1141,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Autoconnect credential"}
+    thp__code_entry = 1142,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Enter this one-time security code on {0}"}
+    thp__code_title = 1143,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "One more step"}
+    thp__connect_title = 1144,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Connection dialog"}
+    thp__nfc_text = 1145,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Keep your Trezor near your phone to complete the setup."}
+    thp__pair_title = 1146,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Before you continue"}
+    thp__qr_title = 1147,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Scan QR code to pair"}
+    ble__pairing_match = 1148,  // "Pairing code match?"
+    ble__pairing_title = 1149,  // "Bluetooth pairing"
+    thp__continue_on_host = 1150,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Continue on host"}
+    thp__pair_name = 1151,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "{0} is your Trezor's name."}
+    thp__pair_new_device = 1152,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Pair with new device"}
+    tutorial__power = 1153,  // "Use the power button on the side to turn your device on or off."
+    auto_lock__on_battery = 1154,  // "on battery / wireless charger"
+    auto_lock__on_usb = 1155,  // "connected to USB"
+    pin__wipe_code_exists_description = 1156,  // "Wipe code must be turned off before turning off PIN protection."
+    pin__wipe_code_exists_title = 1157,  // "Wipe code set"
+    wipe_code__pin_not_set_description = 1158,  // "PIN must be set before enabling wipe code."
+    wipe_code__cancel_setup = 1159,  // {"Bolt": "Cancel wipe code setup", "Caesar": "Cancel wipe code setup", "Delizia": "Cancel wipe code setup", "Eckhart": "Cancel wipe code setup?"}
 }
 
 impl TranslatedString {
@@ -1945,7 +1985,7 @@ impl TranslatedString {
             #[cfg(feature = "layout_eckhart")]
             (Self::ethereum__contract, "Call contract"),
             #[cfg(feature = "universal_fw")]
-            (Self::ethereum__data_size_template, "Size: {0}\u{00a0}bytes"),
+            (Self::ethereum__data_size_template, "Size: {0} bytes"),
             #[cfg(feature = "universal_fw")]
             (Self::ethereum__gas_limit, "Gas limit"),
             #[cfg(feature = "universal_fw")]
@@ -1983,7 +2023,7 @@ impl TranslatedString {
             #[cfg(feature = "universal_fw")]
             (Self::ethereum__title_signing_address, "Signing address"),
             #[cfg(feature = "universal_fw")]
-            (Self::ethereum__units_template, "{0}\u{00a0}units"),
+            (Self::ethereum__units_template, "{0} units"),
             #[cfg(feature = "universal_fw")]
             (Self::ethereum__unknown_token, "Unknown token"),
             #[cfg(feature = "universal_fw")]
@@ -2450,7 +2490,14 @@ impl TranslatedString {
             (Self::recovery__wanna_cancel_dry_run, "Are you sure you want to cancel the backup check?"),
             (Self::recovery__wanna_cancel_recovery, "Are you sure you want to cancel the recovery process?"),
             (Self::recovery__word_count_template, "({0} words)"),
+            #[cfg(feature = "layout_bolt")]
             (Self::recovery__word_x_of_y_template, "Word {0} of {1}"),
+            #[cfg(feature = "layout_caesar")]
+            (Self::recovery__word_x_of_y_template, "Word {0} of {1}"),
+            #[cfg(feature = "layout_delizia")]
+            (Self::recovery__word_x_of_y_template, "Word {0} of {1}"),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::recovery__word_x_of_y_template, "Word {0}\nof {1}"),
             #[cfg(feature = "layout_bolt")]
             (Self::recovery__x_more_items_starting_template_plural, "{count} more {plural} starting"),
             #[cfg(feature = "layout_caesar")]
@@ -2634,7 +2681,7 @@ impl TranslatedString {
             (Self::send__you_are_contributing, "You are contributing:"),
             (Self::share_words__words_in_order, " words in order."),
             (Self::share_words__wrote_down_all, "I wrote down all "),
-            (Self::sign_message__bytes_template, "{0}\u{00a0}Bytes"),
+            (Self::sign_message__bytes_template, "{0} Bytes"),
             (Self::sign_message__confirm_address, "Signing address"),
             (Self::sign_message__confirm_message, "Confirm message"),
             (Self::sign_message__message_size, "Message size"),
@@ -3080,7 +3127,7 @@ impl TranslatedString {
             #[cfg(feature = "layout_delizia")]
             (Self::tutorial__title_hold, "Hold to confirm important actions"),
             #[cfg(feature = "layout_eckhart")]
-            (Self::tutorial__title_hold, "Hold the button to confirm important actions."),
+            (Self::tutorial__title_hold, "Hold the on-screen button at the bottom to confirm important actions."),
             (Self::tutorial__title_well_done, "Well done!"),
             (Self::tutorial__lets_begin, "Learn how to use and navigate this device with ease."),
             (Self::tutorial__get_started, "Get started!"),
@@ -3231,7 +3278,7 @@ impl TranslatedString {
             (Self::words__wallet, "Wallet"),
             (Self::words__authenticate, "Authenticate"),
             #[cfg(feature = "universal_fw")]
-            (Self::ethereum__title_all_input_data_template, "All input data ({0}\u{00a0}bytes)"),
+            (Self::ethereum__title_all_input_data_template, "All input data ({0} bytes)"),
             (Self::auto_lock__description, "Set the time before your Trezor locks automatically."),
             (Self::plurals__lock_after_x_days, "day|days"),
             (Self::firmware_update__restart, "Trezor will restart after update."),
@@ -3269,7 +3316,7 @@ impl TranslatedString {
             (Self::instructions__menu_to_continue, "Use menu to continue"),
             (Self::tutorial__last_one, "Last one"),
             (Self::tutorial__menu_appendix, "View more info, quit flow, ..."),
-            (Self::tutorial__navigation_ts7, "Use buttons at the bottom to navigate and confirm your actions."),
+            (Self::tutorial__navigation_ts7, "Use the on-screen buttons to navigate and confirm your actions."),
             (Self::tutorial__suite_restart, "Replay this tutorial anytime from the Trezor Suite app."),
             (Self::tutorial__welcome_safe7, "Welcome\nto Trezor\nSafe 7"),
             (Self::tutorial__what_is_tropic, "What is TROPIC01?"),
@@ -3337,6 +3384,164 @@ impl TranslatedString {
             (Self::wipe__start_again, "Wipe your Trezor and start the setup process again."),
             (Self::words__set, "Set"),
             (Self::words__wipe, "Wipe"),
+            (Self::lockscreen__unlock, "Unlock"),
+            (Self::recovery__start_entering, "Start entering"),
+            (Self::words__disconnected, "Disconnected"),
+            (Self::ble__forget_all, "Forget all"),
+            (Self::words__connect, "Connect"),
+            (Self::words__forget, "Forget"),
+            (Self::words__power, "Power"),
+            (Self::ble__limit_reached, "Limit of paired devices reached"),
+            (Self::ble__forget_all_description, "They'll be removed, and you'll need to pair them again before use."),
+            (Self::ble__forget_all_devices, "Forget all devices?"),
+            (Self::ble__forget_all_success, "All hosts removed."),
+            (Self::ble__forget_this_description, "It will be removed, and you'll need to pair it again before use."),
+            (Self::ble__forget_this_device, "Forget this device?"),
+            (Self::ble__forget_this_success, "Host removed."),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__autoconnect, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__autoconnect, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__autoconnect, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__autoconnect, "Allow {0} to connect automatically to this Trezor?"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__autoconnect_app, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__autoconnect_app, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__autoconnect_app, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__autoconnect_app, "Allow {0} on {1} to connect automatically to this Trezor?"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__connect, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__connect, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__connect, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__connect, "Allow {0} to connect with this Trezor?"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__connect_app, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__connect_app, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__connect_app, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__connect_app, "Allow {0} on {1} to connect with this Trezor?"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__pair, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__pair, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__pair, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__pair, "Allow {0} to pair with this Trezor?"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__pair_app, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__pair_app, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__pair_app, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__pair_app, "Allow {0} on {1} to pair with this Trezor?"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__autoconnect_title, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__autoconnect_title, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__autoconnect_title, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__autoconnect_title, "Autoconnect credential"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__code_entry, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__code_entry, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__code_entry, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__code_entry, "Enter this one-time security code on {0}"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__code_title, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__code_title, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__code_title, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__code_title, "One more step"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__connect_title, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__connect_title, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__connect_title, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__connect_title, "Connection dialog"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__nfc_text, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__nfc_text, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__nfc_text, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__nfc_text, "Keep your Trezor near your phone to complete the setup."),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__pair_title, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__pair_title, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__pair_title, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__pair_title, "Before you continue"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__qr_title, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__qr_title, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__qr_title, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__qr_title, "Scan QR code to pair"),
+            (Self::ble__pairing_match, "Pairing code match?"),
+            (Self::ble__pairing_title, "Bluetooth pairing"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__continue_on_host, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__continue_on_host, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__continue_on_host, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__continue_on_host, "Continue on host"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__pair_name, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__pair_name, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__pair_name, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__pair_name, "{0} is your Trezor's name."),
+            #[cfg(feature = "layout_bolt")]
+            (Self::thp__pair_new_device, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::thp__pair_new_device, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::thp__pair_new_device, ""),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::thp__pair_new_device, "Pair with new device"),
+            (Self::tutorial__power, "Use the power button on the side to turn your device on or off."),
+            (Self::auto_lock__on_battery, "on battery / wireless charger"),
+            (Self::auto_lock__on_usb, "connected to USB"),
+            (Self::pin__wipe_code_exists_description, "Wipe code must be turned off before turning off PIN protection."),
+            (Self::pin__wipe_code_exists_title, "Wipe code set"),
+            (Self::wipe_code__pin_not_set_description, "PIN must be set before enabling wipe code."),
+            #[cfg(feature = "layout_bolt")]
+            (Self::wipe_code__cancel_setup, "Cancel wipe code setup"),
+            #[cfg(feature = "layout_caesar")]
+            (Self::wipe_code__cancel_setup, "Cancel wipe code setup"),
+            #[cfg(feature = "layout_delizia")]
+            (Self::wipe_code__cancel_setup, "Cancel wipe code setup"),
+            #[cfg(feature = "layout_eckhart")]
+            (Self::wipe_code__cancel_setup, "Cancel wipe code setup?"),
     ];
 
     #[cfg(feature = "micropython")]
@@ -3370,6 +3575,8 @@ impl TranslatedString {
         (Qstr::MP_QSTR_authenticate__header, Self::authenticate__header),
         (Qstr::MP_QSTR_auto_lock__change_template, Self::auto_lock__change_template),
         (Qstr::MP_QSTR_auto_lock__description, Self::auto_lock__description),
+        (Qstr::MP_QSTR_auto_lock__on_battery, Self::auto_lock__on_battery),
+        (Qstr::MP_QSTR_auto_lock__on_usb, Self::auto_lock__on_usb),
         (Qstr::MP_QSTR_auto_lock__title, Self::auto_lock__title),
         (Qstr::MP_QSTR_auto_lock__turned_on, Self::auto_lock__turned_on),
         (Qstr::MP_QSTR_backup__can_back_up_anytime, Self::backup__can_back_up_anytime),
@@ -3416,9 +3623,19 @@ impl TranslatedString {
         (Qstr::MP_QSTR_bitcoin__voting_rights, Self::bitcoin__voting_rights),
         (Qstr::MP_QSTR_ble__disable, Self::ble__disable),
         (Qstr::MP_QSTR_ble__enable, Self::ble__enable),
+        (Qstr::MP_QSTR_ble__forget_all, Self::ble__forget_all),
+        (Qstr::MP_QSTR_ble__forget_all_description, Self::ble__forget_all_description),
+        (Qstr::MP_QSTR_ble__forget_all_devices, Self::ble__forget_all_devices),
+        (Qstr::MP_QSTR_ble__forget_all_success, Self::ble__forget_all_success),
+        (Qstr::MP_QSTR_ble__forget_this_description, Self::ble__forget_this_description),
+        (Qstr::MP_QSTR_ble__forget_this_device, Self::ble__forget_this_device),
+        (Qstr::MP_QSTR_ble__forget_this_success, Self::ble__forget_this_success),
+        (Qstr::MP_QSTR_ble__limit_reached, Self::ble__limit_reached),
         (Qstr::MP_QSTR_ble__manage_paired, Self::ble__manage_paired),
         (Qstr::MP_QSTR_ble__pair_new, Self::ble__pair_new),
         (Qstr::MP_QSTR_ble__pair_title, Self::ble__pair_title),
+        (Qstr::MP_QSTR_ble__pairing_match, Self::ble__pairing_match),
+        (Qstr::MP_QSTR_ble__pairing_title, Self::ble__pairing_title),
         (Qstr::MP_QSTR_ble__unpair_all, Self::ble__unpair_all),
         (Qstr::MP_QSTR_ble__unpair_current, Self::ble__unpair_current),
         (Qstr::MP_QSTR_ble__unpair_title, Self::ble__unpair_title),
@@ -4024,6 +4241,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_lockscreen__tap_to_unlock, Self::lockscreen__tap_to_unlock),
         (Qstr::MP_QSTR_lockscreen__title_locked, Self::lockscreen__title_locked),
         (Qstr::MP_QSTR_lockscreen__title_not_connected, Self::lockscreen__title_not_connected),
+        (Qstr::MP_QSTR_lockscreen__unlock, Self::lockscreen__unlock),
         (Qstr::MP_QSTR_misc__decrypt_value, Self::misc__decrypt_value),
         (Qstr::MP_QSTR_misc__enable_labeling, Self::misc__enable_labeling),
         (Qstr::MP_QSTR_misc__encrypt_value, Self::misc__encrypt_value),
@@ -4231,6 +4449,8 @@ impl TranslatedString {
         (Qstr::MP_QSTR_pin__tries_left, Self::pin__tries_left),
         (Qstr::MP_QSTR_pin__turn_off, Self::pin__turn_off),
         (Qstr::MP_QSTR_pin__turn_on, Self::pin__turn_on),
+        (Qstr::MP_QSTR_pin__wipe_code_exists_description, Self::pin__wipe_code_exists_description),
+        (Qstr::MP_QSTR_pin__wipe_code_exists_title, Self::pin__wipe_code_exists_title),
         (Qstr::MP_QSTR_pin__wrong_pin, Self::pin__wrong_pin),
         (Qstr::MP_QSTR_plurals__contains_x_keys, Self::plurals__contains_x_keys),
         (Qstr::MP_QSTR_plurals__lock_after_x_days, Self::plurals__lock_after_x_days),
@@ -4287,6 +4507,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_recovery__share_from_another_multi_share_backup, Self::recovery__share_from_another_multi_share_backup),
         (Qstr::MP_QSTR_recovery__share_from_group_entered_template, Self::recovery__share_from_group_entered_template),
         (Qstr::MP_QSTR_recovery__share_num_template, Self::recovery__share_num_template),
+        (Qstr::MP_QSTR_recovery__start_entering, Self::recovery__start_entering),
         (Qstr::MP_QSTR_recovery__title, Self::recovery__title),
         (Qstr::MP_QSTR_recovery__title_cancel_dry_run, Self::recovery__title_cancel_dry_run),
         (Qstr::MP_QSTR_recovery__title_cancel_recovery, Self::recovery__title_cancel_recovery),
@@ -4688,6 +4909,22 @@ impl TranslatedString {
         (Qstr::MP_QSTR_tezos__submit_proposal, Self::tezos__submit_proposal),
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_tezos__submit_proposals, Self::tezos__submit_proposals),
+        (Qstr::MP_QSTR_thp__autoconnect, Self::thp__autoconnect),
+        (Qstr::MP_QSTR_thp__autoconnect_app, Self::thp__autoconnect_app),
+        (Qstr::MP_QSTR_thp__autoconnect_title, Self::thp__autoconnect_title),
+        (Qstr::MP_QSTR_thp__code_entry, Self::thp__code_entry),
+        (Qstr::MP_QSTR_thp__code_title, Self::thp__code_title),
+        (Qstr::MP_QSTR_thp__connect, Self::thp__connect),
+        (Qstr::MP_QSTR_thp__connect_app, Self::thp__connect_app),
+        (Qstr::MP_QSTR_thp__connect_title, Self::thp__connect_title),
+        (Qstr::MP_QSTR_thp__continue_on_host, Self::thp__continue_on_host),
+        (Qstr::MP_QSTR_thp__nfc_text, Self::thp__nfc_text),
+        (Qstr::MP_QSTR_thp__pair, Self::thp__pair),
+        (Qstr::MP_QSTR_thp__pair_app, Self::thp__pair_app),
+        (Qstr::MP_QSTR_thp__pair_name, Self::thp__pair_name),
+        (Qstr::MP_QSTR_thp__pair_new_device, Self::thp__pair_new_device),
+        (Qstr::MP_QSTR_thp__pair_title, Self::thp__pair_title),
+        (Qstr::MP_QSTR_thp__qr_title, Self::thp__qr_title),
         (Qstr::MP_QSTR_tutorial__continue, Self::tutorial__continue),
         (Qstr::MP_QSTR_tutorial__did_you_know, Self::tutorial__did_you_know),
         (Qstr::MP_QSTR_tutorial__exit, Self::tutorial__exit),
@@ -4700,6 +4937,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_tutorial__middle_click, Self::tutorial__middle_click),
         (Qstr::MP_QSTR_tutorial__navigation_ts7, Self::tutorial__navigation_ts7),
         (Qstr::MP_QSTR_tutorial__one_more_step, Self::tutorial__one_more_step),
+        (Qstr::MP_QSTR_tutorial__power, Self::tutorial__power),
         (Qstr::MP_QSTR_tutorial__press_and_hold, Self::tutorial__press_and_hold),
         (Qstr::MP_QSTR_tutorial__ready_to_use, Self::tutorial__ready_to_use),
         (Qstr::MP_QSTR_tutorial__ready_to_use_safe5, Self::tutorial__ready_to_use_safe5),
@@ -4736,6 +4974,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_wipe__start_again, Self::wipe__start_again),
         (Qstr::MP_QSTR_wipe__title, Self::wipe__title),
         (Qstr::MP_QSTR_wipe__want_to_wipe, Self::wipe__want_to_wipe),
+        (Qstr::MP_QSTR_wipe_code__cancel_setup, Self::wipe_code__cancel_setup),
         (Qstr::MP_QSTR_wipe_code__change, Self::wipe_code__change),
         (Qstr::MP_QSTR_wipe_code__change_question, Self::wipe_code__change_question),
         (Qstr::MP_QSTR_wipe_code__changed, Self::wipe_code__changed),
@@ -4746,6 +4985,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_wipe_code__info, Self::wipe_code__info),
         (Qstr::MP_QSTR_wipe_code__invalid, Self::wipe_code__invalid),
         (Qstr::MP_QSTR_wipe_code__mismatch, Self::wipe_code__mismatch),
+        (Qstr::MP_QSTR_wipe_code__pin_not_set_description, Self::wipe_code__pin_not_set_description),
         (Qstr::MP_QSTR_wipe_code__reenter, Self::wipe_code__reenter),
         (Qstr::MP_QSTR_wipe_code__reenter_to_confirm, Self::wipe_code__reenter_to_confirm),
         (Qstr::MP_QSTR_wipe_code__remove, Self::wipe_code__remove),
@@ -4775,6 +5015,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_words__chain, Self::words__chain),
         (Qstr::MP_QSTR_words__confirm, Self::words__confirm),
         (Qstr::MP_QSTR_words__confirm_fee, Self::words__confirm_fee),
+        (Qstr::MP_QSTR_words__connect, Self::words__connect),
         (Qstr::MP_QSTR_words__connected, Self::words__connected),
         (Qstr::MP_QSTR_words__contains, Self::words__contains),
         (Qstr::MP_QSTR_words__continue_anyway, Self::words__continue_anyway),
@@ -4783,9 +5024,11 @@ impl TranslatedString {
         (Qstr::MP_QSTR_words__device, Self::words__device),
         (Qstr::MP_QSTR_words__disabled, Self::words__disabled),
         (Qstr::MP_QSTR_words__disconnect, Self::words__disconnect),
+        (Qstr::MP_QSTR_words__disconnected, Self::words__disconnected),
         (Qstr::MP_QSTR_words__enabled, Self::words__enabled),
         (Qstr::MP_QSTR_words__error, Self::words__error),
         (Qstr::MP_QSTR_words__fee, Self::words__fee),
+        (Qstr::MP_QSTR_words__forget, Self::words__forget),
         (Qstr::MP_QSTR_words__from, Self::words__from),
         (Qstr::MP_QSTR_words__good_to_know, Self::words__good_to_know),
         (Qstr::MP_QSTR_words__important, Self::words__important),
@@ -4805,6 +5048,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_words__pay_attention, Self::words__pay_attention),
         (Qstr::MP_QSTR_words__please_check_again, Self::words__please_check_again),
         (Qstr::MP_QSTR_words__please_try_again, Self::words__please_try_again),
+        (Qstr::MP_QSTR_words__power, Self::words__power),
         (Qstr::MP_QSTR_words__provider, Self::words__provider),
         (Qstr::MP_QSTR_words__really_wanna, Self::words__really_wanna),
         (Qstr::MP_QSTR_words__receive, Self::words__receive),

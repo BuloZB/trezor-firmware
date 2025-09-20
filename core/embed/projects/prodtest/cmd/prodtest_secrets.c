@@ -22,39 +22,55 @@
 #include <string.h>
 
 #include <rtl/cli.h>
-#ifdef USE_OPTIGA
-#include <sec/optiga_commands.h>
-#endif
 #include <sec/secret.h>
 #include <sec/secret_keys.h>
 
+#include "common.h"
 #include "memzero.h"
 #include "rand.h"
 #include "secbool.h"
 #include "secure_channel.h"
 
+#ifdef USE_OPTIGA
+#include <sec/optiga.h>
+#include "prodtest_optiga.h"
+#endif
+
+#ifdef USE_TROPIC
+#include <libtropic.h>
+#include <sec/tropic.h>
+#include "prodtest_tropic.h"
+#endif
+
 #ifndef TREZOR_EMULATOR
 #include <trezor_model.h>
 #endif
 
+#include <../vendor/mldsa-native/mldsa/sign.h>
+
 secbool generate_random_secret(uint8_t* secret, size_t length) {
   random_buffer(secret, length);
 
+  uint8_t buffer[length];
 #ifdef USE_OPTIGA
-  uint8_t optiga_secret[length];
-  if (OPTIGA_SUCCESS != optiga_get_random(optiga_secret, length)) {
+  if (!optiga_random_buffer(buffer, length)) {
     return secfalse;
   }
   for (size_t i = 0; i < length; i++) {
-    secret[i] ^= optiga_secret[i];
+    secret[i] ^= buffer[i];
   }
-  memzero(optiga_secret, sizeof(optiga_secret));
 #endif
 
 #ifdef USE_TROPIC
-  // TODO: Generate randomness using tropic and xor it with `secret`.
+  if (LT_OK != lt_random_value_get(tropic_get_handle(), buffer, length)) {
+    return secfalse;
+  }
+  for (size_t i = 0; i < length; i++) {
+    secret[i] ^= buffer[i];
+  }
 #endif
 
+  memzero(buffer, sizeof(buffer));
   return sectrue;
 }
 
@@ -101,6 +117,50 @@ static void prodtest_secrets_init(cli_t* cli) {
     return;
   }
 
+#ifdef SECRET_LOCK_SLOT_OFFSET
+  // Make sure that the secrets sector isn't locked so that we don't overwrite
+  // the MCU's nRF pairing secret.
+  if (secfalse != secret_is_locked()) {
+    cli_error(cli, CLI_ERROR, "Secret sector is already locked");
+    return;
+  }
+#endif
+
+#ifdef USE_OPTIGA
+  // Make sure that Optiga isn't locked so that we don't overwrite the MCU's
+  // pairing secrets.
+  optiga_locked_status optiga_status = get_optiga_locked_status(cli);
+
+  if (optiga_status == OPTIGA_LOCKED_TRUE) {
+    cli_error(cli, CLI_ERROR, "Optiga is already locked");
+    return;
+  }
+
+  if (optiga_status != OPTIGA_LOCKED_FALSE) {
+    // Error reported by get_optiga_locked_status().
+    return;
+  }
+#endif
+
+#ifdef USE_TROPIC
+  // Make sure that Tropic pairing hasn't started so that we don't overwrite the
+  // MCU's pairing secrets.
+  curve25519_key tropic_public = {0};
+  if (secret_key_tropic_public(tropic_public) == sectrue) {
+    cli_error(cli, CLI_ERROR, "Tropic pairing has already started.");
+    return;
+  }
+
+  // Ensure that a session with Tropic is established so that we can include
+  // randomness from the chip when generating the secrets. At this point in
+  // provisioning the factory pairing key should still be valid.
+  if (!prodtest_tropic_factory_session_start(tropic_get_handle())) {
+    cli_error(cli, CLI_ERROR,
+              "`prodtest_tropic_factory_session_start` failed.");
+    return;
+  }
+#endif
+
 #ifdef SECRET_PRIVILEGED_MASTER_KEY_SLOT
   if (set_random_secret(SECRET_PRIVILEGED_MASTER_KEY_SLOT,
                         SECRET_MASTER_KEY_SLOT_SIZE) != sectrue) {
@@ -140,15 +200,20 @@ static void prodtest_secrets_get_mcu_device_key(cli_t* cli) {
     return;
   }
 
-  ed25519_secret_key mcu_private = {0};
-  if (secret_key_mcu_device_auth(mcu_private) != sectrue) {
+  uint8_t seed[MLDSA_SEEDBYTES] = {0};
+  if (secret_key_mcu_device_auth(seed) != sectrue) {
     cli_error(cli, CLI_ERROR, "`secret_key_mcu_device_auth()` failed.");
-    return;
+    goto cleanup;
   }
-  ed25519_public_key mcu_public = {0};
-  ed25519_publickey(mcu_private, mcu_public);
 
-  uint8_t output[sizeof(ed25519_public_key) + NOISE_TAG_SIZE] = {0};
+  uint8_t mcu_public[CRYPTO_PUBLICKEYBYTES] = {0};
+  uint8_t mcu_private[CRYPTO_SECRETKEYBYTES] = {0};
+  if (crypto_sign_keypair_internal(mcu_public, mcu_private, seed) != 0) {
+    cli_error(cli, CLI_ERROR, "`crypto_sign_keypair_internal()` failed.");
+    goto cleanup;
+  }
+
+  uint8_t output[sizeof(mcu_public) + NOISE_TAG_SIZE] = {0};
   if (!secure_channel_encrypt(mcu_public, sizeof(mcu_public), NULL, 0,
                               output)) {
     // `secure_channel_handshake_2()` might not have been called
@@ -159,8 +224,58 @@ static void prodtest_secrets_get_mcu_device_key(cli_t* cli) {
   cli_ok_hexdata(cli, output, sizeof(output));
 
 cleanup:
+  memzero(seed, sizeof(seed));
   memzero(mcu_private, sizeof(mcu_private));
 }
+
+#ifndef TREZOR_EMULATOR
+static bool check_device_cert_chain(cli_t* cli, const uint8_t* chain,
+                                    size_t chain_size) {
+  bool ret = false;
+
+  uint8_t seed[MLDSA_SEEDBYTES] = {0};
+  if (secret_key_mcu_device_auth(seed) != sectrue) {
+    cli_error(cli, CLI_ERROR, "`secret_key_mcu_device_auth()` failed.");
+    goto cleanup;
+  }
+
+  uint8_t mcu_public[CRYPTO_PUBLICKEYBYTES] = {0};
+  uint8_t mcu_private[CRYPTO_SECRETKEYBYTES] = {0};
+  if (crypto_sign_keypair_internal(mcu_public, mcu_private, seed) != 0) {
+    cli_error(cli, CLI_ERROR, "`crypto_sign_keypair_internal()` failed.");
+    goto cleanup;
+  }
+
+  uint8_t rnd[MLDSA_RNDBYTES] = {0};
+  random_buffer(rnd, sizeof(rnd));
+
+  // The challenge is intentionally constant zero.
+  const uint8_t ENCODED_EMPTY_CONTEXT_STRING[] = {0, 0};
+  uint8_t challenge[CHALLENGE_SIZE] = {0};
+  uint8_t signature[CRYPTO_BYTES] = {0};
+  size_t siglen = 0;
+  if (crypto_sign_signature_internal(
+          signature, &siglen, challenge, sizeof(challenge),
+          ENCODED_EMPTY_CONTEXT_STRING, sizeof(ENCODED_EMPTY_CONTEXT_STRING),
+          rnd, mcu_private, 0) != 0) {
+    cli_error(cli, CLI_ERROR, "`crypto_sign_signature()` failed.");
+    goto cleanup;
+  }
+
+  if (!check_cert_chain(cli, chain, chain_size, signature, siglen, challenge)) {
+    // Error returned by check_cert_chain().
+    goto cleanup;
+  }
+
+  ret = true;
+
+cleanup:
+  memzero(seed, sizeof(seed));
+  memzero(mcu_private, sizeof(mcu_private));
+  memzero(rnd, sizeof(rnd));
+  return ret;
+}
+#endif
 
 static void prodtest_secrets_certdev_write(cli_t* cli) {
   if (cli_arg_count(cli) != 1) {
@@ -186,6 +301,12 @@ static void prodtest_secrets_certdev_write(cli_t* cli) {
   }
   prefixed_certificate[0] = (certificate_length >> 8) & 0xFF;
   prefixed_certificate[1] = certificate_length & 0xFF;
+
+  if (!check_device_cert_chain(cli, &prefixed_certificate[prefix_length],
+                               certificate_length)) {
+    // Error returned by check_device_cert_chain().
+    return;
+  }
 
   secret_write(prefixed_certificate, SECRET_MCU_DEVICE_CERT_OFFSET,
                sizeof(prefixed_certificate));

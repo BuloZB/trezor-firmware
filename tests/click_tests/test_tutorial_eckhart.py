@@ -51,7 +51,7 @@ def _assert_tropic_info(debug: "DebugLink"):
     layout = debug.read_layout()
     assert layout.title() == TR.tutorial__what_is_tropic
     text = _paginated_text(debug)
-    assert TR.tutorial__tropic_info in text
+    assert TR.tutorial__tropic_info.replace(" ", "") in text.replace(" ", "")
 
     debug.click(debug.screen_buttons.menu())
 
@@ -70,6 +70,11 @@ def _assert_begin_screen_and_proceed(debug: "DebugLink"):
 
 def _assert_navigation_screen_and_proceed(debug: "DebugLink"):
     assert debug.read_layout().text_content() == TR.tutorial__navigation_ts7
+    debug.click(debug.screen_buttons.ok())
+
+
+def _assert_power_screen_and_proceed(debug: "DebugLink"):
+    assert "TutorialPowerScreen" in debug.read_layout().all_components()
     debug.click(debug.screen_buttons.ok())
 
 
@@ -104,6 +109,7 @@ def test_tutorial_full_completion(device_handler: "BackgroundDeviceHandler"):
     _wait_for_welcome_animation(debug)
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen - continue
@@ -129,6 +135,7 @@ def test_tutorial_cancel_from_main_menu(device_handler: "BackgroundDeviceHandler
     _wait_for_welcome_animation(debug)
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen - exit
@@ -154,6 +161,7 @@ def test_tutorial_cancel_from_confirm_menu(device_handler: "BackgroundDeviceHand
     _wait_for_welcome_animation(debug)
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen - continue
@@ -182,6 +190,7 @@ def test_tutorial_menu_close(device_handler: "BackgroundDeviceHandler"):
     _wait_for_welcome_animation(debug)
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen
@@ -231,6 +240,7 @@ def test_tutorial_menu_tropic(device_handler: "BackgroundDeviceHandler"):
     _wait_for_welcome_animation(debug)
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen
@@ -287,6 +297,7 @@ def test_tutorial_restart(device_handler: "BackgroundDeviceHandler"):
     _wait_for_welcome_animation(debug)
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen - restart
@@ -295,6 +306,7 @@ def test_tutorial_restart(device_handler: "BackgroundDeviceHandler"):
 
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen - continue
@@ -311,6 +323,7 @@ def test_tutorial_restart(device_handler: "BackgroundDeviceHandler"):
 
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen - exit
@@ -330,6 +343,7 @@ def test_tutorial_restart(device_handler: "BackgroundDeviceHandler"):
 
     _assert_begin_screen_and_proceed(debug)
     _assert_navigation_screen_and_proceed(debug)
+    _assert_power_screen_and_proceed(debug)
     _assert_instructions_and_proceed_to_menu(debug)
 
     # menu screen - continue

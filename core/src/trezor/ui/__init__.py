@@ -17,15 +17,16 @@ from trezorui_api import (
 )
 
 if utils.USE_POWER_MANAGER:
-    from apps.management.pm.autodim import autodim_clear
+    from trezor.power_management.autodim import autodim_clear
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Generator, Generic, Iterator, TypeVar
 
+    from trezor.enums import ButtonRequestType
     from trezorui_api import LayoutObj, UiResult  # noqa: F401
 
     T = TypeVar("T", covariant=True)
-
+    ButtonRequestTuple = tuple[ButtonRequestType, str]
 else:
     T = 0
     Generic = {T: object}
@@ -104,18 +105,9 @@ if utils.USE_POWER_MANAGER:
 
     def _handle_power_button_press() -> None:
         """Handle power button press event during firmware operation."""
-        from trezor import config
+        from apps.common.lock_manager import notify_suspend
 
-        from apps.base import lock_device
-        from apps.management.pm.suspend import suspend_device
-
-        if config.has_pin() and config.is_unlocked():
-            lock_device(interrupt_workflow=True)
-            raise Shutdown()
-        else:
-            suspend_device()
-            if CURRENT_LAYOUT is not None:
-                CURRENT_LAYOUT.layout.request_complete_repaint()
+        notify_suspend()
 
 
 class Layout(Generic[T]):
@@ -152,8 +144,8 @@ class Layout(Generic[T]):
         self.layout = layout
         self.tasks: set[loop.Task] = set()
         self.timers: dict[int, loop.Task] = {}
-        self.result_box = loop.mailbox()
-        self.button_request_box = loop.mailbox()
+        self.result_box: loop.mailbox[Any] = loop.mailbox()
+        self.button_request_box: loop.mailbox[ButtonRequestTuple] = loop.mailbox()
         self.button_request_ack_pending: bool = False
         self.transition_out: AttachType | None = None
         self.backlight_level = BacklightLevels.NORMAL
@@ -184,8 +176,6 @@ class Layout(Generic[T]):
 
         If the layout is already RUNNING, do nothing. If the layout is FINISHED, fail.
         """
-        global CURRENT_LAYOUT
-
         # do nothing if we are already running
         if self.is_running():
             return
@@ -229,8 +219,6 @@ class Layout(Generic[T]):
         set to False to indicate that a result became available and that the taker
         should be allowed to pick it up.
         """
-        global CURRENT_LAYOUT
-
         # stop all running timers and spawned tasks
         for timer in self.timers.values():
             loop.close(timer)
@@ -272,6 +260,16 @@ class Layout(Generic[T]):
         """Request a complete repaint of the layout."""
         msg = self.layout.request_complete_repaint()
         assert msg is None
+
+    def repaint(self) -> None:
+        """Repaint the layout. Forces drawing at this moment.
+
+        Useful for recovering from an externally cleared screen, such as on resume
+        from suspend.
+        """
+        self.request_complete_repaint()
+        self.layout.paint()
+        backlight_fade(self.backlight_level)
 
     def _event(self, event_call: Callable[..., LayoutState | None], *args: Any) -> None:
         """Process an event coming out of the Rust layout. Set is as a result and shut
@@ -335,12 +333,7 @@ class Layout(Generic[T]):
         This is a separate call in order for homescreens to be able to override and not
         paint when the screen contents are still valid.
         """
-        # Clear the screen of any leftovers.
-        self.request_complete_repaint()
-        self._paint()
-
-        # Turn the brightness on.
-        backlight_fade(self.backlight_level)
+        self.repaint()
 
     def _set_timer(self, token: int, duration_ms: int) -> None:
         """Timer callback for Rust layouts."""
@@ -435,10 +428,12 @@ class Layout(Generic[T]):
             return
         while True:
             try:
-                br_code, br_name = await loop.race(
+                result = await loop.race(
                     self.context.read(()),
                     self.button_request_box,
                 )
+                assert isinstance(result, tuple)
+                br_code, br_name = result
 
                 if __debug__:
                     log.info(__name__, "ButtonRequest sent: %s", br_name)
@@ -490,7 +485,7 @@ class Layout(Generic[T]):
                 while True:
                     flags = yield pm
                     if flags & io.pm.EVENT_USB_CONNECTED_CHANGED:
-                        # disconnecting from charger restarts autodim/autosuspend timer
+                        # disconnecting from charger restarts autodim/autolock timer
                         # connecting to charger clears autodim state
                         workflow.idle_timer.touch()
                         autodim_clear()
@@ -585,20 +580,24 @@ class ProgressLayout:
         self.value = value
 
     def start(self) -> None:
-        global CURRENT_LAYOUT
-
         if CURRENT_LAYOUT is not self and CURRENT_LAYOUT is not None:
             CURRENT_LAYOUT.stop()
 
         assert CURRENT_LAYOUT is None
         set_current_layout(self)
 
+        self.repaint()
+
+    def stop(self) -> None:
+        if CURRENT_LAYOUT is self:
+            set_current_layout(None)
+
+    def repaint(self) -> None:
+        """Repaint the layout. Forces drawing at this moment.
+
+        Useful for recovering from an externally cleared screen, such as on resume
+        from suspend.
+        """
         self.layout.request_complete_repaint()
         self.layout.paint()
         backlight_fade(BacklightLevels.NORMAL)
-
-    def stop(self) -> None:
-        global CURRENT_LAYOUT
-
-        if CURRENT_LAYOUT is self:
-            set_current_layout(None)

@@ -89,4 +89,25 @@ void rgb_led_set_color(uint32_t color) {
   display_rgb_led(color);
 }
 
+void rgb_led_effect_start(rgb_led_effect_type_t effect_type,
+                          uint32_t requested_cycles) {
+  // RGB effect not supported in unix yet
+  return;
+}
+
+void rgb_led_effect_stop(void) {
+  // RGB effect not supported in unix yet
+  return;
+}
+
+bool rgb_led_effect_ongoing(void) {
+  // RGB effect not supported in unix yet
+  return false;
+}
+
+rgb_led_effect_type_t rgb_led_effect_get_type(void) {
+  // RGB effect not supported in unix yet
+  return RGB_LED_EFFECT_NONE;
+}
+
 #endif /* KERNEL_MODE */

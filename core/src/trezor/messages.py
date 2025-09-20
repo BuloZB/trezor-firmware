@@ -311,8 +311,8 @@ if TYPE_CHECKING:
         def __init__(
             self,
             *,
-            title: "str | None" = None,
-            text: "str | None" = None,
+            title: "str",
+            text: "str",
         ) -> None:
             pass
 
@@ -1072,11 +1072,13 @@ if TYPE_CHECKING:
 
     class BleUnpair(protobuf.MessageType):
         all: "bool | None"
+        addr: "bytes | None"
 
         def __init__(
             self,
             *,
             all: "bool | None" = None,
+            addr: "bytes | None" = None,
         ) -> None:
             pass
 
@@ -2082,6 +2084,7 @@ if TYPE_CHECKING:
         haptic_feedback: "bool | None"
         recovery_type: "RecoveryType | None"
         optiga_sec: "int | None"
+        soc: "int | None"
 
         def __init__(
             self,
@@ -2137,6 +2140,7 @@ if TYPE_CHECKING:
             haptic_feedback: "bool | None" = None,
             recovery_type: "RecoveryType | None" = None,
             optiga_sec: "int | None" = None,
+            soc: "int | None" = None,
         ) -> None:
             pass
 
@@ -2182,6 +2186,7 @@ if TYPE_CHECKING:
         hide_passphrase_from_host: "bool | None"
         haptic_feedback: "bool | None"
         homescreen_length: "int | None"
+        auto_lock_delay_battery_ms: "int | None"
 
         def __init__(
             self,
@@ -2197,6 +2202,7 @@ if TYPE_CHECKING:
             hide_passphrase_from_host: "bool | None" = None,
             haptic_feedback: "bool | None" = None,
             homescreen_length: "int | None" = None,
+            auto_lock_delay_battery_ms: "int | None" = None,
         ) -> None:
             pass
 
@@ -2399,14 +2405,18 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class AuthenticityProof(protobuf.MessageType):
-        certificates: "list[bytes]"
-        signature: "bytes"
+        optiga_certificates: "list[bytes]"
+        optiga_signature: "bytes"
+        tropic_certificates: "list[bytes]"
+        tropic_signature: "bytes | None"
 
         def __init__(
             self,
             *,
-            signature: "bytes",
-            certificates: "list[bytes] | None" = None,
+            optiga_signature: "bytes",
+            optiga_certificates: "list[bytes] | None" = None,
+            tropic_certificates: "list[bytes] | None" = None,
+            tropic_signature: "bytes | None" = None,
         ) -> None:
             pass
 
@@ -4062,6 +4072,26 @@ if TYPE_CHECKING:
         def is_type_of(cls, msg: Any) -> TypeGuard["EthereumFieldType"]:
             return isinstance(msg, cls)
 
+    class EvoluGetNode(protobuf.MessageType):
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EvoluGetNode"]:
+            return isinstance(msg, cls)
+
+    class EvoluNode(protobuf.MessageType):
+        data: "bytes"
+
+        def __init__(
+            self,
+            *,
+            data: "bytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EvoluNode"]:
+            return isinstance(msg, cls)
+
     class MoneroTransactionSourceEntry(protobuf.MessageType):
         outputs: "list[MoneroOutputEntry]"
         real_output: "int | None"
@@ -5623,6 +5653,7 @@ if TYPE_CHECKING:
         memo_id: "int | None"
         memo_hash: "bytes | None"
         num_operations: "int"
+        payment_req: "PaymentRequest | None"
 
         def __init__(
             self,
@@ -5639,6 +5670,7 @@ if TYPE_CHECKING:
             memo_text: "str | None" = None,
             memo_id: "int | None" = None,
             memo_hash: "bytes | None" = None,
+            payment_req: "PaymentRequest | None" = None,
         ) -> None:
             pass
 
@@ -6345,14 +6377,14 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class ThpPairingRequest(protobuf.MessageType):
-        host_name: "str | None"
-        app_name: "str | None"
+        host_name: "str"
+        app_name: "str"
 
         def __init__(
             self,
             *,
-            host_name: "str | None" = None,
-            app_name: "str | None" = None,
+            host_name: "str",
+            app_name: "str",
         ) -> None:
             pass
 
@@ -6608,6 +6640,36 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["ThpAuthenticatedCredentialData"]:
+            return isinstance(msg, cls)
+
+    class ThpPairedCache(protobuf.MessageType):
+        entries: "list[ThpPairedCacheEntry]"
+
+        def __init__(
+            self,
+            *,
+            entries: "list[ThpPairedCacheEntry] | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["ThpPairedCache"]:
+            return isinstance(msg, cls)
+
+    class ThpPairedCacheEntry(protobuf.MessageType):
+        mac_addr: "bytes"
+        host_name: "str"
+
+        def __init__(
+            self,
+            *,
+            mac_addr: "bytes",
+            host_name: "str",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["ThpPairedCacheEntry"]:
             return isinstance(msg, cls)
 
     class WebAuthnListResidentCredentials(protobuf.MessageType):

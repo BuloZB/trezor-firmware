@@ -27,9 +27,9 @@
 
 #define SECRET_KEY_MASKING
 
-#include <ed25519-donna/ed25519.h>
+#include <../vendor/mldsa-native/mldsa/params.h>
 
-secbool secret_key_mcu_device_auth(ed25519_secret_key dest);
+secbool secret_key_mcu_device_auth(uint8_t dest[MLDSA_SEEDBYTES]);
 
 #endif  // SECRET_MASTER_KEY_SLOT_SIZE
 
@@ -56,13 +56,10 @@ secbool secret_key_tropic_masking(uint8_t dest[ECDSA_PRIVATE_KEY_SIZE]);
 
 #endif  // USE_TROPIC
 
-#ifdef USE_NRF
+#ifdef USE_NRF_AUTH
 
 #define NRF_PAIRING_SECRET_SIZE 32
 secbool secret_key_nrf_pairing(uint8_t dest[NRF_PAIRING_SECRET_SIZE]);
-
-secbool secret_validate_nrf_pairing(const uint8_t *message, size_t msg_len,
-                                    const uint8_t *mac, size_t mac_len);
 
 #endif
 
@@ -72,3 +69,11 @@ secbool secret_key_storage_salt(uint16_t fw_type,
                                 uint8_t dest[SECRET_KEY_STORAGE_SALT_SIZE]);
 
 #endif  // SECURE_MODE
+
+#ifdef KERNEL_MODE
+#ifdef USE_NRF_AUTH
+secbool secret_validate_nrf_pairing(const uint8_t *message, size_t msg_len,
+                                    const uint8_t *mac, size_t mac_len);
+
+#endif
+#endif

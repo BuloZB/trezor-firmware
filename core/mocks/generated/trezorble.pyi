@@ -2,7 +2,7 @@ from typing import *
 
 
 # rust/src/trezorhal/ble/micropython.rs
-class BleInterface:
+class BLEIF:
     """
     BLE interface wrapper.
     """
@@ -25,7 +25,7 @@ class BleInterface:
         """
         Reads message using BLE (device).
         """
-interface: BleInterface
+interface: BLEIF
 """BLE interface instance."""
 
 
@@ -38,9 +38,9 @@ def erase_bonds():
 
 
 # rust/src/trezorhal/ble/micropython.rs
-def unpair():
+def unpair(addr: bytes | None):
     """
-    Erases bond for current connection, if any.
+    Erases the bond for the given address or for current connection if addr is None.
     Raises exception if BLE driver reports an error.
     """
 
@@ -119,9 +119,32 @@ def is_pairing_requested() -> bool:
 
 
 # rust/src/trezorhal/ble/micropython.rs
+def is_started() -> bool:
+    """
+    True if BLE subsystem is started.
+    """
+
+
+# rust/src/trezorhal/ble/micropython.rs
 def connection_flags() -> list[str]:
     """
     Returns current connection state as a list of string flags.
+    """
+
+
+# rust/src/trezorhal/ble/micropython.rs
+def get_bonds() -> list[bytes]:
+    """
+    Returns a list of addr_bytes, representing the current bonds.
+    addr_bytes: bytes of length 6
+    """
+
+
+# rust/src/trezorhal/ble/micropython.rs
+def connected_addr() -> bytes | None:
+    """
+    If connected, returns addr_bytes, otherwise None.
+    addr_bytes: bytes of length 6
     """
 
 

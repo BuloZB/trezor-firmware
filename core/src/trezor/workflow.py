@@ -110,7 +110,6 @@ def start_default() -> None:
     If a default task is already running, nothing will happen.
     """
     global default_task
-    global default_constructor
     global autolock_interrupts_workflow
 
     assert default_constructor is not None
@@ -269,6 +268,13 @@ class IdleTimer:
         task = self.tasks.pop(callback, None)
         if task is not None:
             loop.close(task)
+
+    def clear(self) -> None:
+        """Clear all idle callbacks."""
+        for _, task in self.tasks.items():
+            loop.close(task)
+        self.timeouts.clear()
+        self.tasks.clear()
 
 
 idle_timer = IdleTimer()

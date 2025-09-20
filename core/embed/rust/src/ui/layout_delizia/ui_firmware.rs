@@ -3,7 +3,7 @@ use core::cmp::Ordering;
 use crate::{
     error::{value_error, Error},
     io::BinaryData,
-    micropython::{gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
+    micropython::{buffer::StrBuffer, gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
     storage,
     strutil::TString,
     translations::TR,
@@ -28,8 +28,8 @@ use crate::{
             util::{ContentType, PropsList, RecoveryType, StrOrBytes},
         },
         ui_firmware::{
-            FirmwareUI, ERROR_NOT_IMPLEMENTED, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES,
-            MAX_MENU_ITEMS, MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
+            FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS,
+            MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
         },
         ModelUI,
     },
@@ -88,7 +88,7 @@ impl FirmwareUI for UIDelizia {
         _chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
         // confirm_value is used instead
-        Err::<Gc<LayoutObj>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<Gc<LayoutObj>, Error>(Error::NotImplementedError)
     }
 
     fn confirm_trade(
@@ -253,12 +253,12 @@ impl FirmwareUI for UIDelizia {
         let mut ops = OpTextLayout::new(theme::TEXT_NORMAL);
         for item in IterBuf::new().try_iterate(items)? {
             if item.is_str() {
-                ops.add_text(TString::try_from(item)?, fonts::FONT_DEMIBOLD);
+                ops.add_text_with_font(TString::try_from(item)?, fonts::FONT_DEMIBOLD);
             } else {
                 let [_emphasis, text]: [Obj; 2] = util::iter_into_array(item)?;
                 let text: TString = text.try_into()?;
                 // emphasis not implemented on Delizia
-                ops.add_text(text, fonts::FONT_DEMIBOLD);
+                ops.add_text_with_font(text, fonts::FONT_DEMIBOLD);
             }
         }
 
@@ -283,9 +283,7 @@ impl FirmwareUI for UIDelizia {
         #[cfg(feature = "universal_fw")]
         return flow::confirm_fido::new_confirm_fido(title, app_name, icon, accounts);
         #[cfg(not(feature = "universal_fw"))]
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"confirm_fido not used in bitcoin-only firmware",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn confirm_firmware_update(
@@ -378,7 +376,7 @@ impl FirmwareUI for UIDelizia {
         _hold: bool,
         _items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn confirm_reset_device(recovery: bool) -> Result<impl LayoutMaybeTrace, Error> {
@@ -654,11 +652,12 @@ impl FirmwareUI for UIDelizia {
         Ok(flow)
     }
 
-    fn flow_confirm_set_new_pin(
+    fn flow_confirm_set_new_code(
         title: TString<'static>,
         description: TString<'static>,
+        is_wipe_code: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let flow = flow::confirm_set_new_pin::new_set_new_pin(title, description)?;
+        let flow = flow::confirm_set_new_code::new_set_new_code(title, description, is_wipe_code)?;
         Ok(flow)
     }
 
@@ -725,7 +724,7 @@ impl FirmwareUI for UIDelizia {
         _verb: TString<'static>,
         _items: Gc<List>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn prompt_backup() -> Result<impl LayoutMaybeTrace, Error> {
@@ -794,22 +793,23 @@ impl FirmwareUI for UIDelizia {
         _max_ms: u32,
         _description: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn request_pin(
         prompt: TString<'static>,
-        subprompt: TString<'static>,
+        attempts: TString<'static>,
         allow_cancel: bool,
-        warning: bool,
+        wrong_pin: bool,
+        _last_attempt: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let warning = if warning {
+        let warning = if wrong_pin {
             Some(TR::pin__wrong_pin.into())
         } else {
             None
         };
 
-        let layout = RootComponent::new(PinKeyboard::new(prompt, subprompt, warning, allow_cancel));
+        let layout = RootComponent::new(PinKeyboard::new(prompt, attempts, warning, allow_cancel));
         Ok(layout)
     }
 
@@ -828,7 +828,7 @@ impl FirmwareUI for UIDelizia {
         _allow_empty: bool,
         _prefill: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn select_menu(
@@ -910,7 +910,7 @@ impl FirmwareUI for UIDelizia {
         _path: Option<TString<'static>>,
         _xpubs: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_checklist(
@@ -1017,12 +1017,12 @@ impl FirmwareUI for UIDelizia {
     }
 
     fn show_device_menu(
+        _init_submenu: Option<u8>,
         _failed_backup: bool,
         _paired_devices: heapless::Vec<TString<'static>, MAX_PAIRED_DEVICES>,
-        _connected_idx: Option<usize>,
-        _bluetooth: Option<bool>,
+        _connected_idx: Option<u8>,
         _pin_code: Option<bool>,
-        _auto_lock_delay: Option<TString<'static>>,
+        _auto_lock_delay: Option<[TString<'static>; 2]>,
         _wipe_code: Option<bool>,
         _check_backup: bool,
         _device_name: Option<TString<'static>>,
@@ -1031,17 +1031,14 @@ impl FirmwareUI for UIDelizia {
         _led_enabled: Option<bool>,
         _about_items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"show_device_menu not supported",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_pairing_device_name(
+        _description: StrBuffer,
         _device_name: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"show_pairing_device_name not supported",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     #[cfg(feature = "ble")]
@@ -1050,9 +1047,7 @@ impl FirmwareUI for UIDelizia {
         _description: TString<'static>,
         _code: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"show_ble_pairing_code not supported",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_thp_pairing_code(
@@ -1074,6 +1069,13 @@ impl FirmwareUI for UIDelizia {
             None,
             false,
         )
+    }
+
+    fn confirm_thp_pairing(
+        _title: TString<'static>,
+        _description: (StrBuffer, Obj),
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_info(
@@ -1214,9 +1216,7 @@ impl FirmwareUI for UIDelizia {
         _words: heapless::Vec<TString<'static>, 33>,
         _title: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"use show_share_words_extended instead",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_share_words_extended(
@@ -1247,7 +1247,7 @@ impl FirmwareUI for UIDelizia {
 
     fn show_remaining_shares(_pages_iterable: Obj) -> Result<impl LayoutMaybeTrace, Error> {
         // Delizia: remaining shares is a part of `continue_recovery` flow
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_simple(
@@ -1291,7 +1291,7 @@ impl FirmwareUI for UIDelizia {
                 SwipeContent::new(content).with_no_attach_anim(),
             )
             .with_footer(instruction, description)
-            .with_swipe(Direction::Up, SwipeSettings::default())
+            .with_swipe(Direction::Up, SwipeSettings::Default)
             .with_result_icon(theme::ICON_BULLET_CHECKMARK, theme::GREEN_LIGHT),
         ))?;
         Ok(layout)

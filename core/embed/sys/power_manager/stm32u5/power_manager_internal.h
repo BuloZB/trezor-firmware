@@ -31,8 +31,7 @@
 #define PM_TIMER_PERIOD_MS 100
 #define PM_SHUTDOWN_TIMEOUT_MS 15000
 #define PM_BATTERY_UNDERVOLT_THR_V 3.0f
-#define PM_BATTERY_UNDERVOLT_RECOVERY_THR_V 3.1f
-#define PM_BATTERY_UNDERVOLT_RECOVERY_WPC_THR_V 3.2f
+#define PM_BATTERY_CRITICAL_RECOVERY_SOC 0.02f
 #define PM_BATTERY_LOW_THRESHOLD_SOC 15
 #define PM_BATTERY_CHARGING_CURRENT_MAX PMIC_CHARGING_LIMIT_MAX
 #define PM_BATTERY_CHARGING_CURRENT_MIN PMIC_CHARGING_LIMIT_MIN
@@ -42,17 +41,16 @@
 #define PM_SELF_DISG_RATE_SUSPEND_MA 0.032f
 
 // Fuel gauge extended kalman filter parameters
-#define PM_FUEL_GAUGE_R 2000.0f
-#define PM_FUEL_GAUGE_Q 0.001f
-#define PM_FUEL_GAUGE_R_AGGRESSIVE 1000.0f
-#define PM_FUEL_GAUGE_Q_AGGRESSIVE 0.001f
+#define PM_FUEL_GAUGE_R 3500.0f
+#define PM_FUEL_GAUGE_Q 0.0001f
+#define PM_FUEL_GAUGE_R_AGGRESSIVE 3000.0f
+#define PM_FUEL_GAUGE_Q_AGGRESSIVE 0.0002f
 #define PM_FUEL_GAUGE_P_INIT 0.1f
 
 // Timeout after which the device automatically transit from suspend to
 // hibernation
 #define PM_AUTO_HIBERNATE_TIMEOUT_S (2 * 60 * 60)  // 2 hours
 
-#define PM_SUSPENDED_CHARGING_TIMEOUT_S 60
 #define PM_STABILIZATION_TIMEOUT_MS 2000
 // Temperature controller parameters
 #define PM_TEMP_CONTROL_IDLE_PERIOD_MS 2 * 60 * 1000  // 2 minutes
@@ -90,8 +88,6 @@ typedef struct {
   uint8_t bat_sampling_buf_head_idx;
   uint8_t soc_ceiled;
 
-  float vbat_tau;
-
   uint8_t soc_target;
   bool soc_target_reached;
   float target_battery_ocv_v_tau;
@@ -112,11 +108,11 @@ typedef struct {
   uint32_t pmic_sampling_period_ms;
   bool pmic_measurement_ready;
   bool woke_up_from_suspend;
-  bool suspended_charging;
 
   // Power source logical state
   bool usb_connected;
   bool wireless_connected;
+  bool fully_charged;
   bool battery_low;
   bool battery_critical;
 

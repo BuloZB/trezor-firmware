@@ -9,12 +9,16 @@ from trezorutils import (  # noqa: F401
     MODEL_FULL_NAME,
     MODEL_USB_MANUFACTURER,
     MODEL_USB_PRODUCT,
+    NOTIFY_BOOT,
+    NOTIFY_LOCK,
+    NOTIFY_UNLOCK,
     SCM_REVISION,
     UI_LAYOUT,
     USE_BACKLIGHT,
     USE_BLE,
     USE_BUTTON,
     USE_HAPTIC,
+    USE_NRF,
     USE_OPTIGA,
     USE_POWER_MANAGER,
     USE_RGB_LED,
@@ -31,6 +35,7 @@ from trezorutils import (  # noqa: F401
     halt,
     memcpy,
     memzero,
+    notify_send,
     presize_module,
     reboot_to_bootloader,
     sd_hotswap_enabled,
@@ -38,6 +43,11 @@ from trezorutils import (  # noqa: F401
     unit_color,
     unit_packaging,
 )
+
+if USE_NRF:
+    from trezorutils import nrf_get_version  # noqa: F401
+
+
 from typing import TYPE_CHECKING
 
 if __debug__:

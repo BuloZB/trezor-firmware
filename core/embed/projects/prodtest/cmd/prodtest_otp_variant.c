@@ -29,6 +29,10 @@
 #include <stdlib.h>
 #include "prodtest_optiga.h"
 
+#ifdef USE_TROPIC
+#include "prodtest_tropic.h"
+#endif
+
 static void prodtest_otp_variant_read(cli_t* cli) {
   if (cli_arg_count(cli) > 0) {
     cli_error_arg_count(cli);
@@ -133,6 +137,20 @@ static void prodtest_otp_variant_write(cli_t* cli) {
   }
 
   if (optiga_status != OPTIGA_LOCKED_TRUE) {
+    // Error reported by get_optiga_locked_status().
+    return;
+  }
+#endif
+
+#ifdef USE_TROPIC
+  tropic_locked_status tropic_status = get_tropic_locked_status(cli);
+
+  if (tropic_status == TROPIC_LOCKED_FALSE) {
+    cli_error(cli, CLI_ERROR, "Tropic not locked");
+    return;
+  }
+
+  if (tropic_status != TROPIC_LOCKED_TRUE) {
     // Error reported by get_optiga_locked_status().
     return;
   }

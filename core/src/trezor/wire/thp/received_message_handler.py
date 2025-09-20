@@ -69,12 +69,12 @@ async def handle_received_message(channel: Channel) -> bool:
         error_message = Failure(code=FailureType.ThpUnallocatedSession)
         await channel.write(error_message, e.session_id)
     except ThpDecryptionError:
-        await channel.ctx.write_error(
+        await channel.iface_ctx.write_error(
             channel.get_channel_id_int(), ThpErrorType.DECRYPTION_FAILED
         )
         channel.clear()
     except ThpDeviceLockedError:
-        await channel.ctx.write_error(
+        await channel.iface_ctx.write_error(
             channel.get_channel_id_int(), ThpErrorType.DEVICE_LOCKED
         )
     return False
@@ -160,7 +160,7 @@ async def _handle_state_handshake(
 
     # key is decoded in handshake._handle_th2_crypto
     host_static_public_key = host_encrypted_static_public_key[:PUBKEY_LENGTH]
-    ctx.channel_cache.set_host_static_public_key(bytearray(host_static_public_key))
+    ctx.channel_cache.set_host_static_public_key(host_static_public_key)
 
     paired: bool = False
     trezor_state = _TREZOR_STATE_UNPAIRED

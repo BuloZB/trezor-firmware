@@ -24,13 +24,11 @@
 #include <gfx/dma2d_bitblt.h>
 #include <io/display.h>
 #include <io/usb.h>
-#include <io/usb_hid.h>
-#include <io/usb_vcp.h>
-#include <io/usb_webusb.h>
 #include <sec/rng.h>
 #include <sec/secret.h>
 #include <sys/bootutils.h>
 #include <sys/irq.h>
+#include <sys/notify.h>
 #include <sys/sysevent.h>
 #include <sys/systask.h>
 #include <sys/system.h>
@@ -156,6 +154,34 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       }
     } break;
 
+    case SYSCALL_SYSHANDLE_READ: {
+      syshandle_t handle = (syshandle_t)args[0];
+      void *buffer = (void *)args[1];
+      size_t buffer_size = (size_t)args[2];
+      args[0] = syshandle_read__verified(handle, buffer, buffer_size);
+    } break;
+
+    case SYSCALL_SYSHANDLE_WRITE: {
+      syshandle_t handle = (syshandle_t)args[0];
+      const void *data = (const void *)args[1];
+      size_t data_size = (size_t)args[2];
+      args[0] = syshandle_write__verified(handle, data, data_size);
+    } break;
+
+#ifdef USE_DBG_CONSOLE
+    case SYSCALL_DBG_CONSOLE_READ: {
+      void *buffer = (void *)args[0];
+      size_t buffer_size = (size_t)args[1];
+      args[0] = dbg_console_read__verified(buffer, buffer_size);
+    } break;
+
+    case SYSCALL_DBG_CONSOLE_WRITE: {
+      const void *data = (const void *)args[0];
+      size_t data_size = (size_t)args[1];
+      dbg_console_write__verified(data, data_size);
+    } break;
+#endif
+
     case SYSCALL_BOOT_IMAGE_CHECK: {
       const boot_image_t *image = (const boot_image_t *)args[0];
       args[0] = boot_image_check__verified(image);
@@ -177,6 +203,11 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
     case SYSCALL_REBOOT_AND_UPGRADE: {
       const uint8_t *hash = (const uint8_t *)args[0];
       reboot_and_upgrade__verified(hash);
+    } break;
+
+    case SYSCALL_NOTIFY_SEND: {
+      notification_event_t event = (notification_event_t)args[0];
+      notify_send(event);
     } break;
 
     case SYSCALL_DISPLAY_SET_BACKLIGHT: {
@@ -224,17 +255,9 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       display_refresh();
     } break;
 
-    case SYSCALL_USB_INIT: {
-      const usb_dev_info_t *dev_info = (const usb_dev_info_t *)args[0];
-      args[0] = usb_init(dev_info);
-    } break;
-
-    case SYSCALL_USB_DEINIT: {
-      usb_deinit();
-    } break;
-
     case SYSCALL_USB_START: {
-      args[0] = usb_start();
+      const usb_start_params_t *params = (const usb_start_params_t *)args[0];
+      args[0] = usb_start__verified(params);
     } break;
 
     case SYSCALL_USB_STOP: {
@@ -248,153 +271,6 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
     case SYSCALL_USB_GET_STATE: {
       usb_state_t *state = (usb_state_t *)args[0];
       usb_get_state__verified(state);
-    } break;
-
-    case SYSCALL_USB_HID_ADD: {
-      const usb_hid_info_t *hid_info = (const usb_hid_info_t *)args[0];
-      args[0] = usb_hid_add(hid_info);
-    } break;
-
-    case SYSCALL_USB_HID_CAN_READ: {
-      uint8_t iface_num = (uint8_t)args[0];
-      args[0] = usb_hid_can_read(iface_num);
-    } break;
-
-    case SYSCALL_USB_HID_CAN_WRITE: {
-      uint8_t iface_num = (uint8_t)args[0];
-      args[0] = usb_hid_can_write(iface_num);
-    } break;
-
-    case SYSCALL_USB_HID_READ: {
-      uint8_t iface_num = (uint8_t)args[0];
-      uint8_t *buf = (uint8_t *)args[1];
-      uint32_t len = args[2];
-      args[0] = usb_hid_read__verified(iface_num, buf, len);
-    } break;
-
-    case SYSCALL_USB_HID_WRITE: {
-      uint8_t iface_num = (uint8_t)args[0];
-      const uint8_t *buf = (const uint8_t *)args[1];
-      uint32_t len = args[2];
-      args[0] = usb_hid_write__verified(iface_num, buf, len);
-    } break;
-
-    case SYSCALL_USB_HID_READ_SELECT: {
-      uint32_t timeout = args[0];
-      args[0] = usb_hid_read_select(timeout);
-    } break;
-
-    case SYSCALL_USB_HID_READ_BLOCKING: {
-      uint8_t iface_num = (uint8_t)args[0];
-      uint8_t *buf = (uint8_t *)args[1];
-      uint32_t len = args[2];
-      int timeout = (int)args[3];
-      args[0] = usb_hid_read_blocking__verified(iface_num, buf, len, timeout);
-    } break;
-
-    case SYSCALL_USB_HID_WRITE_BLOCKING: {
-      uint8_t iface_num = (uint8_t)args[0];
-      const uint8_t *buf = (const uint8_t *)args[1];
-      uint32_t len = args[2];
-      int timeout = (int)args[3];
-      args[0] = usb_hid_write_blocking__verified(iface_num, buf, len, timeout);
-    } break;
-
-    case SYSCALL_USB_VCP_ADD: {
-      const usb_vcp_info_t *vcp_info = (const usb_vcp_info_t *)args[0];
-      args[0] = usb_vcp_add(vcp_info);
-    } break;
-
-    case SYSCALL_USB_VCP_CAN_READ: {
-      uint8_t iface_num = (uint8_t)args[0];
-      args[0] = usb_vcp_can_read(iface_num);
-    } break;
-
-    case SYSCALL_USB_VCP_CAN_WRITE: {
-      uint8_t iface_num = (uint8_t)args[0];
-      args[0] = usb_vcp_can_write(iface_num);
-    } break;
-
-    case SYSCALL_USB_VCP_READ: {
-      uint8_t iface_num = (uint8_t)args[0];
-      uint8_t *buf = (uint8_t *)args[1];
-      uint32_t len = args[2];
-      args[0] = usb_vcp_read__verified(iface_num, buf, len);
-    } break;
-
-    case SYSCALL_USB_VCP_WRITE: {
-      uint8_t iface_num = (uint8_t)args[0];
-      const uint8_t *buf = (const uint8_t *)args[1];
-      uint32_t len = args[2];
-      args[0] = usb_vcp_write__verified(iface_num, buf, len);
-    } break;
-
-    case SYSCALL_USB_VCP_READ_BLOCKING: {
-      uint8_t iface_num = (uint8_t)args[0];
-      uint8_t *buf = (uint8_t *)args[1];
-      uint32_t len = args[2];
-      int timeout = (int)args[3];
-      args[0] = usb_vcp_read_blocking__verified(iface_num, buf, len, timeout);
-    } break;
-
-    case SYSCALL_USB_VCP_WRITE_BLOCKING: {
-      uint8_t iface_num = (uint8_t)args[0];
-      const uint8_t *buf = (const uint8_t *)args[1];
-      uint32_t len = args[2];
-      int timeout = (int)args[3];
-      args[0] = usb_vcp_write_blocking__verified(iface_num, buf, len, timeout);
-    } break;
-
-    case SYSCALL_USB_WEBUSB_ADD: {
-      const usb_webusb_info_t *webusb_info = (const usb_webusb_info_t *)args[0];
-      args[0] = usb_webusb_add(webusb_info);
-    } break;
-
-    case SYSCALL_USB_WEBUSB_CAN_READ: {
-      uint8_t iface_num = (uint8_t)args[0];
-      args[0] = usb_webusb_can_read(iface_num);
-    } break;
-
-    case SYSCALL_USB_WEBUSB_CAN_WRITE: {
-      uint8_t iface_num = (uint8_t)args[0];
-      args[0] = usb_webusb_can_write(iface_num);
-    } break;
-
-    case SYSCALL_USB_WEBUSB_READ: {
-      uint8_t iface_num = (uint8_t)args[0];
-      uint8_t *buf = (uint8_t *)args[1];
-      uint32_t len = args[2];
-      args[0] = usb_webusb_read__verified(iface_num, buf, len);
-    } break;
-
-    case SYSCALL_USB_WEBUSB_WRITE: {
-      uint8_t iface_num = (uint8_t)args[0];
-      const uint8_t *buf = (const uint8_t *)args[1];
-      uint32_t len = args[2];
-      args[0] = usb_webusb_write__verified(iface_num, buf, len);
-    } break;
-
-    case SYSCALL_USB_WEBUSB_READ_SELECT: {
-      uint32_t timeout = args[0];
-      args[0] = usb_webusb_read_select(timeout);
-    } break;
-
-    case SYSCALL_USB_WEBUSB_READ_BLOCKING: {
-      uint8_t iface_num = (uint8_t)args[0];
-      uint8_t *buf = (uint8_t *)args[1];
-      uint32_t len = args[2];
-      int timeout = (int)args[3];
-      args[0] =
-          usb_webusb_read_blocking__verified(iface_num, buf, len, timeout);
-    } break;
-
-    case SYSCALL_USB_WEBUSB_WRITE_BLOCKING: {
-      uint8_t iface_num = (uint8_t)args[0];
-      const uint8_t *buf = (const uint8_t *)args[1];
-      uint32_t len = args[2];
-      int timeout = (int)args[3];
-      args[0] =
-          usb_webusb_write_blocking__verified(iface_num, buf, len, timeout);
     } break;
 
 #ifdef USE_SD_CARD
@@ -467,6 +343,25 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       uint32_t color = args[0];
       rgb_led_set_color(color);
     } break;
+
+    case SYSCALL_RGB_LED_EFFECT_START: {
+      rgb_led_effect_type_t effect_type = (rgb_led_effect_type_t)args[0];
+      uint32_t requested_cycles = args[1];
+      rgb_led_effect_start(effect_type, requested_cycles);
+    } break;
+
+    case SYSCALL_RGB_LED_EFFECT_STOP: {
+      rgb_led_effect_stop();
+    } break;
+
+    case SYSCALL_RGB_LED_EFFECT_ONGOING: {
+      args[0] = rgb_led_effect_ongoing();
+    } break;
+
+    case SYSCALL_RGB_LED_EFFECT_GET_TYPE: {
+      args[0] = rgb_led_effect_get_type();
+    } break;
+
 #endif
 
 #ifdef USE_HAPTIC
@@ -733,6 +628,17 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       size_t len = args[1];
       ble_set_name__verified(name, len);
     } break;
+
+    case SYSCALL_BLE_UNPAIR: {
+      const bt_le_addr_t *addr = (const bt_le_addr_t *)args[0];
+      args[0] = ble_unpair__verified(addr);
+    } break;
+
+    case SYSCALL_BLE_GET_BOND_LIST: {
+      bt_le_addr_t *list = (bt_le_addr_t *)args[0];
+      size_t list_size = args[1];
+      args[0] = ble_get_bond_list__verified(list, list_size);
+    } break;
 #endif
 
 #ifdef USE_NRF
@@ -747,6 +653,14 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       const uint8_t *data = (const uint8_t *)args[0];
       size_t len = args[1];
       args[0] = nrf_update__verified(data, len);
+    } break;
+
+    case SYSCALL_NRF_GET_VERSION: {
+      args[0] = nrf_get_version();
+    } break;
+
+    case SYSCALL_NRF_AUTHENTICATE: {
+      args[0] = nrf_authenticate();
     } break;
 
 #endif
@@ -883,6 +797,13 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       uint16_t dig_len = (uint16_t)args[2];
       uint8_t *sig = (uint8_t *)args[3];
       args[0] = tropic_ecc_sign__verified(key_slot_index, dig, dig_len, sig);
+    } break;
+
+    case SYSCALL_TROPIC_DATA_READ: {
+      uint16_t udata_slot = (uint16_t)args[0];
+      uint8_t *data = (uint8_t *)args[1];
+      uint16_t *size = (uint16_t *)args[2];
+      args[0] = tropic_data_read__verified(udata_slot, data, size);
     } break;
 #endif
 

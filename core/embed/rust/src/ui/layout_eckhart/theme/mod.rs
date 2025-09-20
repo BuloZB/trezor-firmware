@@ -163,10 +163,14 @@ include_icon!(ICON_SECURED, "layout_eckhart/res/secured.toif");
 
 // Regulatory screen icons
 include_icon!(ICON_UKRAINE, "layout_eckhart/res/ukraine.toif");
+include_icon!(ICON_JAPAN, "layout_eckhart/res/japan.toif");
 include_icon!(ICON_KOREA, "layout_eckhart/res/korea_full.toif");
 include_icon!(ICON_EUROPE, "layout_eckhart/res/europe.toif");
 include_icon!(ICON_RCM, "layout_eckhart/res/rcm.toif");
 include_icon!(ICON_FCC, "layout_eckhart/res/fcc.toif");
+
+// Square icon for BLE connection items
+include_icon!(ICON_SQUARE, "layout_eckhart/res/square.toif");
 
 // Common text styles and button styles must use fonts accessible from both
 // bootloader and firmware

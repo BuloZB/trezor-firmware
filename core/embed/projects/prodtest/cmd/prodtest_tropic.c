@@ -18,6 +18,7 @@
  */
 
 #ifdef USE_TROPIC
+#include "prodtest_tropic.h"
 
 #include <trezor_model.h>
 #include <trezor_rtl.h>
@@ -29,7 +30,9 @@
 #include <sec/secret.h>
 #include <sec/secret_keys.h>
 
+#include "ecdsa.h"
 #include "memzero.h"
+#include "nist256p1.h"
 
 #include "common.h"
 #include "fw_CPU.h"
@@ -37,24 +40,9 @@
 #include "libtropic.h"
 #include "lt_l2.h"
 
+#include <sec/tropic.h>
+
 #include "secure_channel.h"
-
-#define FACTORY_PAIRING_KEY_SLOT \
-  PAIRING_KEY_SLOT_INDEX_0  // This key is used by prodtest to inject the
-                            // privileged and unprivileged pairing keys
-#define UNPRIVILEGED_PAIRING_KEY_SLOT \
-  PAIRING_KEY_SLOT_INDEX_1  // This key is used by HSM to inject the attestation
-                            // FIDO key and generate the device key, and by an
-                            // unofficial firwmare with an unlocked bootloader
-#define PRIVILEGED_PAIRING_KEY_SLOT \
-  PAIRING_KEY_SLOT_INDEX_2  // This key is used by an official firmware
-
-#define TROPIC_FIDO_CERT_FIRST_SLOT 0
-#define TROPIC_FIDO_CERT_SLOTS_COUNT 3
-#define TROPIC_DEV_CERT_FIRST_SLOT 3
-#define TROPIC_DEV_CERT_SLOTS_COUNT 3
-#define TROPIC_DEV_KEY_SLOT 0
-#define TROPIC_FIDO_KEY_SLOT 1
 
 typedef enum {
   TROPIC_HANDSHAKE_STATE_0,  // Handshake has not been initiated yet
@@ -65,8 +53,6 @@ typedef enum {
 
 static tropic_handshake_state_t tropic_handshake_state =
     TROPIC_HANDSHAKE_STATE_0;
-
-static bool tropic_is_paired = false;
 
 static uint8_t tropic_cert_chain[LT_NUM_CERTIFICATES *
                                  LT_L2_GET_INFO_REQ_CERT_SIZE_SINGLE] = {0};
@@ -502,7 +488,7 @@ static struct lt_config_t reversible_configuration = {
         BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) |
             BIT(26),
     }};
-// clang-format-on
+// clang-format on
 
 // TODO: Implement a function `lt_handle_t* start_session(const pkey_index_t
 // pkey_index)`. This function will check whether a session with a specified
@@ -570,7 +556,7 @@ static void prodtest_tropic_get_chip_id(cli_t* cli) {
   cli_ok_hexdata(cli, &chip_id, sizeof(chip_id));
 }
 
-static bool cache_tropic_cert_chain(lt_handle_t* handle) {
+static bool cache_tropic_cert_chain(void) {
   if (tropic_cert_chain_length > 0) {
     return true;
   }
@@ -584,17 +570,19 @@ static bool cache_tropic_cert_chain(lt_handle_t* handle) {
 
   lt_ret_t ret = LT_FAIL;
 
-  ret = lt_get_info_cert_store(handle, &cert_store);
+  ret = lt_get_info_cert_store(tropic_get_handle(), &cert_store);
   if (ret != LT_OK) {
     return false;
   }
 
-  ret = lt_get_st_pub(&cert_store, tropic_public_cached, sizeof(tropic_public_cached));
+  ret = lt_get_st_pub(&cert_store, tropic_public_cached,
+                      sizeof(tropic_public_cached));
   if (ret != LT_OK) {
     return false;
   }
 
-  // Compactify tropic_cert_chain for future use. This invalidates the cert_store.
+  // Compactify tropic_cert_chain for future use. This invalidates the
+  // cert_store.
   size_t length = 0;
   for (size_t i = 0; i < LT_NUM_CERTIFICATES; i++) {
     memmove(&tropic_cert_chain[length], cert_store.certs[i],
@@ -607,13 +595,20 @@ static bool cache_tropic_cert_chain(lt_handle_t* handle) {
   return true;
 }
 
+static const curve25519_key* prodtest_tropic_get_tropic_public(void) {
+  if (!cache_tropic_cert_chain()) {
+    return NULL;
+  }
+  return &tropic_public_cached;
+}
+
 static void prodtest_tropic_certtropic_read(cli_t* cli) {
   if (cli_arg_count(cli) > 0) {
     cli_error_arg_count(cli);
     return;
   }
 
-  if (!cache_tropic_cert_chain(tropic_get_handle())) {
+  if (!cache_tropic_cert_chain()) {
     cli_error(cli, CLI_ERROR, "`cache_tropic_cert_chain()` failed");
     return;
   }
@@ -627,6 +622,22 @@ static void prodtest_tropic_lock_check(cli_t* cli) {
     return;
   }
 
+  tropic_locked_status status = get_tropic_locked_status(cli);
+  switch (status) {
+    case TROPIC_LOCKED_TRUE:
+      cli_ok(cli, "YES");
+      break;
+    case TROPIC_LOCKED_FALSE:
+      cli_ok(cli, "NO");
+      break;
+    default:
+      // Error reported by get_tropic_locked_status.
+      break;
+  }
+}
+
+tropic_locked_status get_tropic_locked_status(cli_t* cli) {
+  tropic_locked_status locked_status = TROPIC_LOCKED_ERROR;
   tropic_handshake_state = TROPIC_HANDSHAKE_STATE_0;
 
   lt_handle_t* tropic_handle = tropic_get_handle();
@@ -634,7 +645,8 @@ static void prodtest_tropic_lock_check(cli_t* cli) {
 
   curve25519_key tropic_public = {0};
   if (secret_key_tropic_public(tropic_public) != sectrue) {
-    cli_error(cli, CLI_ERROR, "`secret_key_tropic_public()` failed.");
+    // The Tropic pairing process was not initiated.
+    locked_status = TROPIC_LOCKED_FALSE;
     goto cleanup;
   }
 
@@ -642,18 +654,18 @@ static void prodtest_tropic_lock_check(cli_t* cli) {
   if (secret_key_tropic_pairing_privileged(privileged_private) != sectrue) {
     cli_error(cli, CLI_ERROR,
               "`secret_key_tropic_pairing_privileged()` failed.");
+    locked_status = TROPIC_LOCKED_ERROR;
     goto cleanup;
   }
   curve25519_key privileged_public = {0};
   curve25519_scalarmult_basepoint(privileged_public, privileged_private);
 
-  ret =
-      lt_session_start(tropic_handle, tropic_public, PRIVILEGED_PAIRING_KEY_SLOT,
-                       privileged_private, privileged_public);
+  ret = lt_session_start(tropic_handle, tropic_public,
+                         TROPIC_PRIVILEGED_PAIRING_KEY_SLOT, privileged_private,
+                         privileged_public);
   if (ret != LT_OK) {
-    cli_error(cli, CLI_ERROR,
-              "`lt_session_start()` for privileged key failed with error %d",
-              ret);
+    // The Tropic pairing process was initiated but probably failed midway.
+    locked_status = TROPIC_LOCKED_FALSE;
     goto cleanup;
   }
 
@@ -663,32 +675,35 @@ static void prodtest_tropic_lock_check(cli_t* cli) {
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR, "`lt_read_whole_R_config()` failed with error %d",
               ret);
-    return;
+    locked_status = TROPIC_LOCKED_ERROR;
+    goto cleanup;
   }
 
   if (memcmp(&reversible_configuration, (uint8_t*)&configuration_read,
              sizeof(reversible_configuration)) != 0) {
-    cli_ok(cli, "NO");
-    return;
+    locked_status = TROPIC_LOCKED_FALSE;
+    goto cleanup;
   }
 
   ret = lt_read_whole_I_config(tropic_handle, &configuration_read);
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR, "`lt_read_whole_I_config()` failed with error %d",
               ret);
-    return;
+    locked_status = TROPIC_LOCKED_ERROR;
+    goto cleanup;
   }
 
   if (memcmp(&irreversible_configuration, (uint8_t*)&configuration_read,
              sizeof(irreversible_configuration)) != 0) {
-    cli_ok(cli, "NO");
-    return;
+    locked_status = TROPIC_LOCKED_FALSE;
+    goto cleanup;
   }
 
-  cli_ok(cli, "YES");
+  locked_status = TROPIC_LOCKED_TRUE;
 
 cleanup:
-    memzero(privileged_private, sizeof(privileged_private));
+  memzero(privileged_private, sizeof(privileged_private));
+  return locked_status;
 }
 
 static lt_ret_t pairing_key_write(lt_handle_t* handle, pkey_index_t slot,
@@ -713,65 +728,83 @@ static lt_ret_t pairing_key_write(lt_handle_t* handle, pkey_index_t slot,
   return LT_OK;
 }
 
-static bool is_paired(cli_t* cli) {
+static bool tropic_is_paired(cli_t* cli) {
+  static bool is_paired = false;
+  if (is_paired) {
+    return true;
+  }
+
   lt_handle_t* tropic_handle = tropic_get_handle();
   lt_ret_t ret = LT_FAIL;
 
   // Retrieve the tropic public key.
   curve25519_key tropic_public = {0};
   if (secret_key_tropic_public(tropic_public) != sectrue) {
-    cli_error(cli, CLI_ERROR, "`secret_key_tropic_public()` failed.");
+    if (cli != NULL) {
+      cli_error(cli, CLI_ERROR, "`secret_key_tropic_public()` failed.");
+    }
     goto cleanup;
   }
 
   // Retrieve the unprivileged key pair and try to establish a session using it.
   curve25519_key unprivileged_private = {0};
   if (secret_key_tropic_pairing_unprivileged(unprivileged_private) != sectrue) {
-    cli_error(cli, CLI_ERROR,
-              "`secret_key_tropic_pairing_unprivileged()` failed.");
+    if (cli != NULL) {
+      cli_error(cli, CLI_ERROR,
+                "`secret_key_tropic_pairing_unprivileged()` failed.");
+    }
     goto cleanup;
   }
   curve25519_key unprivileged_public = {0};
   curve25519_scalarmult_basepoint(unprivileged_public, unprivileged_private);
   ret = lt_session_start(tropic_handle, tropic_public,
-                         UNPRIVILEGED_PAIRING_KEY_SLOT, unprivileged_private,
-                         unprivileged_public);
+                         TROPIC_UNPRIVILEGED_PAIRING_KEY_SLOT,
+                         unprivileged_private, unprivileged_public);
   if (ret != LT_OK) {
-    cli_error(cli, CLI_ERROR,
-              "`lt_session_start()` for unprivileged key failed with error %d",
-              ret);
+    if (cli != NULL) {
+      cli_error(
+          cli, CLI_ERROR,
+          "`lt_session_start()` for unprivileged key failed with error %d",
+          ret);
+    }
     goto cleanup;
   }
 
   // Retrieve the privileged key pair and try to establish a session using it.
   curve25519_key privileged_private = {0};
   if (secret_key_tropic_pairing_privileged(privileged_private) != sectrue) {
-    cli_error(cli, CLI_ERROR,
-              "`secret_key_tropic_pairing_privileged()` failed.");
+    if (cli != NULL) {
+      cli_error(cli, CLI_ERROR,
+                "`secret_key_tropic_pairing_privileged()` failed.");
+    }
     goto cleanup;
   }
   curve25519_key privileged_public = {0};
   curve25519_scalarmult_basepoint(privileged_public, privileged_private);
 
-  ret =
-      lt_session_start(tropic_handle, tropic_public, PRIVILEGED_PAIRING_KEY_SLOT,
-                       privileged_private, privileged_public);
+  ret = lt_session_start(tropic_handle, tropic_public,
+                         TROPIC_PRIVILEGED_PAIRING_KEY_SLOT, privileged_private,
+                         privileged_public);
   if (ret != LT_OK) {
-    cli_error(cli, CLI_ERROR,
-              "`lt_session_start()` for privileged key failed with error %d",
-              ret);
+    if (cli != NULL) {
+      cli_error(cli, CLI_ERROR,
+                "`lt_session_start()` for privileged key failed with error %d",
+                ret);
+    }
     goto cleanup;
   }
 
   // Read the factory pairing key to ensure it is invalidated.
   curve25519_key public_read = {0};
-  ret =
-      lt_pairing_key_read(tropic_handle, public_read, FACTORY_PAIRING_KEY_SLOT);
+  ret = lt_pairing_key_read(tropic_handle, public_read,
+                            TROPIC_FACTORY_PAIRING_KEY_SLOT);
   if (ret != LT_L3_PAIRING_KEY_INVALID) {
-    cli_error(cli, CLI_ERROR,
-              "`lt_pairing_key_read()` for factory pairing key failed with "
-              "error %d",
-              ret);
+    if (cli != NULL) {
+      cli_error(cli, CLI_ERROR,
+                "`lt_pairing_key_read()` for factory pairing key failed with "
+                "error %d",
+                ret);
+    }
     goto cleanup;
   }
 
@@ -779,21 +812,57 @@ static bool is_paired(cli_t* cli) {
   ret =
       lt_pairing_key_read(tropic_handle, public_read, PAIRING_KEY_SLOT_INDEX_3);
   if (ret != LT_L3_PAIRING_KEY_EMPTY) {
-    cli_error(cli, CLI_ERROR,
-              "`lt_pairing_key_read()` for pairing key slot 3 failed with "
-              "error %d",
-              ret);
+    if (cli != NULL) {
+      cli_error(cli, CLI_ERROR,
+                "`lt_pairing_key_read()` for pairing key slot 3 failed with "
+                "error %d",
+                ret);
+    }
     goto cleanup;
   }
 
-  tropic_is_paired = true;
-  ret = LT_OK;
+  is_paired = true;
 
 cleanup:
   memzero(privileged_private, sizeof(privileged_private));
   memzero(unprivileged_private, sizeof(unprivileged_private));
 
-  return ret == LT_OK;
+  return is_paired;
+}
+
+bool prodtest_tropic_factory_session_start(lt_handle_t* tropic_handle) {
+#ifdef TREZOR_EMULATOR
+  curve25519_key factory_private = {
+      0xf0, 0xc4, 0xaa, 0x04, 0x8f, 0x00, 0x13, 0xa0, 0x96, 0x84, 0xdf,
+      0x05, 0xe8, 0xa2, 0x2e, 0xf7, 0x21, 0x38, 0x98, 0x28, 0x2b, 0xa9,
+      0x43, 0x12, 0xf3, 0x13, 0xdf, 0x2d, 0xce, 0x8d, 0x41, 0x64};
+#else
+#ifdef TROPIC_TESTING_KEYS
+  // Testing keys (used in TROPIC01-P2S-P001)
+  curve25519_key factory_private = {
+      0xd0, 0x99, 0x92, 0xb1, 0xf1, 0x7a, 0xbc, 0x4d, 0xb9, 0x37, 0x17,
+      0x68, 0xa2, 0x7d, 0xa0, 0x5b, 0x18, 0xfa, 0xb8, 0x56, 0x13, 0xa7,
+      0x84, 0x2c, 0xa6, 0x4c, 0x79, 0x10, 0xf2, 0x2e, 0x71, 0x6b};
+#else
+  // Production keys
+  curve25519_key factory_private = {
+      0x28, 0x3f, 0x5a, 0x0f, 0xfc, 0x41, 0xcf, 0x50, 0x98, 0xa8, 0xe1,
+      0x7d, 0xb6, 0x37, 0x2c, 0x3c, 0xaa, 0xd1, 0xee, 0xee, 0xdf, 0x0f,
+      0x75, 0xbc, 0x3f, 0xbf, 0xcd, 0x9c, 0xab, 0x3d, 0xe9, 0x72};
+#endif
+#endif
+  curve25519_key factory_public = {0};
+  curve25519_scalarmult_basepoint(factory_public, factory_private);
+
+  const curve25519_key* tropic_public = prodtest_tropic_get_tropic_public();
+  if (tropic_public == NULL) {
+    return false;
+  }
+
+  // Try to establish a session using the factory pairing key.
+  return LT_OK == lt_session_start(tropic_handle, *tropic_public,
+                                   TROPIC_FACTORY_PAIRING_KEY_SLOT,
+                                   factory_private, factory_public);
 }
 
 static void prodtest_tropic_pair(cli_t* cli) {
@@ -822,61 +891,38 @@ static void prodtest_tropic_pair(cli_t* cli) {
 
   lt_handle_t* tropic_handle = tropic_get_handle();
 
-  // Ensure that tropic_public_cached is cached.
-  if (!cache_tropic_cert_chain(tropic_handle)) {
-    cli_error(cli, CLI_ERROR, "`cache_tropic_cert_chain()` failed");
+  // Get the Tropic01 public pairing key from the chip's certificate.
+  const curve25519_key* tropic_public_cert =
+      prodtest_tropic_get_tropic_public();
+  if (tropic_public_cert == NULL) {
+    cli_error(cli, CLI_ERROR, "`prodtest_tropic_get_tropic_public()` failed");
     goto cleanup;
   }
 
   // Retrieve the tropic public key and write it to MCU's flash if it has not
   // been written yet.
-  curve25519_key tropic_public_read = {0};
-  if (secret_key_tropic_public(tropic_public_read) != sectrue) {
+  curve25519_key tropic_public_flash = {0};
+  if (secret_key_tropic_public(tropic_public_flash) != sectrue) {
 #ifdef SECRET_TROPIC_TROPIC_PUBKEY_SLOT
     // This is skipped in the prodtest emulator.
-    if (secret_key_set(SECRET_TROPIC_TROPIC_PUBKEY_SLOT, tropic_public_cached,
-                       sizeof(tropic_public_cached)) != sectrue) {
+    if (secret_key_set(SECRET_TROPIC_TROPIC_PUBKEY_SLOT, *tropic_public_cert,
+                       sizeof(curve25519_key)) != sectrue) {
       cli_error(cli, CLI_ERROR,
                 "`secret_key_set()` failed for tropic public key.");
       goto cleanup;
     }
 #endif
-    if (secret_key_tropic_public(tropic_public_read) != sectrue) {
+    if (secret_key_tropic_public(tropic_public_flash) != sectrue) {
       cli_error(cli, CLI_ERROR, "`secret_key_tropic_public()` failed.");
       goto cleanup;
     }
   }
-  if (memcmp(tropic_public_cached, tropic_public_read, sizeof(tropic_public_cached)) != 0) {
+  if (memcmp(*tropic_public_cert, tropic_public_flash,
+             sizeof(curve25519_key)) != 0) {
     cli_error(cli, CLI_ERROR,
               "Tropic public key does not match the expected value.");
     goto cleanup;
   }
-
-  lt_ret_t ret = LT_FAIL;
-
-  // Retrieve the factory pairing key pair.
-#ifdef TREZOR_EMULATOR
-  curve25519_key factory_private = {
-      0xf0, 0xc4, 0xaa, 0x04, 0x8f, 0x00, 0x13, 0xa0, 0x96, 0x84, 0xdf,
-      0x05, 0xe8, 0xa2, 0x2e, 0xf7, 0x21, 0x38, 0x98, 0x28, 0x2b, 0xa9,
-      0x43, 0x12, 0xf3, 0x13, 0xdf, 0x2d, 0xce, 0x8d, 0x41, 0x64};
-#else
-#ifdef TROPIC_TESTING_KEYS
-  // Testing keys (used in TROPIC01-P2S-P001)
-  curve25519_key factory_private = {
-      0xd0, 0x99, 0x92, 0xb1, 0xf1, 0x7a, 0xbc, 0x4d, 0xb9, 0x37, 0x17,
-      0x68, 0xa2, 0x7d, 0xa0, 0x5b, 0x18, 0xfa, 0xb8, 0x56, 0x13, 0xa7,
-      0x84, 0x2c, 0xa6, 0x4c, 0x79, 0x10, 0xf2, 0x2e, 0x71, 0x6b};
-#else
-  // Production keys
-  curve25519_key factory_private = {
-      0x28, 0x3f, 0x5a, 0x0f, 0xfc, 0x41, 0xcf, 0x50, 0x98, 0xa8, 0xe1,
-      0x7d, 0xb6, 0x37, 0x2c, 0x3c, 0xaa, 0xd1, 0xee, 0xee, 0xdf, 0x0f,
-      0x75, 0xbc, 0x3f, 0xbf, 0xcd, 0x9c, 0xab, 0x3d, 0xe9, 0x72};
-#endif
-#endif
-  curve25519_key factory_public = {0};
-  curve25519_scalarmult_basepoint(factory_public, factory_private);
 
   // Retrieve the unprivileged pairing key pair.
   curve25519_key unprivileged_private = {0};
@@ -898,14 +944,11 @@ static void prodtest_tropic_pair(cli_t* cli) {
   curve25519_key privileged_public = {0};
   curve25519_scalarmult_basepoint(privileged_public, privileged_private);
 
-  // Try to establish a session using the factory pairing key.
-  ret = lt_session_start(tropic_handle, tropic_public_cached, FACTORY_PAIRING_KEY_SLOT,
-                         factory_private, factory_public);
-  if (ret == LT_OK) {
+  if (prodtest_tropic_factory_session_start(tropic_handle)) {
     // Write the privileged pairing key to the tropic's pairing key slot if it
     // has not been written yet.
-    ret = pairing_key_write(tropic_handle, PRIVILEGED_PAIRING_KEY_SLOT,
-                            privileged_public);
+    lt_ret_t ret = pairing_key_write(
+        tropic_handle, TROPIC_PRIVILEGED_PAIRING_KEY_SLOT, privileged_public);
     // If the pairing key has already been written, `pairing_key_write()`
     // returns `LT_OK`.
     if (ret != LT_OK) {
@@ -918,7 +961,7 @@ static void prodtest_tropic_pair(cli_t* cli) {
 
     // Write the unprivileged pairing key to the tropic's pairing key slot if it
     // has not been written yet.
-    ret = pairing_key_write(tropic_handle, UNPRIVILEGED_PAIRING_KEY_SLOT,
+    ret = pairing_key_write(tropic_handle, TROPIC_UNPRIVILEGED_PAIRING_KEY_SLOT,
                             unprivileged_public);
     // If the pairing key has already been written, `pairing_key_write()`
     // returns `LT_OK`.
@@ -932,7 +975,8 @@ static void prodtest_tropic_pair(cli_t* cli) {
     }
 
     // Invalidate the factory pairing key if it has not been invalidated yet.
-    ret = lt_pairing_key_invalidate(tropic_handle, FACTORY_PAIRING_KEY_SLOT);
+    ret = lt_pairing_key_invalidate(tropic_handle,
+                                    TROPIC_FACTORY_PAIRING_KEY_SLOT);
     // If the factory has already been invalidated,
     // `lt_pairing_key_invalidate()` returns `LT_OK`.
     if (ret != LT_OK) {
@@ -944,7 +988,7 @@ static void prodtest_tropic_pair(cli_t* cli) {
     }
   }
 
-  if (is_paired(cli) == true) {
+  if (tropic_is_paired(cli)) {
     cli_ok(cli, "");
   }
 
@@ -969,15 +1013,16 @@ static void prodtest_tropic_get_access_credential(cli_t* cli) {
     goto cleanup;
   }
 
-  if (!cache_tropic_cert_chain(tropic_get_handle())) {
-    cli_error(cli, CLI_ERROR, "`cache_tropic_cert_chain()` failed");
+  const curve25519_key* tropic_public = prodtest_tropic_get_tropic_public();
+  if (tropic_public == NULL) {
+    cli_error(cli, CLI_ERROR, "`prodtest_tropic_get_tropic_public()` failed");
     goto cleanup;
   }
 
   uint8_t output[sizeof(unprivileged_private) + NOISE_TAG_SIZE] = {0};
   if (!secure_channel_encrypt((uint8_t*)unprivileged_private,
-                              sizeof(unprivileged_private), tropic_public_cached,
-                              sizeof(tropic_public_cached), output)) {
+                              sizeof(unprivileged_private), *tropic_public,
+                              sizeof(curve25519_key), output)) {
     // `secure_channel_handshake_2()` might not have been called
     cli_error(cli, CLI_ERROR, "`secure_channel_encrypt()` failed.");
     goto cleanup;
@@ -1063,8 +1108,8 @@ static void prodtest_tropic_handshake(cli_t* cli) {
     return;
   }
 
-  if (tropic_is_paired != true) {
-    cli_error(cli, CLI_ERROR, "You have to call `tropic-pair` first.");
+  if (!tropic_is_paired(NULL)) {
+    cli_error(cli, CLI_ERROR, "`tropic-pair` must be called first.");
     return;
   }
 
@@ -1229,6 +1274,11 @@ static void prodtest_tropic_lock(cli_t* cli) {
     return;
   }
 
+  if (!tropic_is_paired(NULL)) {
+    cli_error(cli, CLI_ERROR, "`tropic-pair` must be called first.");
+    return;
+  }
+
   tropic_handshake_state = TROPIC_HANDSHAKE_STATE_0;
 
   lt_handle_t* tropic_handle = tropic_get_handle();
@@ -1249,9 +1299,9 @@ static void prodtest_tropic_lock(cli_t* cli) {
   curve25519_key privileged_public = {0};
   curve25519_scalarmult_basepoint(privileged_public, privileged_private);
 
-  ret =
-      lt_session_start(tropic_handle, tropic_public, PRIVILEGED_PAIRING_KEY_SLOT,
-                       privileged_private, privileged_public);
+  ret = lt_session_start(tropic_handle, tropic_public,
+                         TROPIC_PRIVILEGED_PAIRING_KEY_SLOT, privileged_private,
+                         privileged_public);
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR,
               "`lt_session_start()` for privileged key failed with error %d",
@@ -1265,54 +1315,54 @@ static void prodtest_tropic_lock(cli_t* cli) {
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR, "`lt_r_config_erase()` failed with error %d",
               ret);
-    return;
+    goto cleanup;
   }
 
   ret = lt_write_whole_R_config(tropic_handle, &reversible_configuration);
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR,
               "`lt_write_whole_R_config()` failed with error %d", ret);
-    return;
+    goto cleanup;
   }
 
   ret = lt_read_whole_R_config(tropic_handle, &configuration_read);
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR, "`lt_read_whole_R_config()` failed with error %d",
               ret);
-    return;
+    goto cleanup;
   }
 
   if (memcmp(&reversible_configuration, (uint8_t*)&configuration_read,
              sizeof(reversible_configuration)) != 0) {
     cli_error(cli, CLI_ERROR, "Reversible configuration mismatch after write.");
-    return;
+    goto cleanup;
   }
 
   ret = lt_write_whole_I_config(tropic_handle, &irreversible_configuration);
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR,
               "`lt_write_whole_I_config()` failed with error %d", ret);
-    return;
+    goto cleanup;
   }
 
   ret = lt_read_whole_I_config(tropic_handle, &configuration_read);
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR, "`lt_read_whole_I_config()` failed with error %d",
               ret);
-    return;
+    goto cleanup;
   }
 
   if (memcmp(&irreversible_configuration, (uint8_t*)&configuration_read,
              sizeof(irreversible_configuration)) != 0) {
     cli_error(cli, CLI_ERROR,
               "Irreversible configuration mismatch after write.");
-    return;
+    goto cleanup;
   }
 
   cli_ok(cli, "");
 
 cleanup:
-    memzero(privileged_private, sizeof(privileged_private));
+  memzero(privileged_private, sizeof(privileged_private));
 }
 
 static lt_ret_t data_write(lt_handle_t* h, uint16_t first_slot,
@@ -1416,7 +1466,7 @@ static bool check_device_cert_chain(cli_t* cli, const uint8_t* chain,
 
   ed25519_signature signature = {0};
 
-  if (lt_ecc_eddsa_sign(tropic_get_handle(), TROPIC_DEV_KEY_SLOT, challenge,
+  if (lt_ecc_eddsa_sign(tropic_get_handle(), TROPIC_DEVICE_KEY_SLOT, challenge,
                         sizeof(challenge), signature) != LT_OK) {
     return false;
   }
@@ -1469,9 +1519,9 @@ static void cert_write(cli_t* cli, uint16_t first_slot, uint16_t slots_count) {
   curve25519_key privileged_public = {0};
   curve25519_scalarmult_basepoint(privileged_public, privileged_private);
 
-  ret =
-      lt_session_start(tropic_handle, tropic_public, PRIVILEGED_PAIRING_KEY_SLOT,
-                       privileged_private, privileged_public);
+  ret = lt_session_start(tropic_handle, tropic_public,
+                         TROPIC_PRIVILEGED_PAIRING_KEY_SLOT, privileged_private,
+                         privileged_public);
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR,
               "`lt_session_start()` for privileged key failed with error %d",
@@ -1495,7 +1545,7 @@ static void cert_write(cli_t* cli, uint16_t first_slot, uint16_t slots_count) {
     goto cleanup;
   }
 
-  if (first_slot == TROPIC_DEV_CERT_FIRST_SLOT &&
+  if (first_slot == TROPIC_DEVICE_CERT_FIRST_SLOT &&
       !check_device_cert_chain(cli, certificate, certificate_length)) {
     // Error returned by check_device_cert_chain().
     return;
@@ -1536,9 +1586,9 @@ static void cert_read(cli_t* cli, uint16_t first_slot, uint16_t slots_count) {
   curve25519_key privileged_public = {0};
   curve25519_scalarmult_basepoint(privileged_public, privileged_private);
 
-  ret =
-      lt_session_start(tropic_handle, tropic_public, PRIVILEGED_PAIRING_KEY_SLOT,
-                       privileged_private, privileged_public);
+  ret = lt_session_start(tropic_handle, tropic_public,
+                         TROPIC_PRIVILEGED_PAIRING_KEY_SLOT, privileged_private,
+                         privileged_public);
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR,
               "`lt_session_start()` for privileged key failed with error %d",
@@ -1561,20 +1611,61 @@ cleanup:
 }
 
 static void prodtest_tropic_certfido_write(cli_t* cli) {
-  cert_write(cli, TROPIC_FIDO_CERT_FIRST_SLOT, TROPIC_FIDO_CERT_SLOTS_COUNT);
+  cert_write(cli, TROPIC_FIDO_CERT_FIRST_SLOT, TROPIC_FIDO_CERT_SLOT_COUNT);
 }
 
 static void prodtest_tropic_certdev_write(cli_t* cli) {
-  cert_write(cli, TROPIC_DEV_CERT_FIRST_SLOT, TROPIC_DEV_CERT_SLOTS_COUNT);
-  // TODO: Parse the device serial number from the certificate and verify that it matches the device serial number written by `otp-device-sn-write`. Do the same for the MCU device certificate and the Optiga device certificate.
+  cert_write(cli, TROPIC_DEVICE_CERT_FIRST_SLOT, TROPIC_DEVICE_CERT_SLOT_COUNT);
 }
 
 static void prodtest_tropic_certfido_read(cli_t* cli) {
-  cert_read(cli, TROPIC_FIDO_CERT_FIRST_SLOT, TROPIC_FIDO_CERT_SLOTS_COUNT);
+  cert_read(cli, TROPIC_FIDO_CERT_FIRST_SLOT, TROPIC_FIDO_CERT_SLOT_COUNT);
 }
 
 static void prodtest_tropic_certdev_read(cli_t* cli) {
-  cert_read(cli, TROPIC_DEV_CERT_FIRST_SLOT, TROPIC_DEV_CERT_SLOTS_COUNT);
+  cert_read(cli, TROPIC_DEVICE_CERT_FIRST_SLOT, TROPIC_DEVICE_CERT_SLOT_COUNT);
+}
+
+static void pubkey_read(cli_t* cli, ecc_slot_t slot,
+                        const uint8_t masking_key[ECDSA_PRIVATE_KEY_SIZE]) {
+  if (cli_arg_count(cli) > 0) {
+    cli_error_arg_count(cli);
+    return;
+  }
+
+  uint8_t public_key[ECDSA_PUBLIC_KEY_SIZE] = {0x04};
+  lt_ecc_curve_type_t curve_type = 0;
+  ecc_key_origin_t origin = 0;
+  lt_ret_t ret = lt_ecc_key_read(tropic_get_handle(), slot, &public_key[1],
+                                 &curve_type, &origin);
+  if (ret != LT_OK || curve_type != CURVE_P256) {
+    cli_error(cli, CLI_ERROR, "lt_ecc_key_read error %d.", ret);
+    return;
+  }
+
+  if (masking_key != NULL) {
+    if (ecdsa_unmask_public_key(&nist256p1, masking_key, public_key,
+                                public_key) != 0) {
+      cli_error(cli, CLI_ERROR, "key unmasking error");
+      return;
+    }
+  }
+
+  cli_ok_hexdata(cli, public_key, sizeof(public_key));
+}
+
+static void prodtest_tropic_keyfido_read(cli_t* cli) {
+#ifdef SECRET_KEY_MASKING
+  uint8_t masking_key[ECDSA_PRIVATE_KEY_SIZE] = {0};
+  if (secret_key_tropic_masking(masking_key) != sectrue) {
+    cli_error(cli, CLI_ERROR, "masking key not available");
+    return;
+  }
+  pubkey_read(cli, TROPIC_FIDO_KEY_SLOT, masking_key);
+  memzero(masking_key, sizeof(masking_key));
+#else
+  pubkey_read(cli, TROPIC_FIDO_KEY_SLOT, NULL);
+#endif  // SECRET_KEY_MASKING
 }
 
 static void prodtest_tropic_update_fw(cli_t* cli) {
@@ -1793,6 +1884,13 @@ PRODTEST_CLI_CMD(
   .func = prodtest_tropic_certfido_write,
   .info = "Write the X.509 certificate for the FIDO key to Tropic",
   .args = "<hex-data>"
+);
+
+PRODTEST_CLI_CMD(
+  .name = "tropic-keyfido-read",
+  .func = prodtest_tropic_keyfido_read,
+  .info = "Read the FIDO public key from Tropic.",
+  .args = ""
 );
 
 PRODTEST_CLI_CMD(

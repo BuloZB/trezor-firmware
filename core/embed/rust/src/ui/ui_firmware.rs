@@ -1,7 +1,7 @@
 use crate::{
     error::Error,
     io::BinaryData,
-    micropython::{gc::Gc, list::List, obj::Obj},
+    micropython::{buffer::StrBuffer, gc::Gc, list::List, obj::Obj},
     strutil::TString,
 };
 use heapless::Vec;
@@ -17,8 +17,6 @@ pub const MAX_GROUP_SHARE_LINES: usize = 4;
 pub const MAX_MENU_ITEMS: usize = 5;
 
 pub const MAX_PAIRED_DEVICES: usize = 8; // Maximum number of paired devices in the device menu
-
-pub const ERROR_NOT_IMPLEMENTED: Error = Error::ValueError(c"not implemented");
 
 pub trait FirmwareUI {
     #[allow(clippy::too_many_arguments)]
@@ -207,9 +205,10 @@ pub trait FirmwareUI {
         cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
-    fn flow_confirm_set_new_pin(
+    fn flow_confirm_set_new_code(
         title: TString<'static>,
         description: TString<'static>,
+        is_wipe_code: bool,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
     #[allow(clippy::too_many_arguments)]
@@ -242,7 +241,7 @@ pub trait FirmwareUI {
         br_name: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
-    // TODO: this is TR specific and used only in confirm_set_new_pin
+    // TODO: this is TR specific and used only in confirm_set_new_code
     fn multiple_pages_texts(
         title: TString<'static>,
         verb: TString<'static>,
@@ -285,6 +284,7 @@ pub trait FirmwareUI {
         subprompt: TString<'static>,
         allow_cancel: bool,
         warning: bool,
+        last_attempt: bool,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
     fn request_passphrase(
@@ -362,12 +362,12 @@ pub trait FirmwareUI {
 
     #[allow(clippy::too_many_arguments)]
     fn show_device_menu(
+        init_submenu: Option<u8>,
         failed_backup: bool,
         paired_devices: heapless::Vec<TString<'static>, MAX_PAIRED_DEVICES>,
-        connected_idx: Option<usize>,
-        bluetooth: Option<bool>,
+        connected_idx: Option<u8>,
         pin_code: Option<bool>,
-        auto_lock_delay: Option<TString<'static>>,
+        auto_lock_delay: Option<[TString<'static>; 2]>,
         wipe_code: Option<bool>,
         check_backup: bool,
         device_name: Option<TString<'static>>,
@@ -378,6 +378,7 @@ pub trait FirmwareUI {
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
     fn show_pairing_device_name(
+        description: StrBuffer,
         device_name: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
@@ -392,6 +393,11 @@ pub trait FirmwareUI {
         title: TString<'static>,
         description: TString<'static>,
         code: TString<'static>,
+    ) -> Result<impl LayoutMaybeTrace, Error>;
+
+    fn confirm_thp_pairing(
+        title: TString<'static>,
+        description: (StrBuffer, Obj),
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
     fn show_info(

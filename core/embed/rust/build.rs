@@ -285,6 +285,7 @@ fn generate_micropython_bindings() {
         .allowlist_var("mp_type_ValueError")
         .allowlist_var("mp_type_TypeError")
         .allowlist_var("mp_type_RuntimeError")
+        .allowlist_var("mp_type_NotImplementedError")
         // time
         .allowlist_function("mp_hal_ticks_ms")
         .allowlist_function("mp_hal_delay_ms")
@@ -399,7 +400,12 @@ fn generate_trezorhal_bindings() {
         // random
         .allowlist_function("random_uniform")
         // rgb led
+        .allowlist_type("rgb_led_effect_type_t")
         .allowlist_function("rgb_led_set_color")
+        .allowlist_function("rgb_led_effect_start")
+        .allowlist_function("rgb_led_effect_stop")
+        .allowlist_function("rgb_led_effect_ongoing")
+        .allowlist_function("rgb_led_effect_get_type")
         // systick
         .allowlist_function("systick_delay_ms")
         .allowlist_function("systick_ms")
@@ -410,6 +416,7 @@ fn generate_trezorhal_bindings() {
         .allowlist_type("usb_event_t")
         .allowlist_function("usb_get_state")
         // ble
+        .allowlist_var("BLE_MAX_BONDS")
         .allowlist_var("BLE_PAIRING_CODE_LEN")
         .allowlist_var("BLE_RX_PACKET_SIZE")
         .allowlist_var("BLE_TX_PACKET_SIZE")
@@ -421,9 +428,12 @@ fn generate_trezorhal_bindings() {
         .allowlist_function("ble_write")
         .allowlist_function("ble_read")
         .allowlist_function("ble_set_name")
+        .allowlist_function("ble_unpair")
+        .allowlist_function("ble_get_bond_list")
         .allowlist_type("ble_command_t")
         .allowlist_type("ble_state_t")
         .allowlist_type("ble_event_t")
+        .allowlist_type("bt_le_addr_t")
         // touch
         .allowlist_function("touch_get_event")
         // button

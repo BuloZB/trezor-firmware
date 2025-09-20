@@ -334,6 +334,11 @@ bool tropic_ecc_sign(uint16_t key_slot_index, const uint8_t *dig,
                               (uint32_t)sig, SMCALL_TROPIC_ECC_SIGN);
 }
 
+bool tropic_data_read(uint16_t udata_slot, uint8_t *data, uint16_t *size) {
+  return (bool)smcall_invoke3((uint32_t)udata_slot, (uint32_t)data,
+                              (uint32_t)size, SMCALL_TROPIC_DATA_READ);
+}
+
 #endif
 
 // =============================================================================
@@ -361,5 +366,17 @@ bool backup_ram_write(uint16_t key, backup_ram_item_type_t type,
 }
 
 #endif  // USE_BACKUP_RAM
+
+#ifdef USE_NRF
+
+#include <sec/secret.h>
+
+secbool secret_validate_nrf_pairing(const uint8_t *message, size_t msg_len,
+                                    const uint8_t *mac, size_t mac_len) {
+  return (secbool)smcall_invoke4((uint32_t)message, msg_len, (uint32_t)mac,
+                                 mac_len, SMCALL_SECRET_VALIDATE_NRF_PAIRING);
+}
+
+#endif
 
 #endif  // defined(KERNEL) && defined(USE_SECMON_LAYOUT)

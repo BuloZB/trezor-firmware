@@ -25,6 +25,7 @@ MICROPY_ENABLE_SOURCE_LINE = ARGUMENTS.get('MICROPY_ENABLE_SOURCE_LINE', '0')
 DISABLE_ANIMATION = ARGUMENTS.get('TREZOR_DISABLE_ANIMATION', '0') == '1'
 BLOCK_ON_VCP = ARGUMENTS.get('BLOCK_ON_VCP', '0') == '1'
 UI_PERFORMANCE_OVERLAY = ARGUMENTS.get('UI_PERFORMANCE_OVERLAY', '0') == '1'
+DBG_CONSOLE = ARGUMENTS.get('DBG_CONSOLE', '')
 
 STORAGE_INSECURE_TESTING_MODE = ARGUMENTS.get('STORAGE_INSECURE_TESTING_MODE', '0') == '1'
 if STORAGE_INSECURE_TESTING_MODE and PRODUCTION:
@@ -64,12 +65,20 @@ FEATURES_WANTED = [
     "suspend",
     "tropic",
     "usb",
+    "usb_iface_wire",
     ]
 
 if DISABLE_OPTIGA:
     if PYOPT != '0':
         raise RuntimeError("DISABLE_OPTIGA requires PYOPT=0")
     FEATURES_WANTED.remove("optiga")
+
+if PYOPT == '0':
+    DBG_CONSOLE = DBG_CONSOLE or "VCP"
+    FEATURES_WANTED += ["usb_iface_debug"]
+
+if DBG_CONSOLE != "":
+    FEATURES_WANTED += ["dbg_console"]
 
 CCFLAGS_MOD = ''
 CPPPATH_MOD = []
@@ -428,6 +437,7 @@ env = Environment(
     CPPDEFINES_IMPLICIT=[],
     CPPDEFPREFIX="-D'",
     CPPDEFSUFFIX="'",
+    DBG_CONSOLE=DBG_CONSOLE,
     )
 
 FEATURES_AVAILABLE = models.configure_board(TREZOR_MODEL, HW_REVISION, FEATURES_WANTED, env, CPPDEFINES_HAL, SOURCE_HAL, PATH_HAL)
@@ -646,6 +656,9 @@ if FROZEN:
         ] if PYOPT != '0' else []
     ))
 
+    if 'power_manager' in FEATURES_AVAILABLE:
+        SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/power_management/*.py'))
+
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'storage/*.py',
         exclude=(
             ([SOURCE_PY_DIR + 'storage/sd_salt.py'] if not SDCARD else []) +
@@ -707,8 +720,7 @@ if FROZEN:
     )
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/management/*/*.py',
         exclude=(
-            ([SOURCE_PY_DIR + 'apps/management/ble/*.py'] if "ble" not in FEATURES_AVAILABLE else []) +
-            ([SOURCE_PY_DIR + 'apps/management/pm/*.py'] if "power_manager" not in FEATURES_AVAILABLE else [])
+            ([SOURCE_PY_DIR + 'apps/management/ble/*.py'] if "ble" not in FEATURES_AVAILABLE else [])
         ))
     )
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/misc/*.py'))
@@ -865,6 +877,8 @@ if EVERYTHING:
     features.append('universal_fw')
 if UI_PERFORMANCE_OVERLAY:
     features.append('ui_performance_overlay')
+if not PRODUCTION:
+    features.append('dev_keys')
 
 
 rust = tools.add_rust_lib(
@@ -919,12 +933,14 @@ tools.embed_raw_binary(
         )
 
 if 'nrf' in FEATURES_AVAILABLE:
+    suffix = "-dev" if BOOTLOADER_DEVEL else ""
+
     tools.embed_raw_binary(
             obj_program,
             env,
             'nrf_app',
             'build/firmware/nrf_app.o',
-            f'embed/models/{TREZOR_MODEL}/trezor-ble.bin',
+            f'embed/models/{TREZOR_MODEL}/trezor-ble{suffix}.bin',
             )
 
 if 'boot_ucb' in FEATURES_AVAILABLE:

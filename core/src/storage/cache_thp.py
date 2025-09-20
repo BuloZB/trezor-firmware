@@ -1,5 +1,6 @@
 import builtins
 from micropython import const
+from typing import Sequence
 
 from storage.cache_common import (
     CHANNEL_HOST_STATIC_PUBKEY,
@@ -15,15 +16,18 @@ from storage.cache_common import (
 _MAX_CHANNELS_COUNT = const(10)
 _MAX_SESSIONS_COUNT = const(20)
 
-
 _CHANNEL_ID_LENGTH = const(2)
 SESSION_ID_LENGTH = const(1)
-BROADCAST_CHANNEL_ID = const(0xFFFF)
 KEY_LENGTH = const(32)
 TAG_LENGTH = const(16)
+
 _UNALLOCATED_STATE = const(0)
 _ALLOCATED_STATE = const(1)
 _SEEDLESS_STATE = const(2)
+
+_MAX_CHANNEL_ID = const(0xFFEF)
+# Channel IDs from 0xFFF0 to 0xFFFE, and 0x0000, are reserved for future use
+BROADCAST_CHANNEL_ID = const(0xFFFF)
 
 
 class ThpDataCache(DataCache):
@@ -68,7 +72,7 @@ class ChannelCache(ThpDataCache):
     def sync(self, value: int) -> None:
         self.set_int(CHANNEL_SYNC, value)
 
-    def set_host_static_public_key(self, key: bytearray) -> None:
+    def set_host_static_public_key(self, key: memoryview) -> None:
         if len(key) != KEY_LENGTH:
             raise ValueError("Invalid key length")
         self.set(CHANNEL_HOST_STATIC_PUBKEY, key)
@@ -121,8 +125,6 @@ _usage_counter = 0
 
 
 def initialize() -> None:
-    global _CHANNELS
-    global _SESSIONS
     global cid_counter
 
     for _ in range(_MAX_CHANNELS_COUNT):
@@ -137,7 +139,7 @@ def initialize() -> None:
 
     from trezorcrypto import random
 
-    cid_counter = random.uniform(0xFFFE)
+    cid_counter = random.uniform(_MAX_CHANNEL_ID)
 
 
 def get_new_channel() -> ChannelCache:
@@ -329,7 +331,7 @@ def get_next_channel_id() -> bytes:
     global cid_counter
     while True:
         cid_counter += 1
-        if cid_counter >= BROADCAST_CHANNEL_ID:
+        if cid_counter > _MAX_CHANNEL_ID:
             cid_counter = 1
         if _is_cid_unique():
             break
@@ -337,7 +339,6 @@ def get_next_channel_id() -> bytes:
 
 
 def _is_cid_unique() -> bool:
-    global cid_counter
     cid_counter_bytes = cid_counter.to_bytes(_CHANNEL_ID_LENGTH, "big")
     for channel in _CHANNELS:
         if channel.channel_id == cid_counter_bytes:
@@ -345,10 +346,7 @@ def _is_cid_unique() -> bool:
     return True
 
 
-def _get_least_recently_used_item(
-    list: list[ChannelCache] | list[SessionThpCache], max_count: int
-) -> int:
-    global _usage_counter
+def _get_least_recently_used_item(list: Sequence[ThpDataCache], max_count: int) -> int:
     lru_counter = _usage_counter + 1
     lru_item_index = 0
     for i in range(max_count):

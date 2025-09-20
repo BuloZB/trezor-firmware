@@ -84,6 +84,34 @@ void sysevents_poll(const sysevents_t *awaited, sysevents_t *signalled,
                   SYSCALL_SYSEVENTS_POLL);
 }
 
+ssize_t syshandle_read(syshandle_t handle, void *buffer, size_t buffer_size) {
+  return syscall_invoke3((uint32_t)handle, (uint32_t)buffer, buffer_size,
+                         SYSCALL_SYSHANDLE_READ);
+}
+
+ssize_t syshandle_write(syshandle_t handle, const void *data,
+                        size_t data_size) {
+  return syscall_invoke3((uint32_t)handle, (uint32_t)data, data_size,
+                         SYSCALL_SYSHANDLE_WRITE);
+}
+
+// =============================================================================
+// dbg_console.h
+// =============================================================================
+
+#ifdef USE_DBG_CONSOLE
+
+ssize_t dbg_console_read(void *buffer, size_t buffer_size) {
+  return syscall_invoke2((uint32_t)buffer, buffer_size,
+                         SYSCALL_DBG_CONSOLE_READ);
+}
+
+void dbg_console_write(const void *data, size_t data_size) {
+  syscall_invoke2((uint32_t)data, data_size, SYSCALL_DBG_CONSOLE_WRITE);
+}
+
+#endif  // USE_DBG_CONSOLE
+
 // =============================================================================
 // boot_image.h
 // =============================================================================
@@ -120,6 +148,16 @@ void reboot_device(void) {
   syscall_invoke0(SYSCALL_REBOOT_DEVICE);
   while (1)
     ;
+}
+
+// =============================================================================
+// notify.h
+// =============================================================================
+
+#include <sys/notify.h>
+
+void notify_send(notification_event_t event) {
+  syscall_invoke1((uint32_t)event, SYSCALL_NOTIFY_SEND);
 }
 
 // =============================================================================
@@ -174,13 +212,9 @@ void display_refresh(void) { syscall_invoke0(SYSCALL_DISPLAY_REFRESH); }
 
 #include <io/usb.h>
 
-secbool usb_init(const usb_dev_info_t *dev_info) {
-  return (secbool)syscall_invoke1((uint32_t)dev_info, SYSCALL_USB_INIT);
+secbool usb_start(const usb_start_params_t *params) {
+  return (secbool)syscall_invoke1((uint32_t)params, SYSCALL_USB_START);
 }
-
-void usb_deinit(void) { syscall_invoke0(SYSCALL_USB_DEINIT); }
-
-secbool usb_start(void) { return (secbool)syscall_invoke0(SYSCALL_USB_START); }
 
 void usb_stop(void) { syscall_invoke0(SYSCALL_USB_STOP); }
 
@@ -190,141 +224,6 @@ usb_event_t usb_get_event(void) {
 
 void usb_get_state(usb_state_t *state) {
   syscall_invoke1((uint32_t)state, SYSCALL_USB_GET_STATE);
-}
-
-// =============================================================================
-// usb_hid.h
-// =============================================================================
-
-#include <io/usb_hid.h>
-
-secbool usb_hid_add(const usb_hid_info_t *hid_info) {
-  return (secbool)syscall_invoke1((uint32_t)hid_info, SYSCALL_USB_HID_ADD);
-}
-
-secbool usb_hid_can_read(uint8_t iface_num) {
-  return (secbool)syscall_invoke1((uint32_t)iface_num,
-                                  SYSCALL_USB_HID_CAN_READ);
-}
-
-secbool usb_hid_can_write(uint8_t iface_num) {
-  return (secbool)syscall_invoke1((uint32_t)iface_num,
-                                  SYSCALL_USB_HID_CAN_WRITE);
-}
-
-int usb_hid_read(uint8_t iface_num, uint8_t *buf, uint32_t len) {
-  return (int)syscall_invoke3((uint32_t)iface_num, (uint32_t)buf, len,
-                              SYSCALL_USB_HID_READ);
-}
-
-int usb_hid_write(uint8_t iface_num, const uint8_t *buf, uint32_t len) {
-  return (int)syscall_invoke3((uint32_t)iface_num, (uint32_t)buf, len,
-                              SYSCALL_USB_HID_WRITE);
-}
-
-int usb_hid_read_select(uint32_t timeout) {
-  return (int)syscall_invoke1(timeout, SYSCALL_USB_HID_READ_SELECT);
-}
-
-int usb_hid_read_blocking(uint8_t iface_num, uint8_t *buf, uint32_t len,
-                          int timeout) {
-  return (int)syscall_invoke4((uint32_t)iface_num, (uint32_t)buf, len, timeout,
-                              SYSCALL_USB_HID_READ_BLOCKING);
-}
-
-int usb_hid_write_blocking(uint8_t iface_num, const uint8_t *buf, uint32_t len,
-                           int timeout) {
-  return (int)syscall_invoke4((uint32_t)iface_num, (uint32_t)buf, len, timeout,
-                              SYSCALL_USB_HID_WRITE_BLOCKING);
-}
-
-// =============================================================================
-// usb_vcp.h
-// =============================================================================
-
-#include <io/usb_vcp.h>
-
-secbool usb_vcp_add(const usb_vcp_info_t *vcp_info) {
-  return (secbool)syscall_invoke1((uint32_t)vcp_info, SYSCALL_USB_VCP_ADD);
-}
-
-secbool usb_vcp_can_read(uint8_t iface_num) {
-  return (secbool)syscall_invoke1((uint32_t)iface_num,
-                                  SYSCALL_USB_VCP_CAN_READ);
-}
-
-secbool usb_vcp_can_write(uint8_t iface_num) {
-  return (secbool)syscall_invoke1((uint32_t)iface_num,
-                                  SYSCALL_USB_VCP_CAN_WRITE);
-}
-
-int usb_vcp_read(uint8_t iface_num, uint8_t *buf, uint32_t len) {
-  return (int)syscall_invoke3((uint32_t)iface_num, (uint32_t)buf, len,
-                              SYSCALL_USB_VCP_READ);
-}
-
-int usb_vcp_write(uint8_t iface_num, const uint8_t *buf, uint32_t len) {
-  return (int)syscall_invoke3((uint32_t)iface_num, (uint32_t)buf, len,
-                              SYSCALL_USB_VCP_WRITE);
-}
-
-int usb_vcp_read_blocking(uint8_t iface_num, uint8_t *buf, uint32_t len,
-                          int timeout) {
-  return (int)syscall_invoke4((uint32_t)iface_num, (uint32_t)buf, len, timeout,
-                              SYSCALL_USB_VCP_READ_BLOCKING);
-}
-
-int usb_vcp_write_blocking(uint8_t iface_num, const uint8_t *buf, uint32_t len,
-                           int timeout) {
-  return (int)syscall_invoke4((uint32_t)iface_num, (uint32_t)buf, len, timeout,
-                              SYSCALL_USB_VCP_WRITE_BLOCKING);
-}
-
-// =============================================================================
-// usb_webusb.h
-// =============================================================================
-
-#include <io/usb_webusb.h>
-
-secbool usb_webusb_add(const usb_webusb_info_t *webusb_info) {
-  return (secbool)syscall_invoke1((uint32_t)webusb_info,
-                                  SYSCALL_USB_WEBUSB_ADD);
-}
-
-secbool usb_webusb_can_read(uint8_t iface_num) {
-  return (secbool)syscall_invoke1((uint32_t)iface_num,
-                                  SYSCALL_USB_WEBUSB_CAN_READ);
-}
-
-secbool usb_webusb_can_write(uint8_t iface_num) {
-  return (secbool)syscall_invoke1((uint32_t)iface_num,
-                                  SYSCALL_USB_WEBUSB_CAN_WRITE);
-}
-
-int usb_webusb_read(uint8_t iface_num, uint8_t *buf, uint32_t len) {
-  return (int)syscall_invoke3((uint32_t)iface_num, (uint32_t)buf, len,
-                              SYSCALL_USB_WEBUSB_READ);
-}
-
-int usb_webusb_write(uint8_t iface_num, const uint8_t *buf, uint32_t len) {
-  return (int)syscall_invoke3((uint32_t)iface_num, (uint32_t)buf, len,
-                              SYSCALL_USB_WEBUSB_WRITE);
-}
-
-int usb_webusb_read_select(uint32_t timeout) {
-  return (int)syscall_invoke1(timeout, SYSCALL_USB_WEBUSB_READ_SELECT);
-}
-
-int usb_webusb_read_blocking(uint8_t iface_num, uint8_t *buf, uint32_t len,
-                             int timeout) {
-  return (int)syscall_invoke4((uint32_t)iface_num, (uint32_t)buf, len, timeout,
-                              SYSCALL_USB_WEBUSB_READ_BLOCKING);
-}
-
-int usb_webusb_write_blocking(uint8_t iface_num, const uint8_t *buf,
-                              uint32_t len, int timeout) {
-  return (int)syscall_invoke4((uint32_t)iface_num, (uint32_t)buf, len, timeout,
-                              SYSCALL_USB_WEBUSB_WRITE_BLOCKING);
 }
 
 // =============================================================================
@@ -431,6 +330,23 @@ bool rgb_led_get_enabled(void) {
 
 void rgb_led_set_color(uint32_t color) {
   syscall_invoke1(color, SYSCALL_RGB_LED_SET_COLOR);
+}
+
+void rgb_led_effect_start(rgb_led_effect_type_t effect_type,
+                          uint32_t requested_cycles) {
+  syscall_invoke2((uint32_t)effect_type, requested_cycles,
+                  SYSCALL_RGB_LED_EFFECT_START);
+}
+
+void rgb_led_effect_stop(void) { syscall_invoke0(SYSCALL_RGB_LED_EFFECT_STOP); }
+
+bool rgb_led_effect_ongoing(void) {
+  return (bool)syscall_invoke0(SYSCALL_RGB_LED_EFFECT_ONGOING);
+}
+
+rgb_led_effect_type_t rgb_led_effect_get_type(void) {
+  return (rgb_led_effect_type_t)syscall_invoke0(
+      SYSCALL_RGB_LED_EFFECT_GET_TYPE);
 }
 
 #endif
@@ -696,6 +612,15 @@ void ble_set_name(const uint8_t *name, size_t len) {
   syscall_invoke2((uint32_t)name, len, SYSCALL_BLE_SET_NAME);
 }
 
+bool ble_unpair(const bt_le_addr_t *addr) {
+  return (bool)syscall_invoke1((uint32_t)addr, SYSCALL_BLE_UNPAIR);
+}
+
+uint8_t ble_get_bond_list(bt_le_addr_t *bonds, size_t count) {
+  return (uint8_t)syscall_invoke2((uint32_t)bonds, count,
+                                  SYSCALL_BLE_GET_BOND_LIST);
+}
+
 #endif
 
 #ifdef USE_NRF
@@ -712,6 +637,14 @@ bool nrf_update_required(const uint8_t *data, size_t len) {
 bool nrf_update(const uint8_t *data, size_t len) {
   return (bool)syscall_invoke2((uint32_t)data, (uint32_t)len,
                                SYSCALL_NRF_UPDATE);
+}
+
+uint32_t nrf_get_version(void) {
+  return syscall_invoke0(SYSCALL_NRF_GET_VERSION);
+}
+
+bool nrf_authenticate(void) {
+  return (bool)syscall_invoke0(SYSCALL_NRF_AUTHENTICATE);
 }
 
 #endif
@@ -854,6 +787,11 @@ bool tropic_ecc_sign(uint16_t key_slot_index, const uint8_t *dig,
                      uint16_t dig_len, uint8_t *sig) {
   return (bool)syscall_invoke4((uint32_t)key_slot_index, (uint32_t)dig, dig_len,
                                (uint32_t)sig, SYSCALL_TROPIC_ECC_SIGN);
+}
+
+bool tropic_data_read(uint16_t udata_slot, uint8_t *data, uint16_t *size) {
+  return (bool)syscall_invoke3((uint32_t)udata_slot, (uint32_t)data,
+                               (uint32_t)size, SYSCALL_TROPIC_DATA_READ);
 }
 
 #endif

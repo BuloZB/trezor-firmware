@@ -11,8 +11,8 @@ from trezor.crypto.curve import nist256p1
 from trezor.ui import Layout
 from trezor.ui.layouts import error_popup
 
-from apps.base import set_homescreen
 from apps.common import cbor
+from apps.common.lock_manager import set_homescreen
 
 from . import common
 from .credential import Credential, Fido2Credential
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from .credential import U2fCredential
 
-    HID = io.HID
+    HID = io.USBIF
 
 
 _CID_BROADCAST = const(0xFFFF_FFFF)  # broadcast channel id

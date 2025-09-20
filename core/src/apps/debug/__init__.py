@@ -41,7 +41,7 @@ if __debug__:
 
         Handler = Callable[[Any], Awaitable[Any]]
 
-    layout_change_box = loop.mailbox()
+    layout_change_box: loop.mailbox[Layout | None] = loop.mailbox()
 
     DEBUG_CONTEXT: Context | None = None
 
@@ -355,8 +355,7 @@ if __debug__:
             # (doing it this way also clears the red square, because the repaint is
             # happening with screenshotting already enabled)
             assert isinstance(ui.CURRENT_LAYOUT, ui.Layout)
-            ui.CURRENT_LAYOUT.request_complete_repaint()
-            ui.CURRENT_LAYOUT._paint()
+            ui.CURRENT_LAYOUT.repaint()
 
         else:
             print("stopping recording")
@@ -434,8 +433,8 @@ if __debug__:
         return Success()
 
     _EXIT_FLAG = False
-    _EXIT_BOX = loop.mailbox()
-    _SESSION_TASK: loop.spawn | None = None
+    _EXIT_BOX: loop.mailbox[None] = loop.mailbox()
+    _SESSION_TASK: loop.spawn[None] | None = None
 
     _CLOSE_TIMEOUT_MS = const(5000)
 

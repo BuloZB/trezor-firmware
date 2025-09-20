@@ -125,7 +125,9 @@ void suspend_drivers(power_save_wakeup_params_t *wakeup_params) {
   haptic_deinit();
 #endif
 #ifdef USE_RGB_LED
-  rgb_led_deinit();
+  // Just store the wakeup params and turn off the LED
+  rgb_led_set_wakeup_params(&wakeup_params->rgb_led);
+  rgb_led_set_color(RGBLED_OFF);
 #endif
 #ifdef USE_TOUCH
   touch_deinit();
@@ -152,10 +154,10 @@ void resume_drivers(const power_save_wakeup_params_t *wakeup_params) {
   haptic_init();
 #endif
 #ifdef USE_RGB_LED
-  rgb_led_init();
+  rgb_led_resume(&wakeup_params->rgb_led);
 #endif
 #ifdef USE_USB
-  usb_start();
+  usb_start(NULL);
 #endif
 #ifdef USE_BLE
   ble_resume(&wakeup_params->ble);

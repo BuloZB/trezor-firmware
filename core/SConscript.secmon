@@ -16,6 +16,7 @@ PYOPT = ARGUMENTS.get('PYOPT', '1')
 DISABLE_OPTIGA = ARGUMENTS.get('DISABLE_OPTIGA', '0') == '1'
 HW_REVISION = ARGUMENTS.get('HW_REVISION', None)
 THP = ARGUMENTS.get('THP', '0') == '1' # Trezor-Host Protocol
+DBG_CONSOLE = ARGUMENTS.get('DBG_CONSOLE', '')
 
 STORAGE_INSECURE_TESTING_MODE = ARGUMENTS.get('STORAGE_INSECURE_TESTING_MODE', '0') == '1'
 if STORAGE_INSECURE_TESTING_MODE and PRODUCTION:
@@ -27,7 +28,6 @@ if STORAGE_INSECURE_TESTING_MODE:
 FEATURE_FLAGS = {
     "RDI": True,
     "SECP256K1_ZKP": True,  # required for trezor.crypto.curve.bip340 (BIP340/Taproot)
-    "SYSTEM_VIEW": False,
     "AES_GCM": True,
 }
 
@@ -42,6 +42,7 @@ FEATURES_WANTED = [
     "storage",
     "suspend",
     "tropic",
+    "nrf_auth"
     ]
 
 if DISABLE_OPTIGA:
@@ -59,6 +60,10 @@ CPPDEFINES_HAL = []
 SOURCE_HAL = []
 PATH_HAL = []
 
+
+if DBG_CONSOLE != "":
+    FEATURES_WANTED += ["dbg_console"]
+
 FROZEN = True
 
 env = Environment(
@@ -67,6 +72,7 @@ env = Environment(
     CPPDEFINES_IMPLICIT=[],
     CPPDEFPREFIX="-D'",
     CPPDEFSUFFIX="'",
+    DBG_CONSOLE=DBG_CONSOLE,
 )
 
 FEATURES_AVAILABLE = models.configure_board(TREZOR_MODEL, HW_REVISION, FEATURES_WANTED, env, CPPDEFINES_HAL, SOURCE_HAL, PATH_HAL)
@@ -217,23 +223,6 @@ CPPDEFINES_MOD += [
 
 if FEATURE_FLAGS["RDI"]:
     CPPDEFINES_MOD += ['RDI']
-
-if FEATURE_FLAGS["SYSTEM_VIEW"]:
-    SOURCE_MOD += [
-        'embed/sys/systemview/stm32/config/SEGGER_SYSVIEW_Config_NoOS.c',
-        'embed/sys/systemview/stm32/segger/SEGGER_SYSVIEW.c',
-        'embed/sys/systemview/stm32/segger/SEGGER_RTT.c',
-        'embed/sys/systemview/stm32/segger/SEGGER_RTT_ASM_ARMv7M.S',
-        'embed/sys/systemview/stm32/segger/Syscalls/SEGGER_RTT_Syscalls_GCC.c',
-        'embed/sys/systemview/systemview.c',
-    ]
-    CPPPATH_MOD += [
-        'embed/sys/systemview/inc',
-        'embed/sys/systemview/stm32/config',
-        'embed/sys/systemview/stm32/segger',
-    ]
-    CPPDEFINES_MOD += ['SYSTEM_VIEW']
-    CCFLAGS_MOD += '-DSYSTEM_VIEW '
 
 TRANSLATION_DATA = [
     "translations/en.json",

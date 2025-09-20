@@ -22,10 +22,12 @@
 
 #include <io/display.h>
 #include <io/display_utils.h>
+#include <io/usb_config.h>
 #include <sec/random_delays.h>
 #include <sec/secret.h>
 #include <sys/bootargs.h>
 #include <sys/bootutils.h>
+#include <sys/notify.h>
 #include <sys/system.h>
 #include <sys/systick.h>
 #include <sys/types.h>
@@ -173,6 +175,26 @@ static secbool boot_sequence(void) {
     turn_on = false;
   }
 
+  if (cmd == BOOT_COMMAND_POWER_OFF) {
+#ifdef USE_BLE
+    ble_init();
+
+    uint32_t timeout = ticks_timeout(5000);
+    ble_state_t state = {0};
+    do {
+      ble_get_state(&state);
+      if (state.state_known) {
+        break;
+      }
+    } while (!ticks_expired(timeout));
+
+    ble_command_t stop_cmd = {
+        .data_len = BLE_SWITCH_OFF,
+    };
+    ble_issue_command(&stop_cmd);
+#endif
+  }
+
   uint32_t press_start = 0;
   bool turn_on_locked = false;
   bool bld_locked = false;
@@ -214,19 +236,22 @@ static secbool boot_sequence(void) {
     pm_state_t state;
     pm_get_state(&state);
 
-    if (state.charging_status == PM_BATTERY_CHARGING) {
-      // charing screen
+    if (pm_is_charging()) {
+      // charging indication
 #ifdef USE_RGB_LED
-      rgb_led_set_color(RGBLED_BLUE);
+      if (!rgb_led_effect_ongoing()) {
+        rgb_led_effect_start(RGB_LED_EFFECT_CHARGING, 0);
+      }
 #endif
     } else {
+#ifdef USE_RGB_LED
+      rgb_led_set_color(0);
+#endif
       if (!btn_down && !state.usb_connected && !state.wireless_connected) {
         // device in just intended to be turned off
         pm_hibernate();
         systick_delay_ms(1000);
         reboot_to_off();
-      } else {
-        // todo signal full battery if conditions are met
       }
     }
   }
@@ -295,8 +320,12 @@ static void drivers_init(secbool manufacturing_mode,
   consumption_mask_init();
 #endif
 
+  usb_configure(NULL);
+
 #ifdef USE_BLE
   ble_init();
+  // increase BLE speed for sake of upload speed
+  ble_set_high_speed(true);
 #endif
 }
 
@@ -664,6 +693,8 @@ int bootloader_main(void) {
 
   ensure(dont_optimize_out_true * (firmware_present == firmware_present_backup),
          NULL);
+
+  notify_send(NOTIFY_BOOT);
 
   // start the bootloader ...
   // ... if user touched the screen on start

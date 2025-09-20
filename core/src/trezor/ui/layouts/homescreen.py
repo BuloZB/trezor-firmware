@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import storage.cache as storage_cache
 import trezorui_api
 from storage.cache_common import APP_COMMON_BUSY_DEADLINE_MS
-from trezor import TR, ui
+from trezor import TR, ui, utils
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator, ParamSpec, TypeVar
@@ -72,7 +72,7 @@ class Homescreen(HomescreenBase):
         super().__init__(
             layout=_retry_with_gc(
                 trezorui_api.show_homescreen,
-                label=label,
+                label=label or utils.MODEL_FULL_NAME,
                 notification=notification,
                 notification_level=notification_level,
                 lockable=lockable,
@@ -124,6 +124,7 @@ class Lockscreen(HomescreenBase):
     async def get_result(self) -> Any:
         result = await super().get_result()
         if self.bootscreen:
+            # todo: should this be repaint()?
             self.request_complete_repaint()
         return result
 
@@ -145,7 +146,7 @@ class Busyscreen(HomescreenBase):
     async def get_result(self) -> Any:
         from trezor.wire import context
 
-        from apps.base import set_homescreen
+        from apps.common.lock_manager import set_homescreen
 
         # Handle timeout.
         result = await super().get_result()

@@ -4,12 +4,12 @@ mod micropython;
 #[cfg(feature = "ui")]
 use crate::ui::event::BLEEvent;
 
-use crate::error::Error;
-use core::mem::size_of;
-
 use super::ffi;
+use crate::{error::Error, trezorhal::ffi::bt_le_addr_t};
+use core::{mem::size_of, ptr};
 
 pub const ADV_NAME_LEN: usize = ffi::BLE_ADV_NAME_LEN as usize;
+pub const BLE_MAX_BONDS: usize = ffi::BLE_MAX_BONDS as usize;
 pub const PAIRING_CODE_LEN: usize = ffi::BLE_PAIRING_CODE_LEN as usize;
 pub const RX_PACKET_SIZE: usize = ffi::BLE_RX_PACKET_SIZE as usize;
 pub const TX_PACKET_SIZE: usize = ffi::BLE_TX_PACKET_SIZE as usize;
@@ -47,6 +47,19 @@ pub fn ble_parse_event(event: ffi::ble_event_t) -> BLEEvent {
     }
 }
 
+impl bt_le_addr_t {
+    fn zero() -> bt_le_addr_t {
+        bt_le_addr_t {
+            type_: 0,
+            addr: [0; 6],
+        }
+    }
+
+    fn new(type_: u8, addr: [u8; 6]) -> bt_le_addr_t {
+        bt_le_addr_t { type_, addr }
+    }
+}
+
 fn state() -> ffi::ble_state_t {
     let mut state = ffi::ble_state_t {
         connected: false,
@@ -55,6 +68,7 @@ fn state() -> ffi::ble_state_t {
         pairing: false,
         pairing_requested: false,
         state_known: false,
+        connected_addr: bt_le_addr_t::zero(),
     };
     unsafe { ffi::ble_get_state(&mut state as _) };
     state
@@ -135,8 +149,16 @@ pub fn erase_bonds() -> Result<(), Error> {
     issue_command(ffi::ble_command_type_t_BLE_ERASE_BONDS, data_none())
 }
 
-pub fn unpair() -> Result<(), Error> {
-    issue_command(ffi::ble_command_type_t_BLE_UNPAIR, data_none())
+pub fn unpair(addr: Option<&bt_le_addr_t>) -> Result<(), Error> {
+    let ptr: *const bt_le_addr_t = match addr {
+        Some(a) => a as *const bt_le_addr_t,
+        None => ptr::null(),
+    };
+
+    if !unsafe { ffi::ble_unpair(ptr) } {
+        return Err(COMMAND_FAILED);
+    }
+    Ok(())
 }
 
 pub fn disconnect() -> Result<(), Error> {
@@ -174,6 +196,19 @@ pub fn is_pairing() -> bool {
 
 pub fn is_pairing_requested() -> bool {
     state().pairing_requested
+}
+
+pub fn connected_addr() -> bt_le_addr_t {
+    state().connected_addr
+}
+
+pub fn get_bonds<F, T>(f: F) -> T
+where
+    F: Fn(&[bt_le_addr_t]) -> T,
+{
+    let mut bonds = [bt_le_addr_t::zero(); BLE_MAX_BONDS];
+    let size = unsafe { ffi::ble_get_bond_list(bonds.as_mut_ptr(), bonds.len()) };
+    f(&bonds[..size.into()])
 }
 
 pub fn write(bytes: &[u8]) -> Result<(), Error> {

@@ -26,7 +26,7 @@
 typedef struct cli cli_t;
 
 // Maximum length of command line input (including command, arguments)
-#define CLI_LINE_BUFFER_SIZE 4096
+#define CLI_LINE_BUFFER_SIZE 8192
 // Maximum number of command arguments + 1
 #define CLI_MAX_ARGS 64
 
@@ -85,9 +85,9 @@ typedef struct {
 #endif
 
 // Callback for writing characters to console output
-typedef size_t (*cli_write_cb_t)(void* ctx, const char* buf, size_t len);
+typedef ssize_t (*cli_write_cb_t)(void* ctx, const char* buf, size_t len);
 // Callback for reading characters from console input
-typedef size_t (*cli_read_cb_t)(void* ctx, char* buf, size_t len);
+typedef ssize_t (*cli_read_cb_t)(void* ctx, char* buf, size_t len);
 
 struct cli {
   // I/O callbacks

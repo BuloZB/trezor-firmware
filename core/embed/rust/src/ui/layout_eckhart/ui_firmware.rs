@@ -3,7 +3,7 @@ use core::cmp::Ordering;
 use crate::{
     error::Error,
     io::BinaryData,
-    micropython::{gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
+    micropython::{buffer::StrBuffer, gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
     storage,
     strutil::TString,
     time::Duration,
@@ -26,11 +26,12 @@ use crate::{
             util::{ConfirmValueParams, ContentType, PropsList, RecoveryType, StrOrBytes},
         },
         ui_firmware::{
-            FirmwareUI, ERROR_NOT_IMPLEMENTED, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES,
-            MAX_MENU_ITEMS, MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
+            FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS,
+            MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
         },
         ModelUI,
     },
+    util::interpolate,
 };
 
 use super::{
@@ -39,8 +40,8 @@ use super::{
         ActionBar, Bip39Input, ConfirmHomescreen, DeviceMenuScreen, DurationInput, Header,
         HeaderMsg, Hint, Homescreen, MnemonicKeyboard, PinKeyboard, ProgressScreen,
         SelectWordCountScreen, SelectWordScreen, SetBrightnessScreen, ShortMenuVec, Slip39Input,
-        TextScreen, TextScreenMsg, ValueInputScreen, VerticalMenu, VerticalMenuScreen,
-        VerticalMenuScreenMsg,
+        StringKeyboard, TextScreen, TextScreenMsg, ValueInputScreen, VerticalMenu,
+        VerticalMenuScreen, VerticalMenuScreenMsg,
     },
     flow, fonts,
     theme::{
@@ -125,7 +126,7 @@ impl FirmwareUI for UIEckhart {
         _info_button: bool,
         _chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
-        Err::<Gc<LayoutObj>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<Gc<LayoutObj>, Error>(Error::NotImplementedError)
     }
 
     fn confirm_homescreen(
@@ -172,16 +173,16 @@ impl FirmwareUI for UIEckhart {
 
         for item in IterBuf::new().try_iterate(items)? {
             if item.is_str() {
-                ops.add_text(TString::try_from(item)?, font);
+                ops.add_text_with_font(TString::try_from(item)?, font);
             } else {
                 let [emphasis, text]: [Obj; 2] = util::iter_into_array(item)?;
                 let text: TString = text.try_into()?;
                 if emphasis.try_into()? {
                     ops.add_color(theme::WHITE)
-                        .add_text(text, font)
+                        .add_text_with_font(text, font)
                         .add_color(text_style.text_color);
                 } else {
-                    ops.add_text(text, font);
+                    ops.add_text_with_font(text, font);
                 }
             }
         }
@@ -208,9 +209,7 @@ impl FirmwareUI for UIEckhart {
         #[cfg(feature = "universal_fw")]
         return flow::confirm_fido::new_confirm_fido(title, app_name, icon, accounts);
         #[cfg(not(feature = "universal_fw"))]
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"confirm_fido not used in bitcoin-only firmware",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn confirm_firmware_update(
@@ -323,7 +322,7 @@ impl FirmwareUI for UIEckhart {
         _hold: bool,
         _items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn confirm_reset_device(recovery: bool) -> Result<impl LayoutMaybeTrace, Error> {
@@ -408,11 +407,11 @@ impl FirmwareUI for UIEckhart {
         let mut ops = OpTextLayout::new(theme::firmware::TEXT_REGULAR);
         ops.add_offset(Offset::y(16))
             .add_color(theme::RED)
-            .add_text(sell_amount, font)
+            .add_text_with_font(sell_amount, font)
             .add_offset(Offset::y(44))
             .add_newline()
             .add_color(theme::GREEN_LIME)
-            .add_text(buy_amount, font);
+            .add_text_with_font(buy_amount, font);
         let screen = TextScreen::new(FormattedText::new(ops))
             .with_subtitle(subtitle)
             .with_header(Header::new(title).with_menu_button())
@@ -612,12 +611,12 @@ impl FirmwareUI for UIEckhart {
                 op_layout
                     .add_line_spacing(3)
                     .add_color(theme::GREY_EXTRA_LIGHT)
-                    .add_text(title, fonts::FONT_SATOSHI_MEDIUM_26)
+                    .add_text_with_font(title, fonts::FONT_SATOSHI_MEDIUM_26)
                     .add_newline()
                     .add_offset(Offset::y(24))
                     .add_color(theme::GREY_LIGHT)
                     .add_line_spacing(16)
-                    .add_text(description, fonts::FONT_MONO_MEDIUM_38);
+                    .add_text_with_font(description, fonts::FONT_MONO_MEDIUM_38);
             }
 
             Some((op_layout, n_pages))
@@ -791,11 +790,12 @@ impl FirmwareUI for UIEckhart {
         Ok(flow)
     }
 
-    fn flow_confirm_set_new_pin(
+    fn flow_confirm_set_new_code(
         title: TString<'static>,
         description: TString<'static>,
+        is_wipe_code: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let flow = flow::confirm_set_new_pin::new_set_new_pin(title, description)?;
+        let flow = flow::confirm_set_new_code::new_set_new_code(title, description, is_wipe_code)?;
         Ok(flow)
     }
 
@@ -866,7 +866,7 @@ impl FirmwareUI for UIEckhart {
         _verb: TString<'static>,
         _items: Gc<List>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn prompt_backup() -> Result<impl LayoutMaybeTrace, Error> {
@@ -946,17 +946,24 @@ impl FirmwareUI for UIEckhart {
 
     fn request_pin(
         prompt: TString<'static>,
-        subprompt: TString<'static>,
+        attempts: TString<'static>,
         allow_cancel: bool,
-        warning: bool,
+        wrong_pin: bool,
+        last_attempt: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let warning = if warning {
+        let warning = if wrong_pin {
             Some(TR::pin__wrong_pin.into())
         } else {
             None
         };
 
-        let layout = RootComponent::new(PinKeyboard::new(prompt, subprompt, warning, allow_cancel));
+        let layout = RootComponent::new(PinKeyboard::new(
+            prompt,
+            attempts,
+            warning,
+            allow_cancel,
+            last_attempt,
+        ));
         Ok(layout)
     }
 
@@ -975,8 +982,8 @@ impl FirmwareUI for UIEckhart {
         allow_empty: bool,
         prefill: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let flow = flow::request_string::new_request_string(prompt, max_len, allow_empty, prefill)?;
-        Ok(flow)
+        let layout = RootComponent::new(StringKeyboard::new(prompt, max_len, allow_empty, prefill));
+        Ok(layout)
     }
 
     fn select_menu(
@@ -1066,7 +1073,7 @@ impl FirmwareUI for UIEckhart {
         _path: Option<TString<'static>>,
         _xpubs: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_checklist(
@@ -1194,12 +1201,12 @@ impl FirmwareUI for UIEckhart {
     }
 
     fn show_device_menu(
+        init_submenu: Option<u8>,
         failed_backup: bool,
         paired_devices: heapless::Vec<TString<'static>, MAX_PAIRED_DEVICES>,
-        connected_idx: Option<usize>,
-        bluetooth: Option<bool>,
+        connected_idx: Option<u8>,
         pin_code: Option<bool>,
-        auto_lock_delay: Option<TString<'static>>,
+        auto_lock_delay: Option<[TString<'static>; 2]>,
         wipe_code: Option<bool>,
         check_backup: bool,
         device_name: Option<TString<'static>>,
@@ -1209,10 +1216,10 @@ impl FirmwareUI for UIEckhart {
         about_items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let layout = RootComponent::new(DeviceMenuScreen::new(
+            init_submenu,
             failed_backup,
             paired_devices,
             connected_idx,
-            bluetooth,
             pin_code,
             auto_lock_delay,
             wipe_code,
@@ -1227,19 +1234,28 @@ impl FirmwareUI for UIEckhart {
     }
 
     fn show_pairing_device_name(
+        description: StrBuffer,
         device_name: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let font = fonts::FONT_SATOSHI_REGULAR_38;
         let text_style = theme::firmware::TEXT_REGULAR;
+        let font = text_style.text_font;
         let mut ops = OpTextLayout::new(text_style);
-        let text: TString = " is your Trezor's name.".into();
-        ops.add_color(theme::GREEN)
-            .add_text(device_name, font)
-            .add_color(text_style.text_color)
-            .add_text(text, font);
+        for part in interpolate::parse(description) {
+            match part {
+                interpolate::Item::Text(s) => {
+                    ops.add_color(text_style.text_color);
+                    ops.add_text_with_font(s, font);
+                }
+                interpolate::Item::Arg(0) => {
+                    ops.add_color(theme::GREEN);
+                    ops.add_text_with_font(device_name, font);
+                }
+                _ => return Err(Error::OutOfRange),
+            };
+        }
         let screen = TextScreen::new(FormattedText::new(ops))
-            .with_header(Header::new("Pair with new device".into()).with_close_button())
-            .with_action_bar(ActionBar::new_text_only("Continue on host".into()));
+            .with_header(Header::new(TR::thp__pair_new_device.into()).with_close_button())
+            .with_action_bar(ActionBar::new_text_only(TR::thp__continue_on_host.into()));
         #[cfg(feature = "ble")]
         let screen = crate::ui::component::BLEHandler::new(screen, true);
         let layout = RootComponent::new(screen);
@@ -1253,12 +1269,12 @@ impl FirmwareUI for UIEckhart {
         code: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut ops = OpTextLayout::new(theme::firmware::TEXT_REGULAR);
-        ops.add_text(description, fonts::FONT_SATOSHI_REGULAR_38)
+        ops.add_text_with_font(description, fonts::FONT_SATOSHI_REGULAR_38)
             .add_newline()
             .add_newline()
             .add_newline()
             .add_alignment(Alignment::Center)
-            .add_text(code, fonts::FONT_SATOSHI_EXTRALIGHT_72);
+            .add_text_with_font(code, fonts::FONT_SATOSHI_EXTRALIGHT_72);
         let screen = crate::ui::component::BLEHandler::new(
             TextScreen::new(FormattedText::new(ops))
                 .with_header(Header::new(title))
@@ -1277,6 +1293,35 @@ impl FirmwareUI for UIEckhart {
         let flow =
             flow::show_thp_pairing_code::new_show_thp_pairing_code(title, description, code)?;
         Ok(flow)
+    }
+
+    fn confirm_thp_pairing(
+        title: TString<'static>,
+        description: (StrBuffer, Obj),
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        let (format, args_obj) = description;
+        let args: heapless::Vec<TString<'static>, 2> = util::iter_into_vec(args_obj)?;
+        let style = theme::firmware::TEXT_REGULAR;
+        let mut ops = OpTextLayout::new(style);
+        for part in interpolate::parse(format) {
+            match part {
+                interpolate::Item::Text(s) => {
+                    ops.add_text_with_font(s, style.text_font);
+                }
+                interpolate::Item::Arg(i) => match args.get(i) {
+                    Some(&s) => {
+                        ops.add_color(theme::YELLOW);
+                        ops.add_text_with_font(s, style.text_font);
+                        ops.add_color(style.text_color);
+                    }
+                    None => return Err(Error::OutOfRange),
+                },
+            };
+        }
+        let screen = TextScreen::new(FormattedText::new(ops))
+            .with_header(Header::new(title))
+            .with_action_bar(ActionBar::new_cancel_confirm());
+        Ok(RootComponent::new(screen))
     }
 
     fn show_info(
@@ -1350,8 +1395,8 @@ impl FirmwareUI for UIEckhart {
 
         let text_style = theme::TEXT_REGULAR;
         let mut ops = OpTextLayout::new(text_style);
-        ops.add_text(description, text_style.text_font)
-            .add_text(url, theme::TEXT_MONO_MEDIUM.text_font);
+        ops.add_text_with_font(description, text_style.text_font)
+            .add_text_with_font(url, theme::TEXT_MONO_MEDIUM.text_font);
 
         let screen = TextScreen::new(FormattedText::new(ops))
             .with_header(Header::new(title))
@@ -1456,9 +1501,7 @@ impl FirmwareUI for UIEckhart {
         _words: heapless::Vec<TString<'static>, 33>,
         _title: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"use show_share_words_extended instead",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_share_words_extended(
@@ -1495,7 +1538,7 @@ impl FirmwareUI for UIEckhart {
     }
 
     fn show_remaining_shares(_pages_iterable: Obj) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_simple(

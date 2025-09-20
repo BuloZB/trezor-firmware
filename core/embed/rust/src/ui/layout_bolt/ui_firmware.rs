@@ -27,8 +27,8 @@ use crate::{
             util::{ConfirmValueParams, PropsList, RecoveryType},
         },
         ui_firmware::{
-            FirmwareUI, ERROR_NOT_IMPLEMENTED, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES,
-            MAX_MENU_ITEMS, MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
+            FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS,
+            MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
         },
         ModelUI,
     },
@@ -111,7 +111,7 @@ impl FirmwareUI for UIBolt {
         _buy_amount: TString<'static>,
         _back_button: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn confirm_value(
@@ -150,7 +150,7 @@ impl FirmwareUI for UIBolt {
         _hold: bool,
         _chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
-        Err::<Gc<LayoutObj>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<Gc<LayoutObj>, Error>(Error::NotImplementedError)
     }
 
     fn confirm_homescreen(
@@ -203,14 +203,14 @@ impl FirmwareUI for UIBolt {
         let mut ops = OpTextLayout::new(theme::TEXT_NORMAL);
         for item in IterBuf::new().try_iterate(items)? {
             if item.is_str() {
-                ops.add_text(TString::try_from(item)?, fonts::FONT_NORMAL);
+                ops.add_text_with_font(TString::try_from(item)?, fonts::FONT_NORMAL);
             } else {
                 let [emphasis, text]: [Obj; 2] = util::iter_into_array(item)?;
                 let text: TString = text.try_into()?;
                 if emphasis.try_into()? {
-                    ops.add_text(text, fonts::FONT_DEMIBOLD);
+                    ops.add_text_with_font(text, fonts::FONT_DEMIBOLD);
                 } else {
-                    ops.add_text(text, fonts::FONT_NORMAL);
+                    ops.add_text_with_font(text, fonts::FONT_NORMAL);
                 }
             }
         }
@@ -598,14 +598,15 @@ impl FirmwareUI for UIBolt {
         _summary_br_name: Option<TString<'static>>,
         _cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
-    fn flow_confirm_set_new_pin(
+    fn flow_confirm_set_new_code(
         _title: TString<'static>,
         _description: TString<'static>,
+        _is_wipe_code: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn flow_get_address(
@@ -623,7 +624,7 @@ impl FirmwareUI for UIBolt {
         _br_code: u16,
         _br_name: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn flow_get_pubkey(
@@ -637,7 +638,7 @@ impl FirmwareUI for UIBolt {
         _br_code: u16,
         _br_name: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn multiple_pages_texts(
@@ -645,11 +646,11 @@ impl FirmwareUI for UIBolt {
         _verb: TString<'static>,
         _items: Gc<List>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn prompt_backup() -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn request_bip39(
@@ -703,21 +704,22 @@ impl FirmwareUI for UIBolt {
         _max_ms: u32,
         _description: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn request_pin(
         prompt: TString<'static>,
-        subprompt: TString<'static>,
+        attempts: TString<'static>,
         allow_cancel: bool,
-        warning: bool,
+        wrong_pin: bool,
+        _last_attempt: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let warning = if warning {
+        let warning = if wrong_pin {
             Some(TR::pin__wrong_pin.into())
         } else {
             None
         };
-        let layout = RootComponent::new(PinKeyboard::new(prompt, subprompt, warning, allow_cancel));
+        let layout = RootComponent::new(PinKeyboard::new(prompt, attempts, warning, allow_cancel));
         Ok(layout)
     }
 
@@ -736,7 +738,7 @@ impl FirmwareUI for UIBolt {
         _allow_empty: bool,
         _prefill: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn select_menu(
@@ -744,7 +746,7 @@ impl FirmwareUI for UIBolt {
         _current: usize,
         _cancel: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn select_word(
@@ -880,7 +882,7 @@ impl FirmwareUI for UIBolt {
         _menu_title: Option<TString<'static>>,
         _verb_cancel: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_error(
@@ -933,12 +935,12 @@ impl FirmwareUI for UIBolt {
     }
 
     fn show_device_menu(
+        _init_submenu: Option<u8>,
         _failed_backup: bool,
         _paired_devices: heapless::Vec<TString<'static>, MAX_PAIRED_DEVICES>,
-        _connected_idx: Option<usize>,
-        _bluetooth: Option<bool>,
+        _connected_idx: Option<u8>,
         _pin_code: Option<bool>,
-        _auto_lock_delay: Option<TString<'static>>,
+        _auto_lock_delay: Option<[TString<'static>; 2]>,
         _wipe_code: Option<bool>,
         _check_backup: bool,
         _device_name: Option<TString<'static>>,
@@ -947,17 +949,14 @@ impl FirmwareUI for UIBolt {
         _led_enabled: Option<bool>,
         _about_items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"show_device_menu not supported",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_pairing_device_name(
+        _description: StrBuffer,
         _device_name: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"show_pairing_device_name not supported",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     #[cfg(feature = "ble")]
@@ -966,9 +965,7 @@ impl FirmwareUI for UIBolt {
         _description: TString<'static>,
         _code: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(Error::ValueError(
-            c"show_ble_pairing_code not supported",
-        ))
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_thp_pairing_code(
@@ -990,6 +987,13 @@ impl FirmwareUI for UIBolt {
             None,
             false,
         )
+    }
+
+    fn confirm_thp_pairing(
+        _title: TString<'static>,
+        _description: (StrBuffer, Obj),
+    ) -> Result<impl LayoutMaybeTrace, Error> {
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_info(
@@ -1145,7 +1149,7 @@ impl FirmwareUI for UIBolt {
         _title: TString<'static>,
         _value: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_share_words(
@@ -1171,7 +1175,7 @@ impl FirmwareUI for UIBolt {
         _text_confirm: TString<'static>,
         _text_check: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn show_remaining_shares(pages_iterable: Obj) -> Result<impl LayoutMaybeTrace, Error> {
@@ -1293,7 +1297,7 @@ impl FirmwareUI for UIBolt {
     }
 
     fn tutorial() -> Result<impl LayoutMaybeTrace, Error> {
-        Err::<RootComponent<Empty, ModelUI>, Error>(ERROR_NOT_IMPLEMENTED)
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 }
 
@@ -1493,11 +1497,11 @@ mod tests {
         );
 
         let mut ops = OpTextLayout::new(theme::TEXT_NORMAL);
-        ops.add_text(
+        ops.add_text_with_font(
             "Testing text layout, with some text, and some more text. And ",
             fonts::FONT_NORMAL,
         )
-        .add_text("parameters!", fonts::FONT_BOLD_UPPER);
+        .add_text_with_font("parameters!", fonts::FONT_BOLD_UPPER);
         let formatted = FormattedText::new(ops);
         let mut layout = Dialog::new(formatted, buttons);
         layout.place(SCREEN);

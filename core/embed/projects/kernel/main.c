@@ -86,16 +86,17 @@
 #include <sys/rtc.h>
 #endif
 
-#ifdef SYSTEM_VIEW
-#include <sys/systemview.h>
-#endif
-
 #ifdef USE_TAMPER
 #include <sys/tamper.h>
 #endif
 
 #ifdef USE_TOUCH
 #include <io/touch.h>
+#endif
+
+#ifdef USE_USB
+#include <io/usb.h>
+#include <io/usb_config.h>
 #endif
 
 void drivers_init() {
@@ -139,10 +140,6 @@ void drivers_init() {
   pvd_init();
 #endif
 
-#ifdef SYSTEM_VIEW
-  enable_systemview();
-#endif
-
   display_init(DISPLAY_JUMP_BEHAVIOR);
 
 #ifdef SECURE_MODE
@@ -184,6 +181,10 @@ void drivers_init() {
   tropic_init();
 #endif
 #endif  // SECURE_MODE
+
+#ifdef USE_USB
+  usb_configure(NULL);
+#endif
 }
 
 // Kernel task main loop

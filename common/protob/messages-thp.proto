@@ -98,8 +98,8 @@ message ThpCreateNewSession {
  * @next ThpPairingRequestApproved
  */
 message ThpPairingRequest {
-    optional string host_name = 1;     // Human-readable host name (browser name for web apps)
-    optional string app_name = 2;      // Human-readable application name
+    required string host_name = 1;     // Human-readable host name (browser name for web apps)
+    required string app_name = 2;      // Human-readable application name
 }
 
 /**
@@ -269,4 +269,24 @@ message ThpEndResponse {}
     option (internal_only) = true;
     required bytes host_static_public_key = 1;        // Host's static public key used in the handshake
     required ThpCredentialMetadata cred_metadata = 2; // Credential metadata
+}
+
+/**
+ * Recent THP paired hosts.
+ * Only for internal use.
+ * @embed
+ */
+message ThpPairedCache {
+    option (internal_only) = true;
+    repeated ThpPairedCacheEntry entries = 1;
+
+    /**
+    * Only for internal use.
+    * @embed
+    */
+    message ThpPairedCacheEntry {
+        option (internal_only) = true;
+        required bytes mac_addr = 1;    // 6-byte MAC address
+        required string host_name = 2;  // Human-readable host name (≤32 bytes)
+    }
 }

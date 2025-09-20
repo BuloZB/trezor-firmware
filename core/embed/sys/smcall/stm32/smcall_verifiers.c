@@ -405,6 +405,7 @@ access_violation:
 // ---------------------------------------------------------------------
 
 #ifdef USE_TROPIC
+#include <libtropic_common.h>
 #include <sec/tropic.h>
 #include "ecdsa.h"
 
@@ -443,6 +444,22 @@ access_violation:
   apptask_access_violation();
   return false;
 }
+
+bool tropic_data_read__verified(uint16_t udata_slot, uint8_t *data,
+                                uint16_t *size) {
+  if (!probe_write_access(data, R_MEM_DATA_SIZE_MAX)) {
+    goto access_violation;
+  }
+
+  if (!probe_write_access(size, sizeof(*size))) {
+    goto access_violation;
+  }
+
+  return tropic_data_read(udata_slot, data, size);
+access_violation:
+  apptask_access_violation();
+  return false;
+}
 #endif
 
 #ifdef USE_BACKUP_RAM
@@ -476,5 +493,26 @@ access_violation:
 }
 
 #endif  // USE_BACKUP_RAM
+
+#ifdef USE_NRF_AUTH
+secbool secret_validate_nrf_pairing__verified(const uint8_t *message,
+                                              size_t msg_len,
+                                              const uint8_t *mac,
+                                              size_t mac_len) {
+  if (!probe_read_access(message, msg_len)) {
+    goto access_violation;
+  }
+  if (!probe_read_access(mac, mac_len)) {
+    goto access_violation;
+  }
+
+  return secret_validate_nrf_pairing(message, msg_len, mac, mac_len);
+
+access_violation:
+  apptask_access_violation();
+  return false;
+}
+
+#endif
 
 #endif  // SECMON

@@ -24,10 +24,9 @@
 
 #include <io/nrf.h>
 #include <rtl/cli.h>
-#include <util/flash_otp.h>
+#include <sec/secret.h>
 
 #include "common.h"
-#include "prodtest_optiga.h"
 
 static void prodtest_nrf_communication(cli_t* cli) {
   cli_trace(cli, "Testing SPI communication...");
@@ -88,16 +87,16 @@ static void prodtest_nrf_pair(cli_t* cli) {
     return;
   }
 
-  if (OPTIGA_LOCKED_FALSE != get_optiga_locked_status(cli)) {
-    cli_error(cli, CLI_ERROR,
-              "Optiga is not unlocked. Pairing is not allowed.");
-    return;
-  }
+  if (secfalse != secret_is_locked()) {
+    if (nrf_authenticate()) {
+      cli_trace(cli, "Already paired");
+      cli_ok(cli, "");
+      return;
+    }
 
-  if (secfalse != flash_otp_is_locked(FLASH_OTP_BLOCK_DEVICE_SN)) {
-    cli_error(
-        cli, CLI_ERROR,
-        "OTP Device serial number block is locked. Pairing is not allowed.");
+    cli_error(cli, CLI_ERROR,
+              "Secrets sector is locked. Pairing is not allowed.");
+    return;
   }
 
   if (nrf_test_pair()) {

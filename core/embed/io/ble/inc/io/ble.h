@@ -31,6 +31,8 @@
 #define BLE_ADV_NAME_LEN 20
 #define BLE_PAIRING_CODE_LEN 6
 
+#define BLE_MAX_BONDS 8
+
 typedef enum {
   BLE_SWITCH_OFF = 0,      // Turn off BLE advertising, disconnect
   BLE_SWITCH_ON = 1,       // Turn on BLE advertising
@@ -39,9 +41,8 @@ typedef enum {
   BLE_ERASE_BONDS = 4,     // Erase all bonding information
   BLE_ALLOW_PAIRING = 5,   // Accept pairing request
   BLE_REJECT_PAIRING = 6,  // Reject pairing request
-  BLE_UNPAIR = 7,          // Erase bond for currently connected device
   BLE_KEEP_CONNECTION =
-      8,  // Keep connection to the connected device, but do not advertise
+      7,  // Keep connection to the connected device, but do not advertise
 } ble_command_type_t;
 
 typedef enum {
@@ -51,6 +52,20 @@ typedef enum {
   BLE_MODE_PAIRING,
   BLE_MODE_DFU,
 } ble_mode_t;
+
+/*
+ * Address types:
+ * BT_ADDR_LE_PUBLIC       0x00
+ * BT_ADDR_LE_RANDOM       0x01
+ * BT_ADDR_LE_PUBLIC_ID    0x02
+ * BT_ADDR_LE_RANDOM_ID    0x03
+ * BT_ADDR_LE_UNRESOLVED   0xFE
+ * BT_ADDR_LE_ANONYMOUS    0xFF
+ */
+typedef struct {
+  uint8_t type;
+  uint8_t addr[6];
+} bt_le_addr_t;
 
 typedef struct {
   uint8_t name[BLE_ADV_NAME_LEN];
@@ -72,11 +87,13 @@ typedef struct {
 typedef struct {
   bool accept_msgs;
   bool reboot_on_resume;
+  bool high_speed;
   uint8_t peer_count;
   ble_mode_t mode_requested;
-  uint8_t connected_addr[6];
-  uint8_t connected_addr_type;
+  bt_le_addr_t connected_addr;
   ble_adv_start_cmd_data_t adv_data;
+  bool restart_adv_on_disconnect;
+  bool next_adv_with_disconnect;
 } ble_wakeup_params_t;
 
 typedef enum {
@@ -104,6 +121,7 @@ typedef struct {
   bool pairing_requested;
   bool state_known;
   uint8_t peer_count;
+  bt_le_addr_t connected_addr;
 } ble_state_t;
 
 // Initializes the BLE module
@@ -165,6 +183,9 @@ void ble_get_advertising_name(char *name, size_t max_len);
 // Check if write is possible
 bool ble_can_write(void);
 
+// Unpair device. Unpairs currently connected device if addr is NULL.
+bool ble_unpair(const bt_le_addr_t *addr);
+
 // Writes data to a connected BLE device
 //
 // Sends data over an established BLE connection.
@@ -172,6 +193,9 @@ bool ble_write(const uint8_t *data, uint16_t len);
 
 // Check if read is possible
 bool ble_can_read(void);
+
+// Get bond list
+uint8_t ble_get_bond_list(bt_le_addr_t *bonds, size_t count);
 
 // Reads data from a connected BLE device
 //
@@ -185,4 +209,15 @@ uint32_t ble_read(uint8_t *data, uint16_t max_len);
 //
 // When not using static address, the address is random and may not correspond
 // to what is actually used for advertising
-bool ble_get_mac(uint8_t *mac, size_t max_len);
+bool ble_get_mac(bt_le_addr_t *addr);
+
+// Set high speed connection
+//
+// When enabled, the connection parameters will be set to achieve
+// higher data throughput, at the cost of increased power consumption.
+void ble_set_high_speed(bool enable);
+
+// BLE notify
+//
+// Sends notification to host over BLE
+void ble_notify(const uint8_t *data, size_t len);

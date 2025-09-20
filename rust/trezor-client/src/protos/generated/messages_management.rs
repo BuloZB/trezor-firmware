@@ -467,6 +467,8 @@ pub struct Features {
     pub recovery_type: ::std::option::Option<::protobuf::EnumOrUnknown<RecoveryType>>,
     // @@protoc_insertion_point(field:hw.trezor.messages.management.Features.optiga_sec)
     pub optiga_sec: ::std::option::Option<u32>,
+    // @@protoc_insertion_point(field:hw.trezor.messages.management.Features.soc)
+    pub soc: ::std::option::Option<u32>,
     // special fields
     // @@protoc_insertion_point(special_field:hw.trezor.messages.management.Features.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
@@ -1643,8 +1645,27 @@ impl Features {
         self.optiga_sec = ::std::option::Option::Some(v);
     }
 
+    // optional uint32 soc = 55;
+
+    pub fn soc(&self) -> u32 {
+        self.soc.unwrap_or(0)
+    }
+
+    pub fn clear_soc(&mut self) {
+        self.soc = ::std::option::Option::None;
+    }
+
+    pub fn has_soc(&self) -> bool {
+        self.soc.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_soc(&mut self, v: u32) {
+        self.soc = ::std::option::Option::Some(v);
+    }
+
     fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
-        let mut fields = ::std::vec::Vec::with_capacity(52);
+        let mut fields = ::std::vec::Vec::with_capacity(53);
         let mut oneofs = ::std::vec::Vec::with_capacity(0);
         fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
             "vendor",
@@ -1906,6 +1927,11 @@ impl Features {
             |m: &Features| { &m.optiga_sec },
             |m: &mut Features| { &mut m.optiga_sec },
         ));
+        fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
+            "soc",
+            |m: &Features| { &m.soc },
+            |m: &mut Features| { &mut m.soc },
+        ));
         ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<Features>(
             "Features",
             fields,
@@ -2092,6 +2118,9 @@ impl ::protobuf::Message for Features {
                 432 => {
                     self.optiga_sec = ::std::option::Option::Some(is.read_uint32()?);
                 },
+                440 => {
+                    self.soc = ::std::option::Option::Some(is.read_uint32()?);
+                },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
                 },
@@ -2260,6 +2289,9 @@ impl ::protobuf::Message for Features {
         if let Some(v) = self.optiga_sec {
             my_size += ::protobuf::rt::uint32_size(54, v);
         }
+        if let Some(v) = self.soc {
+            my_size += ::protobuf::rt::uint32_size(55, v);
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
         self.special_fields.cached_size().set(my_size as u32);
         my_size
@@ -2422,6 +2454,9 @@ impl ::protobuf::Message for Features {
         if let Some(v) = self.optiga_sec {
             os.write_uint32(54, v)?;
         }
+        if let Some(v) = self.soc {
+            os.write_uint32(55, v)?;
+        }
         os.write_unknown_fields(self.special_fields.unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -2491,6 +2526,7 @@ impl ::protobuf::Message for Features {
         self.haptic_feedback = ::std::option::Option::None;
         self.recovery_type = ::std::option::Option::None;
         self.optiga_sec = ::std::option::Option::None;
+        self.soc = ::std::option::Option::None;
         self.special_fields.clear();
     }
 
@@ -2548,6 +2584,7 @@ impl ::protobuf::Message for Features {
             haptic_feedback: ::std::option::Option::None,
             recovery_type: ::std::option::Option::None,
             optiga_sec: ::std::option::Option::None,
+            soc: ::std::option::Option::None,
             special_fields: ::protobuf::SpecialFields::new(),
         };
         &instance
@@ -3277,6 +3314,8 @@ pub struct ApplySettings {
     pub haptic_feedback: ::std::option::Option<bool>,
     // @@protoc_insertion_point(field:hw.trezor.messages.management.ApplySettings.homescreen_length)
     pub homescreen_length: ::std::option::Option<u32>,
+    // @@protoc_insertion_point(field:hw.trezor.messages.management.ApplySettings.auto_lock_delay_battery_ms)
+    pub auto_lock_delay_battery_ms: ::std::option::Option<u32>,
     // special fields
     // @@protoc_insertion_point(special_field:hw.trezor.messages.management.ApplySettings.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
@@ -3597,8 +3636,27 @@ impl ApplySettings {
         self.homescreen_length = ::std::option::Option::Some(v);
     }
 
+    // optional uint32 auto_lock_delay_battery_ms = 15;
+
+    pub fn auto_lock_delay_battery_ms(&self) -> u32 {
+        self.auto_lock_delay_battery_ms.unwrap_or(0)
+    }
+
+    pub fn clear_auto_lock_delay_battery_ms(&mut self) {
+        self.auto_lock_delay_battery_ms = ::std::option::Option::None;
+    }
+
+    pub fn has_auto_lock_delay_battery_ms(&self) -> bool {
+        self.auto_lock_delay_battery_ms.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_auto_lock_delay_battery_ms(&mut self, v: u32) {
+        self.auto_lock_delay_battery_ms = ::std::option::Option::Some(v);
+    }
+
     fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
-        let mut fields = ::std::vec::Vec::with_capacity(13);
+        let mut fields = ::std::vec::Vec::with_capacity(14);
         let mut oneofs = ::std::vec::Vec::with_capacity(0);
         fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
             "language",
@@ -3665,6 +3723,11 @@ impl ApplySettings {
             |m: &ApplySettings| { &m.homescreen_length },
             |m: &mut ApplySettings| { &mut m.homescreen_length },
         ));
+        fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
+            "auto_lock_delay_battery_ms",
+            |m: &ApplySettings| { &m.auto_lock_delay_battery_ms },
+            |m: &mut ApplySettings| { &mut m.auto_lock_delay_battery_ms },
+        ));
         ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<ApplySettings>(
             "ApplySettings",
             fields,
@@ -3722,6 +3785,9 @@ impl ::protobuf::Message for ApplySettings {
                 112 => {
                     self.homescreen_length = ::std::option::Option::Some(is.read_uint32()?);
                 },
+                120 => {
+                    self.auto_lock_delay_battery_ms = ::std::option::Option::Some(is.read_uint32()?);
+                },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
                 },
@@ -3773,6 +3839,9 @@ impl ::protobuf::Message for ApplySettings {
         if let Some(v) = self.homescreen_length {
             my_size += ::protobuf::rt::uint32_size(14, v);
         }
+        if let Some(v) = self.auto_lock_delay_battery_ms {
+            my_size += ::protobuf::rt::uint32_size(15, v);
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
         self.special_fields.cached_size().set(my_size as u32);
         my_size
@@ -3818,6 +3887,9 @@ impl ::protobuf::Message for ApplySettings {
         if let Some(v) = self.homescreen_length {
             os.write_uint32(14, v)?;
         }
+        if let Some(v) = self.auto_lock_delay_battery_ms {
+            os.write_uint32(15, v)?;
+        }
         os.write_unknown_fields(self.special_fields.unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -3848,6 +3920,7 @@ impl ::protobuf::Message for ApplySettings {
         self.hide_passphrase_from_host = ::std::option::Option::None;
         self.haptic_feedback = ::std::option::Option::None;
         self.homescreen_length = ::std::option::Option::None;
+        self.auto_lock_delay_battery_ms = ::std::option::Option::None;
         self.special_fields.clear();
     }
 
@@ -3866,6 +3939,7 @@ impl ::protobuf::Message for ApplySettings {
             hide_passphrase_from_host: ::std::option::Option::None,
             haptic_feedback: ::std::option::Option::None,
             homescreen_length: ::std::option::Option::None,
+            auto_lock_delay_battery_ms: ::std::option::Option::None,
             special_fields: ::protobuf::SpecialFields::new(),
         };
         &instance
@@ -6145,10 +6219,14 @@ impl ::protobuf::reflect::ProtobufValue for AuthenticateDevice {
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct AuthenticityProof {
     // message fields
-    // @@protoc_insertion_point(field:hw.trezor.messages.management.AuthenticityProof.certificates)
-    pub certificates: ::std::vec::Vec<::std::vec::Vec<u8>>,
-    // @@protoc_insertion_point(field:hw.trezor.messages.management.AuthenticityProof.signature)
-    pub signature: ::std::option::Option<::std::vec::Vec<u8>>,
+    // @@protoc_insertion_point(field:hw.trezor.messages.management.AuthenticityProof.optiga_certificates)
+    pub optiga_certificates: ::std::vec::Vec<::std::vec::Vec<u8>>,
+    // @@protoc_insertion_point(field:hw.trezor.messages.management.AuthenticityProof.optiga_signature)
+    pub optiga_signature: ::std::option::Option<::std::vec::Vec<u8>>,
+    // @@protoc_insertion_point(field:hw.trezor.messages.management.AuthenticityProof.tropic_certificates)
+    pub tropic_certificates: ::std::vec::Vec<::std::vec::Vec<u8>>,
+    // @@protoc_insertion_point(field:hw.trezor.messages.management.AuthenticityProof.tropic_signature)
+    pub tropic_signature: ::std::option::Option<::std::vec::Vec<u8>>,
     // special fields
     // @@protoc_insertion_point(special_field:hw.trezor.messages.management.AuthenticityProof.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
@@ -6165,54 +6243,100 @@ impl AuthenticityProof {
         ::std::default::Default::default()
     }
 
-    // required bytes signature = 2;
+    // required bytes optiga_signature = 2;
 
-    pub fn signature(&self) -> &[u8] {
-        match self.signature.as_ref() {
+    pub fn optiga_signature(&self) -> &[u8] {
+        match self.optiga_signature.as_ref() {
             Some(v) => v,
             None => &[],
         }
     }
 
-    pub fn clear_signature(&mut self) {
-        self.signature = ::std::option::Option::None;
+    pub fn clear_optiga_signature(&mut self) {
+        self.optiga_signature = ::std::option::Option::None;
     }
 
-    pub fn has_signature(&self) -> bool {
-        self.signature.is_some()
+    pub fn has_optiga_signature(&self) -> bool {
+        self.optiga_signature.is_some()
     }
 
     // Param is passed by value, moved
-    pub fn set_signature(&mut self, v: ::std::vec::Vec<u8>) {
-        self.signature = ::std::option::Option::Some(v);
+    pub fn set_optiga_signature(&mut self, v: ::std::vec::Vec<u8>) {
+        self.optiga_signature = ::std::option::Option::Some(v);
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_signature(&mut self) -> &mut ::std::vec::Vec<u8> {
-        if self.signature.is_none() {
-            self.signature = ::std::option::Option::Some(::std::vec::Vec::new());
+    pub fn mut_optiga_signature(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.optiga_signature.is_none() {
+            self.optiga_signature = ::std::option::Option::Some(::std::vec::Vec::new());
         }
-        self.signature.as_mut().unwrap()
+        self.optiga_signature.as_mut().unwrap()
     }
 
     // Take field
-    pub fn take_signature(&mut self) -> ::std::vec::Vec<u8> {
-        self.signature.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    pub fn take_optiga_signature(&mut self) -> ::std::vec::Vec<u8> {
+        self.optiga_signature.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+
+    // optional bytes tropic_signature = 4;
+
+    pub fn tropic_signature(&self) -> &[u8] {
+        match self.tropic_signature.as_ref() {
+            Some(v) => v,
+            None => &[],
+        }
+    }
+
+    pub fn clear_tropic_signature(&mut self) {
+        self.tropic_signature = ::std::option::Option::None;
+    }
+
+    pub fn has_tropic_signature(&self) -> bool {
+        self.tropic_signature.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_tropic_signature(&mut self, v: ::std::vec::Vec<u8>) {
+        self.tropic_signature = ::std::option::Option::Some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_tropic_signature(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.tropic_signature.is_none() {
+            self.tropic_signature = ::std::option::Option::Some(::std::vec::Vec::new());
+        }
+        self.tropic_signature.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_tropic_signature(&mut self) -> ::std::vec::Vec<u8> {
+        self.tropic_signature.take().unwrap_or_else(|| ::std::vec::Vec::new())
     }
 
     fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
-        let mut fields = ::std::vec::Vec::with_capacity(2);
+        let mut fields = ::std::vec::Vec::with_capacity(4);
         let mut oneofs = ::std::vec::Vec::with_capacity(0);
         fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
-            "certificates",
-            |m: &AuthenticityProof| { &m.certificates },
-            |m: &mut AuthenticityProof| { &mut m.certificates },
+            "optiga_certificates",
+            |m: &AuthenticityProof| { &m.optiga_certificates },
+            |m: &mut AuthenticityProof| { &mut m.optiga_certificates },
         ));
         fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
-            "signature",
-            |m: &AuthenticityProof| { &m.signature },
-            |m: &mut AuthenticityProof| { &mut m.signature },
+            "optiga_signature",
+            |m: &AuthenticityProof| { &m.optiga_signature },
+            |m: &mut AuthenticityProof| { &mut m.optiga_signature },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "tropic_certificates",
+            |m: &AuthenticityProof| { &m.tropic_certificates },
+            |m: &mut AuthenticityProof| { &mut m.tropic_certificates },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
+            "tropic_signature",
+            |m: &AuthenticityProof| { &m.tropic_signature },
+            |m: &mut AuthenticityProof| { &mut m.tropic_signature },
         ));
         ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<AuthenticityProof>(
             "AuthenticityProof",
@@ -6226,7 +6350,7 @@ impl ::protobuf::Message for AuthenticityProof {
     const NAME: &'static str = "AuthenticityProof";
 
     fn is_initialized(&self) -> bool {
-        if self.signature.is_none() {
+        if self.optiga_signature.is_none() {
             return false;
         }
         true
@@ -6236,10 +6360,16 @@ impl ::protobuf::Message for AuthenticityProof {
         while let Some(tag) = is.read_raw_tag_or_eof()? {
             match tag {
                 10 => {
-                    self.certificates.push(is.read_bytes()?);
+                    self.optiga_certificates.push(is.read_bytes()?);
                 },
                 18 => {
-                    self.signature = ::std::option::Option::Some(is.read_bytes()?);
+                    self.optiga_signature = ::std::option::Option::Some(is.read_bytes()?);
+                },
+                26 => {
+                    self.tropic_certificates.push(is.read_bytes()?);
+                },
+                34 => {
+                    self.tropic_signature = ::std::option::Option::Some(is.read_bytes()?);
                 },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
@@ -6253,11 +6383,17 @@ impl ::protobuf::Message for AuthenticityProof {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u64 {
         let mut my_size = 0;
-        for value in &self.certificates {
+        for value in &self.optiga_certificates {
             my_size += ::protobuf::rt::bytes_size(1, &value);
         };
-        if let Some(v) = self.signature.as_ref() {
+        if let Some(v) = self.optiga_signature.as_ref() {
             my_size += ::protobuf::rt::bytes_size(2, &v);
+        }
+        for value in &self.tropic_certificates {
+            my_size += ::protobuf::rt::bytes_size(3, &value);
+        };
+        if let Some(v) = self.tropic_signature.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(4, &v);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
         self.special_fields.cached_size().set(my_size as u32);
@@ -6265,11 +6401,17 @@ impl ::protobuf::Message for AuthenticityProof {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
-        for v in &self.certificates {
+        for v in &self.optiga_certificates {
             os.write_bytes(1, &v)?;
         };
-        if let Some(v) = self.signature.as_ref() {
+        if let Some(v) = self.optiga_signature.as_ref() {
             os.write_bytes(2, v)?;
+        }
+        for v in &self.tropic_certificates {
+            os.write_bytes(3, &v)?;
+        };
+        if let Some(v) = self.tropic_signature.as_ref() {
+            os.write_bytes(4, v)?;
         }
         os.write_unknown_fields(self.special_fields.unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -6288,15 +6430,19 @@ impl ::protobuf::Message for AuthenticityProof {
     }
 
     fn clear(&mut self) {
-        self.certificates.clear();
-        self.signature = ::std::option::Option::None;
+        self.optiga_certificates.clear();
+        self.optiga_signature = ::std::option::Option::None;
+        self.tropic_certificates.clear();
+        self.tropic_signature = ::std::option::Option::None;
         self.special_fields.clear();
     }
 
     fn default_instance() -> &'static AuthenticityProof {
         static instance: AuthenticityProof = AuthenticityProof {
-            certificates: ::std::vec::Vec::new(),
-            signature: ::std::option::Option::None,
+            optiga_certificates: ::std::vec::Vec::new(),
+            optiga_signature: ::std::option::Option::None,
+            tropic_certificates: ::std::vec::Vec::new(),
+            tropic_signature: ::std::option::Option::None,
             special_fields: ::protobuf::SpecialFields::new(),
         };
         &instance
@@ -11613,7 +11759,7 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \roptions.proto\"\x80\x01\n\nInitialize\x12\x1d\n\nsession_id\x18\x01\
     \x20\x01(\x0cR\tsessionId\x12,\n\x10_skip_passphrase\x18\x02\x20\x01(\
     \x08R\x0eSkipPassphraseB\x02\x18\x01\x12%\n\x0ederive_cardano\x18\x03\
-    \x20\x01(\x08R\rderiveCardano\"\r\n\x0bGetFeatures\"\xba\x18\n\x08Featur\
+    \x20\x01(\x08R\rderiveCardano\"\r\n\x0bGetFeatures\"\xcc\x18\n\x08Featur\
     es\x12\x16\n\x06vendor\x18\x01\x20\x01(\tR\x06vendor\x12#\n\rmajor_versi\
     on\x18\x02\x20\x02(\rR\x0cmajorVersion\x12#\n\rminor_version\x18\x03\x20\
     \x02(\rR\x0cminorVersion\x12#\n\rpatch_version\x18\x04\x20\x02(\rR\x0cpa\
@@ -11664,134 +11810,138 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     itPackaging\x12'\n\x0fhaptic_feedback\x184\x20\x01(\x08R\x0ehapticFeedba\
     ck\x12P\n\rrecovery_type\x185\x20\x01(\x0e2+.hw.trezor.messages.manageme\
     nt.RecoveryTypeR\x0crecoveryType\x12\x1d\n\noptiga_sec\x186\x20\x01(\rR\
-    \toptigaSec\"C\n\x12BackupAvailability\x12\x10\n\x0cNotAvailable\x10\0\
-    \x12\x0c\n\x08Required\x10\x01\x12\r\n\tAvailable\x10\x02\"7\n\x0eRecove\
-    ryStatus\x12\x0b\n\x07Nothing\x10\0\x12\x0c\n\x08Recovery\x10\x01\x12\n\
-    \n\x06Backup\x10\x02\"\xf6\x04\n\nCapability\x12\x1c\n\x12Capability_Bit\
-    coin\x10\x01\x1a\x04\x80\xa6\x1d\x01\x12\x1b\n\x17Capability_Bitcoin_lik\
-    e\x10\x02\x12\x16\n\x12Capability_Binance\x10\x03\x12\x16\n\x12Capabilit\
-    y_Cardano\x10\x04\x12\x1b\n\x11Capability_Crypto\x10\x05\x1a\x04\x80\xa6\
-    \x1d\x01\x12\x12\n\x0eCapability_EOS\x10\x06\x12\x17\n\x13Capability_Eth\
-    ereum\x10\x07\x12\x17\n\x0fCapability_Lisk\x10\x08\x1a\x02\x08\x01\x12\
-    \x15\n\x11Capability_Monero\x10\t\x12\x12\n\x0eCapability_NEM\x10\n\x12\
-    \x15\n\x11Capability_Ripple\x10\x0b\x12\x16\n\x12Capability_Stellar\x10\
-    \x0c\x12\x14\n\x10Capability_Tezos\x10\r\x12\x12\n\x0eCapability_U2F\x10\
-    \x0e\x12\x1b\n\x11Capability_Shamir\x10\x0f\x1a\x04\x80\xa6\x1d\x01\x12!\
-    \n\x17Capability_ShamirGroups\x10\x10\x1a\x04\x80\xa6\x1d\x01\x12$\n\x1a\
-    Capability_PassphraseEntry\x10\x11\x1a\x04\x80\xa6\x1d\x01\x12\x15\n\x11\
-    Capability_Solana\x10\x12\x12!\n\x17Capability_Translations\x10\x13\x1a\
-    \x04\x80\xa6\x1d\x01\x12\x1f\n\x15Capability_Brightness\x10\x14\x1a\x04\
-    \x80\xa6\x1d\x01\x12\x1b\n\x11Capability_Haptic\x10\x15\x1a\x04\x80\xa6\
-    \x1d\x01\x12\x18\n\x0eCapability_BLE\x10\x16\x1a\x04\x80\xa6\x1d\x01\x12\
-    \x18\n\x0eCapability_NFC\x10\x17\x1a\x04\x80\xa6\x1d\x01\x1a\x04\xc8\xf3\
-    \x18\x01\"\x0c\n\nLockDevice\"&\n\x07SetBusy\x12\x1b\n\texpiry_ms\x18\
-    \x01\x20\x01(\rR\x08expiryMs\"\x0c\n\nEndSession\"\xa1\x05\n\rApplySetti\
-    ngs\x12\x1e\n\x08language\x18\x01\x20\x01(\tR\x08languageB\x02\x18\x01\
-    \x12\x14\n\x05label\x18\x02\x20\x01(\tR\x05label\x12%\n\x0euse_passphras\
-    e\x18\x03\x20\x01(\x08R\rusePassphrase\x12\x1e\n\nhomescreen\x18\x04\x20\
-    \x01(\x0cR\nhomescreen\x120\n\x12_passphrase_source\x18\x05\x20\x01(\rR\
-    \x10PassphraseSourceB\x02\x18\x01\x12+\n\x12auto_lock_delay_ms\x18\x06\
-    \x20\x01(\rR\x0fautoLockDelayMs\x12Y\n\x10display_rotation\x18\x07\x20\
-    \x01(\x0e2..hw.trezor.messages.management.DisplayRotationR\x0fdisplayRot\
-    ation\x12=\n\x1bpassphrase_always_on_device\x18\x08\x20\x01(\x08R\x18pas\
-    sphraseAlwaysOnDevice\x12T\n\rsafety_checks\x18\t\x20\x01(\x0e2/.hw.trez\
-    or.messages.management.SafetyCheckLevelR\x0csafetyChecks\x123\n\x15exper\
-    imental_features\x18\n\x20\x01(\x08R\x14experimentalFeatures\x129\n\x19h\
-    ide_passphrase_from_host\x18\x0b\x20\x01(\x08R\x16hidePassphraseFromHost\
-    \x12'\n\x0fhaptic_feedback\x18\r\x20\x01(\x08R\x0ehapticFeedback\x12+\n\
-    \x11homescreen_length\x18\x0e\x20\x01(\rR\x10homescreenLength\"T\n\x0eCh\
-    angeLanguage\x12\x1f\n\x0bdata_length\x18\x01\x20\x02(\rR\ndataLength\
-    \x12!\n\x0cshow_display\x18\x02\x20\x01(\x08R\x0bshowDisplay\"T\n\x10Dat\
-    aChunkRequest\x12\x1f\n\x0bdata_length\x18\x01\x20\x02(\rR\ndataLength\
-    \x12\x1f\n\x0bdata_offset\x18\x02\x20\x02(\rR\ndataOffset\"-\n\x0cDataCh\
-    unkAck\x12\x1d\n\ndata_chunk\x18\x01\x20\x02(\x0cR\tdataChunk\"\"\n\nApp\
-    lyFlags\x12\x14\n\x05flags\x18\x01\x20\x02(\rR\x05flags\"#\n\tChangePin\
-    \x12\x16\n\x06remove\x18\x01\x20\x01(\x08R\x06remove\"(\n\x0eChangeWipeC\
-    ode\x12\x16\n\x06remove\x18\x01\x20\x01(\x08R\x06remove\"\xaa\x01\n\tSdP\
-    rotect\x12]\n\toperation\x18\x01\x20\x02(\x0e2?.hw.trezor.messages.manag\
-    ement.SdProtect.SdProtectOperationTypeR\toperation\">\n\x16SdProtectOper\
-    ationType\x12\x0b\n\x07DISABLE\x10\0\x12\n\n\x06ENABLE\x10\x01\x12\x0b\n\
-    \x07REFRESH\x10\x02\"O\n\x04Ping\x12\x1a\n\x07message\x18\x01\x20\x01(\t\
-    :\0R\x07message\x12+\n\x11button_protection\x18\x02\x20\x01(\x08R\x10but\
-    tonProtection\"\x08\n\x06Cancel\"\x20\n\nGetEntropy\x12\x12\n\x04size\
-    \x18\x01\x20\x02(\rR\x04size\"#\n\x07Entropy\x12\x18\n\x07entropy\x18\
-    \x01\x20\x02(\x0cR\x07entropy\"/\n\x0fGetFirmwareHash\x12\x1c\n\tchallen\
-    ge\x18\x01\x20\x01(\x0cR\tchallenge\"\"\n\x0cFirmwareHash\x12\x12\n\x04h\
-    ash\x18\x01\x20\x02(\x0cR\x04hash\"2\n\x12AuthenticateDevice\x12\x1c\n\t\
-    challenge\x18\x01\x20\x02(\x0cR\tchallenge\"U\n\x11AuthenticityProof\x12\
-    \"\n\x0ccertificates\x18\x01\x20\x03(\x0cR\x0ccertificates\x12\x1c\n\tsi\
-    gnature\x18\x02\x20\x02(\x0cR\tsignature\"\x0c\n\nWipeDevice\"\xad\x02\n\
-    \nLoadDevice\x12\x1c\n\tmnemonics\x18\x01\x20\x03(\tR\tmnemonics\x12\x10\
-    \n\x03pin\x18\x03\x20\x01(\tR\x03pin\x123\n\x15passphrase_protection\x18\
-    \x04\x20\x01(\x08R\x14passphraseProtection\x12\x1e\n\x08language\x18\x05\
-    \x20\x01(\tR\x08languageB\x02\x18\x01\x12\x14\n\x05label\x18\x06\x20\x01\
-    (\tR\x05label\x12#\n\rskip_checksum\x18\x07\x20\x01(\x08R\x0cskipChecksu\
-    m\x12\x1f\n\x0bu2f_counter\x18\x08\x20\x01(\rR\nu2fCounter\x12!\n\x0cnee\
-    ds_backup\x18\t\x20\x01(\x08R\x0bneedsBackup\x12\x1b\n\tno_backup\x18\n\
-    \x20\x01(\x08R\x08noBackup\"\x9d\x03\n\x0bResetDevice\x12\x1f\n\x08stren\
-    gth\x18\x02\x20\x01(\r:\x03256R\x08strength\x123\n\x15passphrase_protect\
-    ion\x18\x03\x20\x01(\x08R\x14passphraseProtection\x12%\n\x0epin_protecti\
-    on\x18\x04\x20\x01(\x08R\rpinProtection\x12\x1e\n\x08language\x18\x05\
-    \x20\x01(\tR\x08languageB\x02\x18\x01\x12\x14\n\x05label\x18\x06\x20\x01\
-    (\tR\x05label\x12\x1f\n\x0bu2f_counter\x18\x07\x20\x01(\rR\nu2fCounter\
-    \x12\x1f\n\x0bskip_backup\x18\x08\x20\x01(\x08R\nskipBackup\x12\x1b\n\tn\
-    o_backup\x18\t\x20\x01(\x08R\x08noBackup\x12Q\n\x0bbackup_type\x18\n\x20\
-    \x01(\x0e2).hw.trezor.messages.management.BackupType:\x05Bip39R\nbackupT\
-    ype\x12#\n\rentropy_check\x18\x0b\x20\x01(\x08R\x0centropyCheckJ\x04\x08\
-    \x01\x10\x02\"\xe5\x01\n\x0cBackupDevice\x12'\n\x0fgroup_threshold\x18\
-    \x01\x20\x01(\rR\x0egroupThreshold\x12O\n\x06groups\x18\x02\x20\x03(\x0b\
-    27.hw.trezor.messages.management.BackupDevice.Slip39GroupR\x06groups\x1a\
-    [\n\x0bSlip39Group\x12)\n\x10member_threshold\x18\x01\x20\x02(\rR\x0fmem\
-    berThreshold\x12!\n\x0cmember_count\x18\x02\x20\x02(\rR\x0bmemberCount\"\
-    b\n\x0eEntropyRequest\x12-\n\x12entropy_commitment\x18\x01\x20\x01(\x0cR\
-    \x11entropyCommitment\x12!\n\x0cprev_entropy\x18\x02\x20\x01(\x0cR\x0bpr\
-    evEntropy\"&\n\nEntropyAck\x12\x18\n\x07entropy\x18\x01\x20\x02(\x0cR\
-    \x07entropy\"\x13\n\x11EntropyCheckReady\"5\n\x14EntropyCheckContinue\
-    \x12\x1d\n\x06finish\x18\x01\x20\x01(\x08:\x05falseR\x06finish\"\x8d\x04\
-    \n\x0eRecoveryDevice\x12\x1d\n\nword_count\x18\x01\x20\x01(\rR\twordCoun\
-    t\x123\n\x15passphrase_protection\x18\x02\x20\x01(\x08R\x14passphrasePro\
-    tection\x12%\n\x0epin_protection\x18\x03\x20\x01(\x08R\rpinProtection\
-    \x12\x1e\n\x08language\x18\x04\x20\x01(\tR\x08languageB\x02\x18\x01\x12\
-    \x14\n\x05label\x18\x05\x20\x01(\tR\x05label\x12)\n\x10enforce_wordlist\
-    \x18\x06\x20\x01(\x08R\x0fenforceWordlist\x12j\n\x0cinput_method\x18\x08\
-    \x20\x01(\x0e2G.hw.trezor.messages.management.RecoveryDevice.RecoveryDev\
-    iceInputMethodR\x0binputMethod\x12\x1f\n\x0bu2f_counter\x18\t\x20\x01(\r\
-    R\nu2fCounter\x12O\n\x04type\x18\n\x20\x01(\x0e2+.hw.trezor.messages.man\
-    agement.RecoveryType:\x0eNormalRecoveryR\x04type\";\n\x19RecoveryDeviceI\
-    nputMethod\x12\x12\n\x0eScrambledWords\x10\0\x12\n\n\x06Matrix\x10\x01J\
-    \x04\x08\x07\x10\x08\"\xc5\x01\n\x0bWordRequest\x12N\n\x04type\x18\x01\
-    \x20\x02(\x0e2:.hw.trezor.messages.management.WordRequest.WordRequestTyp\
-    eR\x04type\"f\n\x0fWordRequestType\x12\x19\n\x15WordRequestType_Plain\
-    \x10\0\x12\x1b\n\x17WordRequestType_Matrix9\x10\x01\x12\x1b\n\x17WordReq\
-    uestType_Matrix6\x10\x02\"\x1d\n\x07WordAck\x12\x12\n\x04word\x18\x01\
-    \x20\x02(\tR\x04word\"0\n\rSetU2FCounter\x12\x1f\n\x0bu2f_counter\x18\
-    \x01\x20\x02(\rR\nu2fCounter\"\x13\n\x11GetNextU2FCounter\"1\n\x0eNextU2\
-    FCounter\x12\x1f\n\x0bu2f_counter\x18\x01\x20\x02(\rR\nu2fCounter\"\x11\
-    \n\x0fDoPreauthorized\"\x16\n\x14PreauthorizedRequest\"\x15\n\x13CancelA\
-    uthorization\"\x9a\x02\n\x12RebootToBootloader\x12o\n\x0cboot_command\
-    \x18\x01\x20\x01(\x0e2=.hw.trezor.messages.management.RebootToBootloader\
-    .BootCommand:\rSTOP_AND_WAITR\x0bbootCommand\x12'\n\x0ffirmware_header\
-    \x18\x02\x20\x01(\x0cR\x0efirmwareHeader\x123\n\x14language_data_length\
-    \x18\x03\x20\x01(\r:\x010R\x12languageDataLength\"5\n\x0bBootCommand\x12\
-    \x11\n\rSTOP_AND_WAIT\x10\0\x12\x13\n\x0fINSTALL_UPGRADE\x10\x01\"\x10\n\
-    \x08GetNonce:\x04\x88\xb2\x19\x01\"#\n\x05Nonce\x12\x14\n\x05nonce\x18\
-    \x01\x20\x02(\x0cR\x05nonce:\x04\x88\xb2\x19\x01\";\n\nUnlockPath\x12\
-    \x1b\n\taddress_n\x18\x01\x20\x03(\rR\x08addressN\x12\x10\n\x03mac\x18\
-    \x02\x20\x01(\x0cR\x03mac\"'\n\x13UnlockedPathRequest\x12\x10\n\x03mac\
-    \x18\x01\x20\x02(\x0cR\x03mac\"\x14\n\x12ShowDeviceTutorial\"\x12\n\x10U\
-    nlockBootloader\"%\n\rSetBrightness\x12\x14\n\x05value\x18\x01\x20\x01(\
-    \rR\x05value*\x99\x01\n\nBackupType\x12\t\n\x05Bip39\x10\0\x12\x10\n\x0c\
-    Slip39_Basic\x10\x01\x12\x13\n\x0fSlip39_Advanced\x10\x02\x12\x1c\n\x18S\
-    lip39_Single_Extendable\x10\x03\x12\x1b\n\x17Slip39_Basic_Extendable\x10\
-    \x04\x12\x1e\n\x1aSlip39_Advanced_Extendable\x10\x05*G\n\x10SafetyCheckL\
-    evel\x12\n\n\x06Strict\x10\0\x12\x10\n\x0cPromptAlways\x10\x01\x12\x15\n\
-    \x11PromptTemporarily\x10\x02*=\n\x0fDisplayRotation\x12\t\n\x05North\
-    \x10\0\x12\x08\n\x04East\x10Z\x12\n\n\x05South\x10\xb4\x01\x12\t\n\x04We\
-    st\x10\x8e\x02*0\n\x10HomescreenFormat\x12\x08\n\x04Toif\x10\x01\x12\x08\
-    \n\x04Jpeg\x10\x02\x12\x08\n\x04ToiG\x10\x03*H\n\x0cRecoveryType\x12\x12\
-    \n\x0eNormalRecovery\x10\0\x12\n\n\x06DryRun\x10\x01\x12\x18\n\x14Unlock\
-    RepeatedBackup\x10\x02BB\n#com.satoshilabs.trezor.lib.protobufB\x17Trezo\
-    rMessageManagement\x80\xa6\x1d\x01\
+    \toptigaSec\x12\x10\n\x03soc\x187\x20\x01(\rR\x03soc\"C\n\x12BackupAvail\
+    ability\x12\x10\n\x0cNotAvailable\x10\0\x12\x0c\n\x08Required\x10\x01\
+    \x12\r\n\tAvailable\x10\x02\"7\n\x0eRecoveryStatus\x12\x0b\n\x07Nothing\
+    \x10\0\x12\x0c\n\x08Recovery\x10\x01\x12\n\n\x06Backup\x10\x02\"\xf6\x04\
+    \n\nCapability\x12\x1c\n\x12Capability_Bitcoin\x10\x01\x1a\x04\x80\xa6\
+    \x1d\x01\x12\x1b\n\x17Capability_Bitcoin_like\x10\x02\x12\x16\n\x12Capab\
+    ility_Binance\x10\x03\x12\x16\n\x12Capability_Cardano\x10\x04\x12\x1b\n\
+    \x11Capability_Crypto\x10\x05\x1a\x04\x80\xa6\x1d\x01\x12\x12\n\x0eCapab\
+    ility_EOS\x10\x06\x12\x17\n\x13Capability_Ethereum\x10\x07\x12\x17\n\x0f\
+    Capability_Lisk\x10\x08\x1a\x02\x08\x01\x12\x15\n\x11Capability_Monero\
+    \x10\t\x12\x12\n\x0eCapability_NEM\x10\n\x12\x15\n\x11Capability_Ripple\
+    \x10\x0b\x12\x16\n\x12Capability_Stellar\x10\x0c\x12\x14\n\x10Capability\
+    _Tezos\x10\r\x12\x12\n\x0eCapability_U2F\x10\x0e\x12\x1b\n\x11Capability\
+    _Shamir\x10\x0f\x1a\x04\x80\xa6\x1d\x01\x12!\n\x17Capability_ShamirGroup\
+    s\x10\x10\x1a\x04\x80\xa6\x1d\x01\x12$\n\x1aCapability_PassphraseEntry\
+    \x10\x11\x1a\x04\x80\xa6\x1d\x01\x12\x15\n\x11Capability_Solana\x10\x12\
+    \x12!\n\x17Capability_Translations\x10\x13\x1a\x04\x80\xa6\x1d\x01\x12\
+    \x1f\n\x15Capability_Brightness\x10\x14\x1a\x04\x80\xa6\x1d\x01\x12\x1b\
+    \n\x11Capability_Haptic\x10\x15\x1a\x04\x80\xa6\x1d\x01\x12\x18\n\x0eCap\
+    ability_BLE\x10\x16\x1a\x04\x80\xa6\x1d\x01\x12\x18\n\x0eCapability_NFC\
+    \x10\x17\x1a\x04\x80\xa6\x1d\x01\x1a\x04\xc8\xf3\x18\x01\"\x0c\n\nLockDe\
+    vice\"&\n\x07SetBusy\x12\x1b\n\texpiry_ms\x18\x01\x20\x01(\rR\x08expiryM\
+    s\"\x0c\n\nEndSession\"\xdd\x05\n\rApplySettings\x12\x1e\n\x08language\
+    \x18\x01\x20\x01(\tR\x08languageB\x02\x18\x01\x12\x14\n\x05label\x18\x02\
+    \x20\x01(\tR\x05label\x12%\n\x0euse_passphrase\x18\x03\x20\x01(\x08R\rus\
+    ePassphrase\x12\x1e\n\nhomescreen\x18\x04\x20\x01(\x0cR\nhomescreen\x120\
+    \n\x12_passphrase_source\x18\x05\x20\x01(\rR\x10PassphraseSourceB\x02\
+    \x18\x01\x12+\n\x12auto_lock_delay_ms\x18\x06\x20\x01(\rR\x0fautoLockDel\
+    ayMs\x12Y\n\x10display_rotation\x18\x07\x20\x01(\x0e2..hw.trezor.message\
+    s.management.DisplayRotationR\x0fdisplayRotation\x12=\n\x1bpassphrase_al\
+    ways_on_device\x18\x08\x20\x01(\x08R\x18passphraseAlwaysOnDevice\x12T\n\
+    \rsafety_checks\x18\t\x20\x01(\x0e2/.hw.trezor.messages.management.Safet\
+    yCheckLevelR\x0csafetyChecks\x123\n\x15experimental_features\x18\n\x20\
+    \x01(\x08R\x14experimentalFeatures\x129\n\x19hide_passphrase_from_host\
+    \x18\x0b\x20\x01(\x08R\x16hidePassphraseFromHost\x12'\n\x0fhaptic_feedba\
+    ck\x18\r\x20\x01(\x08R\x0ehapticFeedback\x12+\n\x11homescreen_length\x18\
+    \x0e\x20\x01(\rR\x10homescreenLength\x12:\n\x1aauto_lock_delay_battery_m\
+    s\x18\x0f\x20\x01(\rR\x16autoLockDelayBatteryMs\"T\n\x0eChangeLanguage\
+    \x12\x1f\n\x0bdata_length\x18\x01\x20\x02(\rR\ndataLength\x12!\n\x0cshow\
+    _display\x18\x02\x20\x01(\x08R\x0bshowDisplay\"T\n\x10DataChunkRequest\
+    \x12\x1f\n\x0bdata_length\x18\x01\x20\x02(\rR\ndataLength\x12\x1f\n\x0bd\
+    ata_offset\x18\x02\x20\x02(\rR\ndataOffset\"-\n\x0cDataChunkAck\x12\x1d\
+    \n\ndata_chunk\x18\x01\x20\x02(\x0cR\tdataChunk\"\"\n\nApplyFlags\x12\
+    \x14\n\x05flags\x18\x01\x20\x02(\rR\x05flags\"#\n\tChangePin\x12\x16\n\
+    \x06remove\x18\x01\x20\x01(\x08R\x06remove\"(\n\x0eChangeWipeCode\x12\
+    \x16\n\x06remove\x18\x01\x20\x01(\x08R\x06remove\"\xaa\x01\n\tSdProtect\
+    \x12]\n\toperation\x18\x01\x20\x02(\x0e2?.hw.trezor.messages.management.\
+    SdProtect.SdProtectOperationTypeR\toperation\">\n\x16SdProtectOperationT\
+    ype\x12\x0b\n\x07DISABLE\x10\0\x12\n\n\x06ENABLE\x10\x01\x12\x0b\n\x07RE\
+    FRESH\x10\x02\"O\n\x04Ping\x12\x1a\n\x07message\x18\x01\x20\x01(\t:\0R\
+    \x07message\x12+\n\x11button_protection\x18\x02\x20\x01(\x08R\x10buttonP\
+    rotection\"\x08\n\x06Cancel\"\x20\n\nGetEntropy\x12\x12\n\x04size\x18\
+    \x01\x20\x02(\rR\x04size\"#\n\x07Entropy\x12\x18\n\x07entropy\x18\x01\
+    \x20\x02(\x0cR\x07entropy\"/\n\x0fGetFirmwareHash\x12\x1c\n\tchallenge\
+    \x18\x01\x20\x01(\x0cR\tchallenge\"\"\n\x0cFirmwareHash\x12\x12\n\x04has\
+    h\x18\x01\x20\x02(\x0cR\x04hash\"2\n\x12AuthenticateDevice\x12\x1c\n\tch\
+    allenge\x18\x01\x20\x02(\x0cR\tchallenge\"\xcb\x01\n\x11AuthenticityProo\
+    f\x12/\n\x13optiga_certificates\x18\x01\x20\x03(\x0cR\x12optigaCertifica\
+    tes\x12)\n\x10optiga_signature\x18\x02\x20\x02(\x0cR\x0foptigaSignature\
+    \x12/\n\x13tropic_certificates\x18\x03\x20\x03(\x0cR\x12tropicCertificat\
+    es\x12)\n\x10tropic_signature\x18\x04\x20\x01(\x0cR\x0ftropicSignature\"\
+    \x0c\n\nWipeDevice\"\xad\x02\n\nLoadDevice\x12\x1c\n\tmnemonics\x18\x01\
+    \x20\x03(\tR\tmnemonics\x12\x10\n\x03pin\x18\x03\x20\x01(\tR\x03pin\x123\
+    \n\x15passphrase_protection\x18\x04\x20\x01(\x08R\x14passphraseProtectio\
+    n\x12\x1e\n\x08language\x18\x05\x20\x01(\tR\x08languageB\x02\x18\x01\x12\
+    \x14\n\x05label\x18\x06\x20\x01(\tR\x05label\x12#\n\rskip_checksum\x18\
+    \x07\x20\x01(\x08R\x0cskipChecksum\x12\x1f\n\x0bu2f_counter\x18\x08\x20\
+    \x01(\rR\nu2fCounter\x12!\n\x0cneeds_backup\x18\t\x20\x01(\x08R\x0bneeds\
+    Backup\x12\x1b\n\tno_backup\x18\n\x20\x01(\x08R\x08noBackup\"\x9d\x03\n\
+    \x0bResetDevice\x12\x1f\n\x08strength\x18\x02\x20\x01(\r:\x03256R\x08str\
+    ength\x123\n\x15passphrase_protection\x18\x03\x20\x01(\x08R\x14passphras\
+    eProtection\x12%\n\x0epin_protection\x18\x04\x20\x01(\x08R\rpinProtectio\
+    n\x12\x1e\n\x08language\x18\x05\x20\x01(\tR\x08languageB\x02\x18\x01\x12\
+    \x14\n\x05label\x18\x06\x20\x01(\tR\x05label\x12\x1f\n\x0bu2f_counter\
+    \x18\x07\x20\x01(\rR\nu2fCounter\x12\x1f\n\x0bskip_backup\x18\x08\x20\
+    \x01(\x08R\nskipBackup\x12\x1b\n\tno_backup\x18\t\x20\x01(\x08R\x08noBac\
+    kup\x12Q\n\x0bbackup_type\x18\n\x20\x01(\x0e2).hw.trezor.messages.manage\
+    ment.BackupType:\x05Bip39R\nbackupType\x12#\n\rentropy_check\x18\x0b\x20\
+    \x01(\x08R\x0centropyCheckJ\x04\x08\x01\x10\x02\"\xe5\x01\n\x0cBackupDev\
+    ice\x12'\n\x0fgroup_threshold\x18\x01\x20\x01(\rR\x0egroupThreshold\x12O\
+    \n\x06groups\x18\x02\x20\x03(\x0b27.hw.trezor.messages.management.Backup\
+    Device.Slip39GroupR\x06groups\x1a[\n\x0bSlip39Group\x12)\n\x10member_thr\
+    eshold\x18\x01\x20\x02(\rR\x0fmemberThreshold\x12!\n\x0cmember_count\x18\
+    \x02\x20\x02(\rR\x0bmemberCount\"b\n\x0eEntropyRequest\x12-\n\x12entropy\
+    _commitment\x18\x01\x20\x01(\x0cR\x11entropyCommitment\x12!\n\x0cprev_en\
+    tropy\x18\x02\x20\x01(\x0cR\x0bprevEntropy\"&\n\nEntropyAck\x12\x18\n\
+    \x07entropy\x18\x01\x20\x02(\x0cR\x07entropy\"\x13\n\x11EntropyCheckRead\
+    y\"5\n\x14EntropyCheckContinue\x12\x1d\n\x06finish\x18\x01\x20\x01(\x08:\
+    \x05falseR\x06finish\"\x8d\x04\n\x0eRecoveryDevice\x12\x1d\n\nword_count\
+    \x18\x01\x20\x01(\rR\twordCount\x123\n\x15passphrase_protection\x18\x02\
+    \x20\x01(\x08R\x14passphraseProtection\x12%\n\x0epin_protection\x18\x03\
+    \x20\x01(\x08R\rpinProtection\x12\x1e\n\x08language\x18\x04\x20\x01(\tR\
+    \x08languageB\x02\x18\x01\x12\x14\n\x05label\x18\x05\x20\x01(\tR\x05labe\
+    l\x12)\n\x10enforce_wordlist\x18\x06\x20\x01(\x08R\x0fenforceWordlist\
+    \x12j\n\x0cinput_method\x18\x08\x20\x01(\x0e2G.hw.trezor.messages.manage\
+    ment.RecoveryDevice.RecoveryDeviceInputMethodR\x0binputMethod\x12\x1f\n\
+    \x0bu2f_counter\x18\t\x20\x01(\rR\nu2fCounter\x12O\n\x04type\x18\n\x20\
+    \x01(\x0e2+.hw.trezor.messages.management.RecoveryType:\x0eNormalRecover\
+    yR\x04type\";\n\x19RecoveryDeviceInputMethod\x12\x12\n\x0eScrambledWords\
+    \x10\0\x12\n\n\x06Matrix\x10\x01J\x04\x08\x07\x10\x08\"\xc5\x01\n\x0bWor\
+    dRequest\x12N\n\x04type\x18\x01\x20\x02(\x0e2:.hw.trezor.messages.manage\
+    ment.WordRequest.WordRequestTypeR\x04type\"f\n\x0fWordRequestType\x12\
+    \x19\n\x15WordRequestType_Plain\x10\0\x12\x1b\n\x17WordRequestType_Matri\
+    x9\x10\x01\x12\x1b\n\x17WordRequestType_Matrix6\x10\x02\"\x1d\n\x07WordA\
+    ck\x12\x12\n\x04word\x18\x01\x20\x02(\tR\x04word\"0\n\rSetU2FCounter\x12\
+    \x1f\n\x0bu2f_counter\x18\x01\x20\x02(\rR\nu2fCounter\"\x13\n\x11GetNext\
+    U2FCounter\"1\n\x0eNextU2FCounter\x12\x1f\n\x0bu2f_counter\x18\x01\x20\
+    \x02(\rR\nu2fCounter\"\x11\n\x0fDoPreauthorized\"\x16\n\x14Preauthorized\
+    Request\"\x15\n\x13CancelAuthorization\"\x9a\x02\n\x12RebootToBootloader\
+    \x12o\n\x0cboot_command\x18\x01\x20\x01(\x0e2=.hw.trezor.messages.manage\
+    ment.RebootToBootloader.BootCommand:\rSTOP_AND_WAITR\x0bbootCommand\x12'\
+    \n\x0ffirmware_header\x18\x02\x20\x01(\x0cR\x0efirmwareHeader\x123\n\x14\
+    language_data_length\x18\x03\x20\x01(\r:\x010R\x12languageDataLength\"5\
+    \n\x0bBootCommand\x12\x11\n\rSTOP_AND_WAIT\x10\0\x12\x13\n\x0fINSTALL_UP\
+    GRADE\x10\x01\"\x10\n\x08GetNonce:\x04\x88\xb2\x19\x01\"#\n\x05Nonce\x12\
+    \x14\n\x05nonce\x18\x01\x20\x02(\x0cR\x05nonce:\x04\x88\xb2\x19\x01\";\n\
+    \nUnlockPath\x12\x1b\n\taddress_n\x18\x01\x20\x03(\rR\x08addressN\x12\
+    \x10\n\x03mac\x18\x02\x20\x01(\x0cR\x03mac\"'\n\x13UnlockedPathRequest\
+    \x12\x10\n\x03mac\x18\x01\x20\x02(\x0cR\x03mac\"\x14\n\x12ShowDeviceTuto\
+    rial\"\x12\n\x10UnlockBootloader\"%\n\rSetBrightness\x12\x14\n\x05value\
+    \x18\x01\x20\x01(\rR\x05value*\x99\x01\n\nBackupType\x12\t\n\x05Bip39\
+    \x10\0\x12\x10\n\x0cSlip39_Basic\x10\x01\x12\x13\n\x0fSlip39_Advanced\
+    \x10\x02\x12\x1c\n\x18Slip39_Single_Extendable\x10\x03\x12\x1b\n\x17Slip\
+    39_Basic_Extendable\x10\x04\x12\x1e\n\x1aSlip39_Advanced_Extendable\x10\
+    \x05*G\n\x10SafetyCheckLevel\x12\n\n\x06Strict\x10\0\x12\x10\n\x0cPrompt\
+    Always\x10\x01\x12\x15\n\x11PromptTemporarily\x10\x02*=\n\x0fDisplayRota\
+    tion\x12\t\n\x05North\x10\0\x12\x08\n\x04East\x10Z\x12\n\n\x05South\x10\
+    \xb4\x01\x12\t\n\x04West\x10\x8e\x02*0\n\x10HomescreenFormat\x12\x08\n\
+    \x04Toif\x10\x01\x12\x08\n\x04Jpeg\x10\x02\x12\x08\n\x04ToiG\x10\x03*H\n\
+    \x0cRecoveryType\x12\x12\n\x0eNormalRecovery\x10\0\x12\n\n\x06DryRun\x10\
+    \x01\x12\x18\n\x14UnlockRepeatedBackup\x10\x02BB\n#com.satoshilabs.trezo\
+    r.lib.protobufB\x17TrezorMessageManagement\x80\xa6\x1d\x01\
 ";
 
 /// `FileDescriptorProto` object which was a source for this generated file

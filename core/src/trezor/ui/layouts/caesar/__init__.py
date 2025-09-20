@@ -1739,16 +1739,16 @@ async def request_pin_on_device(
     # Not showing the prompt in case user did not enter it badly yet
     # (has full 16 attempts left)
     if attempts_remaining is None or attempts_remaining == 16:
-        subprompt = ""
+        attempts = ""
     elif attempts_remaining == 1:
-        subprompt = TR.pin__last_attempt
+        attempts = TR.pin__last_attempt
     else:
-        subprompt = f"{attempts_remaining} {TR.pin__tries_left}"
+        attempts = f"{attempts_remaining} {TR.pin__tries_left}"
 
     result = await interact(
         trezorui_api.request_pin(
             prompt=prompt,
-            subprompt=subprompt,
+            attempts=attempts,
             allow_cancel=allow_cancel,
             wrong_pin=wrong_pin,
         ),
@@ -1819,11 +1819,34 @@ def wipe_code_same_as_pin_popup() -> Awaitable[None]:
     )
 
 
-async def confirm_set_new_pin(
+async def wipe_code_pin_not_set_popup(
+    title: str, description: str, button: str
+) -> NoReturn:
+    await show_error_and_raise(
+        "warning_pin_not_set",
+        description,
+        title,
+        button,
+    )
+
+
+async def pin_wipe_code_exists_popup(
+    title: str, description: str, button: str
+) -> NoReturn:
+    await show_error_and_raise(
+        "wipe_code_exists",
+        description,
+        title,
+        button,
+    )
+
+
+async def confirm_set_new_code(
     br_name: str,
     title: str,
     description: str,
     information: str,
+    is_wipe_code: bool,
     br_code: ButtonRequestType = BR_CODE_OTHER,
 ) -> None:
     await _confirm_multiple_pages_texts(
@@ -1835,7 +1858,7 @@ async def confirm_set_new_pin(
     )
 
     # Not showing extra info for wipe code
-    if "wipe_code" in br_name:
+    if is_wipe_code:
         return
 
     # Additional information for the user to know about PIN

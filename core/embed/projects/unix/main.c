@@ -37,7 +37,9 @@
 #include <unistd.h>
 
 #include <io/display.h>
+#include <io/usb_config.h>
 #include <sec/secret.h>
+#include <sys/dbg_console.h>
 #include <sys/system.h>
 #include <sys/systimer.h>
 #include <util/flash.h>
@@ -83,9 +85,8 @@ long heap_size = 1024 * 1024 * (sizeof(mp_uint_t) / 4);
 
 STATIC void stderr_print_strn(void *env, const char *str, size_t len) {
   (void)env;
-  ssize_t dummy = write(STDERR_FILENO, str, len);
+  dbg_console_write(str, len);
   mp_uos_dupterm_tx_strn(str, len);
-  (void)dummy;
 }
 
 const mp_print_t mp_stderr_print = {NULL, stderr_print_strn};
@@ -522,6 +523,8 @@ void drivers_init() {
 #ifdef USE_TROPIC
   tropic_init();
 #endif
+
+  usb_configure(NULL);
 }
 
 // Initialize the system and drivers for running tests in the Rust code.

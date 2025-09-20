@@ -1,6 +1,7 @@
 use crate::{
     io::BinaryData,
     micropython::{
+        buffer::StrBuffer,
         gc::Gc,
         list::List,
         macros::{obj_fn_0, obj_fn_1, obj_fn_kw, obj_module},
@@ -570,7 +571,7 @@ extern "C" fn new_flow_confirm_output(n_args: usize, args: *const Obj, kwargs: *
     unsafe { util::try_with_args_and_kwargs(n_args, args, kwargs, block) }
 }
 
-extern "C" fn new_flow_confirm_set_new_pin(
+extern "C" fn new_flow_confirm_set_new_code(
     n_args: usize,
     args: *const Obj,
     kwargs: *mut Map,
@@ -578,8 +579,9 @@ extern "C" fn new_flow_confirm_set_new_pin(
     let block = move |_args: &[Obj], kwargs: &Map| {
         let title: TString = kwargs.get(Qstr::MP_QSTR_title)?.try_into()?;
         let description: TString = kwargs.get(Qstr::MP_QSTR_description)?.try_into()?;
+        let is_wipe_code: bool = kwargs.get(Qstr::MP_QSTR_is_wipe_code)?.try_into()?;
 
-        let layout = ModelUI::flow_confirm_set_new_pin(title, description)?;
+        let layout = ModelUI::flow_confirm_set_new_code(title, description, is_wipe_code)?;
         Ok(LayoutObj::new_root(layout)?.into())
     };
     unsafe { util::try_with_args_and_kwargs(n_args, args, kwargs, block) }
@@ -741,11 +743,12 @@ extern "C" fn new_request_duration(n_args: usize, args: *const Obj, kwargs: *mut
 extern "C" fn new_request_pin(n_args: usize, args: *const Obj, kwargs: *mut Map) -> Obj {
     let block = move |_args: &[Obj], kwargs: &Map| {
         let prompt: TString = kwargs.get(Qstr::MP_QSTR_prompt)?.try_into()?;
-        let subprompt: TString = kwargs.get(Qstr::MP_QSTR_subprompt)?.try_into()?;
+        let attempts: TString = kwargs.get(Qstr::MP_QSTR_attempts)?.try_into()?;
         let allow_cancel: bool = kwargs.get_or(Qstr::MP_QSTR_allow_cancel, true)?;
-        let warning: bool = kwargs.get_or(Qstr::MP_QSTR_wrong_pin, false)?;
+        let wrong_pin: bool = kwargs.get_or(Qstr::MP_QSTR_wrong_pin, false)?;
+        let last_attempt: bool = kwargs.get_or(Qstr::MP_QSTR_last_attempt, false)?;
 
-        let layout = ModelUI::request_pin(prompt, subprompt, allow_cancel, warning)?;
+        let layout = ModelUI::request_pin(prompt, attempts, allow_cancel, wrong_pin, last_attempt)?;
         Ok(LayoutObj::new_root(layout)?.into())
     };
     unsafe { util::try_with_args_and_kwargs(n_args, args, kwargs, block) }
@@ -915,10 +918,7 @@ extern "C" fn new_show_group_share_success(
 
 extern "C" fn new_show_homescreen(n_args: usize, args: *const Obj, kwargs: *mut Map) -> Obj {
     let block = move |_args: &[Obj], kwargs: &Map| {
-        let label: TString<'static> = kwargs
-            .get(Qstr::MP_QSTR_label)?
-            .try_into_option()?
-            .unwrap_or_else(|| model::FULL_NAME.into());
+        let label: TString<'static> = kwargs.get(Qstr::MP_QSTR_label)?.try_into()?;
         let notification: Option<TString<'static>> =
             kwargs.get(Qstr::MP_QSTR_notification)?.try_into_option()?;
         let notification_level: u8 = kwargs.get_or(Qstr::MP_QSTR_notification_level, 0)?;
@@ -937,16 +937,18 @@ extern "C" fn new_show_homescreen(n_args: usize, args: *const Obj, kwargs: *mut 
 
 extern "C" fn new_show_device_menu(n_args: usize, args: *const Obj, kwargs: *mut Map) -> Obj {
     let block = move |_args: &[Obj], kwargs: &Map| {
+        let init_submenu: Option<u8> = kwargs.get(Qstr::MP_QSTR_init_submenu)?.try_into_option()?;
         let failed_backup: bool = kwargs.get(Qstr::MP_QSTR_failed_backup)?.try_into()?;
         let paired_devices: Obj = kwargs.get(Qstr::MP_QSTR_paired_devices)?;
         let paired_devices: Vec<TString, MAX_PAIRED_DEVICES> = util::iter_into_vec(paired_devices)?;
-        let connected_idx: Option<usize> =
+        let connected_idx: Option<u8> =
             kwargs.get(Qstr::MP_QSTR_connected_idx)?.try_into_option()?;
-        let bluetooth: Option<bool> = kwargs.get(Qstr::MP_QSTR_bluetooth)?.try_into_option()?;
         let pin_code: Option<bool> = kwargs.get(Qstr::MP_QSTR_pin_code)?.try_into_option()?;
-        let auto_lock_delay: Option<TString> = kwargs
+        let auto_lock_delay: Option<[TString; 2]> = kwargs
             .get(Qstr::MP_QSTR_auto_lock_delay)?
-            .try_into_option()?;
+            .try_into_option()?
+            .map(util::iter_into_array)
+            .transpose()?;
         let wipe_code: Option<bool> = kwargs.get(Qstr::MP_QSTR_wipe_code)?.try_into_option()?;
         let check_backup: bool = kwargs.get(Qstr::MP_QSTR_check_backup)?.try_into()?;
         let device_name: Option<TString> =
@@ -960,10 +962,10 @@ extern "C" fn new_show_device_menu(n_args: usize, args: *const Obj, kwargs: *mut
         let led_enabled: Option<bool> = kwargs.get(Qstr::MP_QSTR_led_enabled)?.try_into_option()?;
         let about_items: Obj = kwargs.get(Qstr::MP_QSTR_about_items)?;
         let layout = ModelUI::show_device_menu(
+            init_submenu,
             failed_backup,
             paired_devices,
             connected_idx,
-            bluetooth,
             pin_code,
             auto_lock_delay,
             wipe_code,
@@ -987,8 +989,9 @@ extern "C" fn new_show_pairing_device_name(
     kwargs: *mut Map,
 ) -> Obj {
     let block = move |_args: &[Obj], kwargs: &Map| {
+        let description: StrBuffer = kwargs.get(Qstr::MP_QSTR_description)?.try_into()?;
         let device_name: TString = kwargs.get(Qstr::MP_QSTR_device_name)?.try_into()?;
-        let layout = ModelUI::show_pairing_device_name(device_name)?;
+        let layout = ModelUI::show_pairing_device_name(description, device_name)?;
         let layout_obj = LayoutObj::new_root(layout)?;
         Ok(layout_obj.into())
     };
@@ -1025,6 +1028,18 @@ extern "C" fn new_show_thp_pairing_code(n_args: usize, args: *const Obj, kwargs:
         let description: TString = kwargs.get(Qstr::MP_QSTR_description)?.try_into()?;
         let code: TString = kwargs.get(Qstr::MP_QSTR_code)?.try_into()?;
         let layout = ModelUI::show_thp_pairing_code(title, description, code)?;
+        let layout_obj = LayoutObj::new_root(layout)?;
+        Ok(layout_obj.into())
+    };
+    unsafe { util::try_with_args_and_kwargs(n_args, args, kwargs, block) }
+}
+
+extern "C" fn new_confirm_thp_pairing(n_args: usize, args: *const Obj, kwargs: *mut Map) -> Obj {
+    let block = move |_args: &[Obj], kwargs: &Map| {
+        let title: TString = kwargs.get(Qstr::MP_QSTR_title)?.try_into()?;
+        let fmt: StrBuffer = kwargs.get(Qstr::MP_QSTR_description)?.try_into()?;
+        let args: Obj = kwargs.get(Qstr::MP_QSTR_args)?;
+        let layout = ModelUI::confirm_thp_pairing(title, (fmt, args))?;
         let layout_obj = LayoutObj::new_root(layout)?;
         Ok(layout_obj.into())
     };
@@ -1294,6 +1309,7 @@ pub extern "C" fn upy_backlight_fade(_level: Obj) -> Obj {
 #[no_mangle]
 pub static mp_module_trezorui_api: Module = obj_module! {
     /// from trezor import utils
+    /// from trezor.enums import ButtonRequestType
     ///
     /// PropertyType = tuple[str | None, str | bytes | None, bool | None]
     /// T = TypeVar("T")
@@ -1370,7 +1386,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     def page_count(self) -> int:
     ///         """Return the number of pages in the layout object."""
     ///
-    ///     def button_request(self) -> tuple[int, str] | None:
+    ///     def button_request(self) -> tuple[ButtonRequestType, str] | None:
     ///         """Return (code, type) of button request made during the last event or timer pass."""
     ///
     ///     def get_transition_out(self) -> AttachType:
@@ -1673,15 +1689,14 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     """Confirm the recipient, (optionally) confirm the amount and (optionally) confirm the summary and present a Hold to Sign page."""
     Qstr::MP_QSTR_flow_confirm_output => obj_fn_kw!(0, new_flow_confirm_output).as_obj(),
 
-    // TODO: supply more arguments for Wipe code setting (delizia)
-    ///
-    /// def flow_confirm_set_new_pin(
+    /// def flow_confirm_set_new_code(
     ///     *,
     ///     title: str,
     ///     description: str,
+    ///     is_wipe_code: bool,
     /// ) -> LayoutObj[UiResult]:
-    ///     """Confirm new PIN setup with an option to cancel action."""
-    Qstr::MP_QSTR_flow_confirm_set_new_pin => obj_fn_kw!(0, new_flow_confirm_set_new_pin).as_obj(),
+    ///     """Confirm new PIN/wipe code setup with an option to cancel action."""
+    Qstr::MP_QSTR_flow_confirm_set_new_code => obj_fn_kw!(0, new_flow_confirm_set_new_code).as_obj(),
 
     /// def flow_get_address(
     ///     *,
@@ -1778,9 +1793,10 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// def request_pin(
     ///     *,
     ///     prompt: str,
-    ///     subprompt: str,
+    ///     attempts: str,
     ///     allow_cancel: bool = True,
     ///     wrong_pin: bool = False,
+    ///     last_attempt: bool = False,
     /// ) -> LayoutObj[str | UiResult]:
     ///     """Request pin on device."""
     Qstr::MP_QSTR_request_pin => obj_fn_kw!(0, new_request_pin).as_obj(),
@@ -1890,7 +1906,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
 
     /// def show_homescreen(
     ///     *,
-    ///     label: str | None,
+    ///     label: str,
     ///     notification: str | None,
     ///     notification_level: int = 0,
     ///     lockable: bool,
@@ -1901,12 +1917,12 @@ pub static mp_module_trezorui_api: Module = obj_module! {
 
     /// def show_device_menu(
     ///     *,
+    ///     init_submenu: int | None,
     ///     failed_backup: bool,
     ///     paired_devices: Iterable[str],
     ///     connected_idx: int | None,
-    ///     bluetooth: bool | None,
     ///     pin_code: bool | None,
-    ///     auto_lock_delay: str | None,
+    ///     auto_lock_delay: tuple[str, str] | None,
     ///     wipe_code: bool | None,
     ///     check_backup: bool,
     ///     device_name: str | None,
@@ -1920,6 +1936,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
 
     /// def show_pairing_device_name(
     ///     *,
+    ///     description: str,
     ///     device_name: str,
     /// ) -> LayoutObj[UiResult]:
     ///     """Pairing device: first screen (device name).
@@ -1935,6 +1952,15 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     """BLE pairing: second screen (pairing code).
     ///     Returns on BLEEvent::{PairingCanceled, Disconnected}."""
     Qstr::MP_QSTR_show_ble_pairing_code => obj_fn_kw!(0, new_show_ble_pairing_code).as_obj(),
+
+    /// def confirm_thp_pairing(
+    ///     *,
+    ///     title: str,
+    ///     description: str,
+    ///     args: Iterable[str],
+    /// ) -> LayoutObj[UiResult]:
+    ///     """THP pairing: first screen (host and app names)."""
+    Qstr::MP_QSTR_confirm_thp_pairing => obj_fn_kw!(0, new_confirm_thp_pairing).as_obj(),
 
     /// def show_thp_pairing_code(
     ///     *,
@@ -2110,15 +2136,14 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// class DeviceMenuResult:
     ///     """Result of a device menu operation."""
     ///     BackupFailed: ClassVar[DeviceMenuResult]
-    ///     DeviceConnect: ClassVar[DeviceMenuResult]
     ///     DeviceDisconnect: ClassVar[DeviceMenuResult]
     ///     DevicePair: ClassVar[DeviceMenuResult]
     ///     DeviceUnpair: ClassVar[DeviceMenuResult]
     ///     DeviceUnpairAll: ClassVar[DeviceMenuResult]
-    ///     Bluetooth: ClassVar[DeviceMenuResult]
     ///     PinCode: ClassVar[DeviceMenuResult]
     ///     PinRemove: ClassVar[DeviceMenuResult]
-    ///     AutoLockDelay: ClassVar[DeviceMenuResult]
+    ///     AutoLockBattery: ClassVar[DeviceMenuResult]
+    ///     AutoLockUSB: ClassVar[DeviceMenuResult]
     ///     WipeCode: ClassVar[DeviceMenuResult]
     ///     WipeRemove: ClassVar[DeviceMenuResult]
     ///     CheckBackup: ClassVar[DeviceMenuResult]
@@ -2127,5 +2152,9 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     HapticFeedback: ClassVar[DeviceMenuResult]
     ///     LedEnabled: ClassVar[DeviceMenuResult]
     ///     WipeDevice: ClassVar[DeviceMenuResult]
+    ///     Reboot: ClassVar[DeviceMenuResult]
+    ///     RebootToBootloader: ClassVar[DeviceMenuResult]
+    ///     TurnOff: ClassVar[DeviceMenuResult]
+    ///     MenuRefresh: ClassVar[DeviceMenuResult]
     Qstr::MP_QSTR_DeviceMenuResult => DEVICE_MENU_RESULT.as_obj(),
 };

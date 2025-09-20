@@ -161,6 +161,9 @@
 #define MICROPY_PY_USOCKET          (0)
 #define MICROPY_PY_NETWORK          (0)
 
+// allocate traceback data only on debug builds
+#define MICROPY_PY_SYS_TRACEBACK_DISABLE (PYOPT)
+
 #define MICROPY_PY_TREZORCONFIG     (1)
 #define MICROPY_PY_TREZORCRYPTO     (1)
 #define MICROPY_PY_TREZORIO         (1)
@@ -169,15 +172,6 @@
 #define MICROPY_PY_TREZORPROTO      (1)
 #define MICROPY_PY_TREZORTRANSLATE  (1)
 #define MICROPY_PY_TREZORUI_API     (1)
-
-#ifdef SYSTEM_VIEW
-#define MP_PLAT_PRINT_STRN(str, len) segger_print(str, len)
-// uncomment DEST_RTT and comment DEST_SYSTEMVIEW
-// if you want to print to RTT instead of SystemView
-// OpenOCD supports only the RTT output method
-// #define SYSTEMVIEW_DEST_RTT         (1)
-#define SYSTEMVIEW_DEST_SYSTEMVIEW  (1)
-#endif
 
 #define MP_STATE_PORT MP_STATE_VM
 

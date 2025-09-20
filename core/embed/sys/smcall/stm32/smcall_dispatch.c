@@ -23,6 +23,7 @@
 
 #include <sec/random_delays.h>
 #include <sec/rng.h>
+#include <sec/secret.h>
 #include <sys/bootargs.h>
 #include <sys/bootutils.h>
 #include <sys/irq.h>
@@ -41,10 +42,6 @@
 
 #ifdef USE_SUSPEND
 #include <sys/suspend_io.h>
-#endif
-
-#ifdef LOCKABLE_BOOTLOADER
-#include <sec/secret.h>
 #endif
 
 #include <util/boot_image.h>
@@ -134,6 +131,17 @@ __attribute((no_stack_protector)) void smcall_handler(uint32_t *args,
       args[0] = secret_bootloader_locked();
     } break;
 #endif
+
+#ifdef USE_NRF_AUTH
+    case SMCALL_SECRET_VALIDATE_NRF_PAIRING: {
+      const uint8_t *message = (const uint8_t *)args[0];
+      size_t message_len = args[1];
+      const uint8_t *mac = (const uint8_t *)args[2];
+      size_t mac_len = args[3];
+      args[0] = secret_validate_nrf_pairing__verified(message, message_len, mac,
+                                                      mac_len);
+    } break;
+#endif  // USE_NRF_AUTH
 
     case SMCALL_WAIT_RANDOM: {
       wait_random();
@@ -333,6 +341,13 @@ __attribute((no_stack_protector)) void smcall_handler(uint32_t *args,
       uint16_t dig_len = (uint16_t)args[2];
       uint8_t *sig = (uint8_t *)args[3];
       args[0] = tropic_ecc_sign__verified(key_slot_index, dig, dig_len, sig);
+    } break;
+
+    case SMCALL_TROPIC_DATA_READ: {
+      uint16_t udata_slot = (uint16_t)args[0];
+      uint8_t *data = (uint8_t *)args[1];
+      uint16_t *size = (uint16_t *)args[2];
+      args[0] = tropic_data_read__verified(udata_slot, data, size);
     } break;
 #endif
 

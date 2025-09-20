@@ -57,16 +57,12 @@ void pm_pmic_data_ready(void* context, pmic_report_t* report) {
   // Store measurement timestamp
   if (drv->pmic_last_update_us == 0) {
     drv->pmic_sampling_period_ms = PM_TIMER_PERIOD_MS;
-    drv->vbat_tau = report->vbat;
   } else {
     // Calculate the time since the last PMIC update
     drv->pmic_sampling_period_ms =
         (systick_us() - drv->pmic_last_update_us) / 1000;
   }
   drv->pmic_last_update_us = systick_us();
-
-  drv->vbat_tau = (drv->vbat_tau * 0.95f) + (report->vbat * 0.05f);
-
   // Copy pmic data
   memcpy(&drv->pmic_data, report, sizeof(pmic_report_t));
 
@@ -86,27 +82,19 @@ void pm_pmic_data_ready(void* context, pmic_report_t* report) {
 
   } else {
     if (drv->woke_up_from_suspend) {
-      // Just woke up from suspend, use the last known battery data to
-      // update the fuel gauge.
-      if (drv->suspended_charging) {
-        pm_compensate_fuel_gauge(&drv->fuel_gauge.soc, drv->time_in_suspend_s,
-                                 drv->pmic_data.ibat, drv->pmic_data.ntc_temp);
+      // Use known battery self-discharge rate to compensate the fuel gauge
+      // estimation during the suspend period. Since this period may be very
+      // long and the battery temperature may vary, use the average ambient
+      // temperature.
+      pm_compensate_fuel_gauge(&drv->fuel_gauge.soc, drv->time_in_suspend_s,
+                               PM_SELF_DISG_RATE_SUSPEND_MA, 25.0f);
 
-      } else {
-        // Use known battery self-discharge rate to compensate the fuel gauge
-        // estimation during the suspend period. Since this period may be very
-        // long and the battery temperature may vary, use the average ambient
-        // temperature.
-        pm_compensate_fuel_gauge(&drv->fuel_gauge.soc, drv->time_in_suspend_s,
-                                 PM_SELF_DISG_RATE_SUSPEND_MA, 25.0f);
-
-        // TODO: Currently in suspend mode we use single self-discharge rate
-        // but in practive the discharge rate may change in case the BLE chip
-        // remains active. Since the device is very likely to stay in suspend
-        // mode for limited time, for now we decided to neglect this. but in
-        // the future we may want to distinguish between suspend mode
-        // with/without BLE and use different self-discharge rates.
-      }
+      // TODO: Currently in suspend mode we use single self-discharge rate
+      // but in practive the discharge rate may change in case the BLE chip
+      // remains active. Since the device is very likely to stay in suspend
+      // mode for limited time, for now we decided to neglect this. but in
+      // the future we may want to distinguish between suspend mode
+      // with/without BLE and use different self-discharge rates.
 
       fuel_gauge_set_soc(&drv->fuel_gauge, drv->fuel_gauge.soc,
                          drv->fuel_gauge.P);
@@ -120,10 +108,13 @@ void pm_pmic_data_ready(void* context, pmic_report_t* report) {
                         drv->pmic_data.ntc_temp);
     }
 
-    // Charging completed
+    // Charging completed flag from PMIC controller
     if (drv->pmic_data.charge_status & 0x2) {
       // Force fuel gauge to 100%, keep the covariance
+      drv->fully_charged = true;
       fuel_gauge_set_soc(&drv->fuel_gauge, 1.0f, drv->fuel_gauge.P);
+    } else {
+      drv->fully_charged = false;
     }
 
     // Ceil the float soc to user-friendly integer
@@ -306,13 +297,16 @@ static void pm_parse_power_source_state(pm_driver_t* drv) {
   }
 
   // Check battery voltage for critical (undervoltage) threshold
-  if ((drv->vbat_tau < PM_BATTERY_UNDERVOLT_THR_V) && !drv->battery_critical) {
+  if ((drv->pmic_data.vbat < PM_BATTERY_UNDERVOLT_THR_V) &&
+      !drv->battery_critical && !drv->usb_connected) {
     // Force Fuel gauge to 0, keep the covariance
     fuel_gauge_set_soc(&drv->fuel_gauge, 0.0f, drv->fuel_gauge.P);
-
     drv->battery_critical = true;
-  } else if (drv->vbat_tau > (PM_BATTERY_UNDERVOLT_RECOVERY_THR_V) &&
-             drv->battery_critical) {
+
+  } else if (drv->fuel_gauge.soc_latched >=
+                 (PM_BATTERY_CRITICAL_RECOVERY_SOC) ||
+             drv->usb_connected) {
+    // Restore the battery critical state
     drv->battery_critical = false;
   }
 }

@@ -1509,11 +1509,11 @@ async def confirm_modify_output(
         # if the user cancels here, raise ActionCancelled (by default)
         await interact(
             trezorui_api.confirm_value(
-                title="MODIFY AMOUNT",
+                title=TR.modify_amount__title,
                 value=address,
-                verb="CONTINUE",
+                verb=TR.buttons__continue,
                 verb_cancel=None,
-                description="Address:",
+                description=TR.words__address + ":",
             ),
             "modify_output" if send_button_request else None,
             ButtonRequestType.ConfirmOutput,
@@ -1737,16 +1737,16 @@ async def request_pin_on_device(
     from trezor.wire import PinCancelled
 
     if attempts_remaining is None:
-        subprompt = ""
+        attempts = ""
     elif attempts_remaining == 1:
-        subprompt = TR.pin__last_attempt
+        attempts = TR.pin__last_attempt
     else:
-        subprompt = f"{attempts_remaining} {TR.pin__tries_left}"
+        attempts = f"{attempts_remaining} {TR.pin__tries_left}"
 
     result = await interact(
         trezorui_api.request_pin(
             prompt=prompt,
-            subprompt=subprompt,
+            attempts=attempts,
             allow_cancel=allow_cancel,
             wrong_pin=wrong_pin,
         ),
@@ -1792,11 +1792,34 @@ def wipe_code_same_as_pin_popup() -> Awaitable[None]:
     )
 
 
-def confirm_set_new_pin(
+async def wipe_code_pin_not_set_popup(
+    title: str, description: str, button: str
+) -> NoReturn:
+    await show_error_and_raise(
+        "warning_pin_not_set",
+        description,
+        title,
+        button,
+    )
+
+
+async def pin_wipe_code_exists_popup(
+    title: str, description: str, button: str
+) -> NoReturn:
+    await show_error_and_raise(
+        "wipe_code_exists",
+        description,
+        title,
+        button,
+    )
+
+
+def confirm_set_new_code(
     br_name: str,
     title: str,
     description: str,
     information: str,
+    is_wipe_code: bool,
     br_code: ButtonRequestType = BR_CODE_OTHER,
 ) -> Awaitable[None]:
     return raise_if_cancelled(

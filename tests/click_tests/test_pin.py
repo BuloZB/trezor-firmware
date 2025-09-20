@@ -25,7 +25,7 @@ from trezorlib import device, exceptions
 from trezorlib.debuglink import DisplayStyle, LayoutType
 
 from .. import translations as TR
-from .common import go_back, go_next, navigate_to_action_and_press
+from .common import go_next, navigate_to_action_and_press
 
 if TYPE_CHECKING:
     from trezorlib.debuglink import DebugLink
@@ -77,6 +77,14 @@ class Situation(Enum):
     PIN_INPUT_CANCEL = 5
 
 
+def scroll_through_pages(page_count, debug):
+    for _ in range(page_count - 1):
+        if debug.layout_type is LayoutType.Eckhart:
+            debug.click(debug.screen_buttons.ok())
+        else:
+            debug.swipe_up()
+
+
 @contextmanager
 def prepare(
     device_handler: "BackgroundDeviceHandler",
@@ -101,7 +109,10 @@ def prepare(
     elif situation == Situation.PIN_SETUP:
         # Set new PIN
         device_handler.run_with_provided_session(device_handler.client.get_seedless_session(), device.change_pin)  # type: ignore
-        debug.synchronize_at([TR.pin__turn_on, TR.pin__info, TR.pin__title_settings])
+        pin_turn_on = debug.synchronize_at(
+            [TR.pin__turn_on, TR.pin__info, TR.pin__title_settings]
+        )
+        scroll_through_pages(pin_turn_on.page_count(), debug)
         if debug.layout_type in (
             LayoutType.Bolt,
             LayoutType.Delizia,
@@ -129,9 +140,10 @@ def prepare(
         if old_pin:
             _assert_pin_entry(debug)
             _input_see_confirm(debug, old_pin)
-        debug.synchronize_at(
+        wipe_code_info = debug.synchronize_at(
             [TR.wipe_code__turn_on, TR.wipe_code__info, TR.wipe_code__title_settings]
         )
+        scroll_through_pages(wipe_code_info.page_count(), debug)
         go_next(debug)
         if debug.layout_type is LayoutType.Caesar:
             go_next(debug)
@@ -401,15 +413,6 @@ def test_wipe_code_same_as_pin(device_handler: "BackgroundDeviceHandler"):
         # Try again
         go_next(debug)
         _enter_two_times(debug, "2", "2")
-
-
-@pytest.mark.setup_client()
-def test_pin_same_as_wipe_code(device_handler: "BackgroundDeviceHandler"):
-    with prepare(device_handler, Situation.WIPE_CODE_SETUP) as debug:
-        _enter_two_times(debug, "1", "1")
-    with PIN_INVALID, prepare(device_handler, Situation.PIN_SETUP) as debug:
-        _enter_two_times(debug, "1", "1")
-        go_back(debug, r_middle=True)
 
 
 @pytest.mark.models("t2t1", "delizia", "eckhart")

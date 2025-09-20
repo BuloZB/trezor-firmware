@@ -1,5 +1,6 @@
 from typing import *
 from trezor import utils
+from trezor.enums import ButtonRequestType
 PropertyType = tuple[str | None, str | bytes | None, bool | None]
 T = TypeVar("T")
 
@@ -58,7 +59,7 @@ class LayoutObj(Generic[T]):
             """Paint bounds of individual components on screen."""
     def page_count(self) -> int:
         """Return the number of pages in the layout object."""
-    def button_request(self) -> tuple[int, str] | None:
+    def button_request(self) -> tuple[ButtonRequestType, str] | None:
         """Return (code, type) of button request made during the last event or timer pass."""
     def get_transition_out(self) -> AttachType:
         """Return the transition type."""
@@ -374,12 +375,13 @@ def flow_confirm_output(
 
 
 # rust/src/ui/api/firmware_micropython.rs
-def flow_confirm_set_new_pin(
+def flow_confirm_set_new_code(
     *,
     title: str,
     description: str,
+    is_wipe_code: bool,
 ) -> LayoutObj[UiResult]:
-    """Confirm new PIN setup with an option to cancel action."""
+    """Confirm new PIN/wipe code setup with an option to cancel action."""
 
 
 # rust/src/ui/api/firmware_micropython.rs
@@ -486,9 +488,10 @@ def request_duration(
 def request_pin(
     *,
     prompt: str,
-    subprompt: str,
+    attempts: str,
     allow_cancel: bool = True,
     wrong_pin: bool = False,
+    last_attempt: bool = False,
 ) -> LayoutObj[str | UiResult]:
     """Request pin on device."""
 
@@ -610,7 +613,7 @@ def show_group_share_success(
 # rust/src/ui/api/firmware_micropython.rs
 def show_homescreen(
     *,
-    label: str | None,
+    label: str,
     notification: str | None,
     notification_level: int = 0,
     lockable: bool,
@@ -622,12 +625,12 @@ def show_homescreen(
 # rust/src/ui/api/firmware_micropython.rs
 def show_device_menu(
     *,
+    init_submenu: int | None,
     failed_backup: bool,
     paired_devices: Iterable[str],
     connected_idx: int | None,
-    bluetooth: bool | None,
     pin_code: bool | None,
-    auto_lock_delay: str | None,
+    auto_lock_delay: tuple[str, str] | None,
     wipe_code: bool | None,
     check_backup: bool,
     device_name: str | None,
@@ -642,6 +645,7 @@ def show_device_menu(
 # rust/src/ui/api/firmware_micropython.rs
 def show_pairing_device_name(
     *,
+    description: str,
     device_name: str,
 ) -> LayoutObj[UiResult]:
     """Pairing device: first screen (device name).
@@ -657,6 +661,16 @@ def show_ble_pairing_code(
 ) -> LayoutObj[UiResult]:
     """BLE pairing: second screen (pairing code).
     Returns on BLEEvent::{PairingCanceled, Disconnected}."""
+
+
+# rust/src/ui/api/firmware_micropython.rs
+def confirm_thp_pairing(
+    *,
+    title: str,
+    description: str,
+    args: Iterable[str],
+) -> LayoutObj[UiResult]:
+    """THP pairing: first screen (host and app names)."""
 
 
 # rust/src/ui/api/firmware_micropython.rs
@@ -851,15 +865,14 @@ class LayoutState:
 class DeviceMenuResult:
     """Result of a device menu operation."""
     BackupFailed: ClassVar[DeviceMenuResult]
-    DeviceConnect: ClassVar[DeviceMenuResult]
     DeviceDisconnect: ClassVar[DeviceMenuResult]
     DevicePair: ClassVar[DeviceMenuResult]
     DeviceUnpair: ClassVar[DeviceMenuResult]
     DeviceUnpairAll: ClassVar[DeviceMenuResult]
-    Bluetooth: ClassVar[DeviceMenuResult]
     PinCode: ClassVar[DeviceMenuResult]
     PinRemove: ClassVar[DeviceMenuResult]
-    AutoLockDelay: ClassVar[DeviceMenuResult]
+    AutoLockBattery: ClassVar[DeviceMenuResult]
+    AutoLockUSB: ClassVar[DeviceMenuResult]
     WipeCode: ClassVar[DeviceMenuResult]
     WipeRemove: ClassVar[DeviceMenuResult]
     CheckBackup: ClassVar[DeviceMenuResult]
@@ -868,3 +881,7 @@ class DeviceMenuResult:
     HapticFeedback: ClassVar[DeviceMenuResult]
     LedEnabled: ClassVar[DeviceMenuResult]
     WipeDevice: ClassVar[DeviceMenuResult]
+    Reboot: ClassVar[DeviceMenuResult]
+    RebootToBootloader: ClassVar[DeviceMenuResult]
+    TurnOff: ClassVar[DeviceMenuResult]
+    MenuRefresh: ClassVar[DeviceMenuResult]

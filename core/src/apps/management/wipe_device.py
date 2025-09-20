@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from trezor import utils
 from trezor.wire.context import get_context, try_get_ctx_ids
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ async def wipe_device(msg: WipeDevice) -> NoReturn:
     from trezor.pin import render_empty_loader
     from trezor.ui.layouts import confirm_action
 
-    from apps.base import reload_settings_from_storage
+    from apps.common.lock_manager import reload_settings_from_storage
 
     await confirm_action(
         "confirm_wipe",
@@ -58,5 +59,12 @@ async def wipe_device(msg: WipeDevice) -> NoReturn:
 
     # reload settings
     reload_settings_from_storage()
+
+    if utils.USE_BLE:
+        from trezorble import erase_bonds
+
+        # raise an exception if bonds erasing fails
+        erase_bonds()
+
     if __debug__:
         log.debug(__name__, "Device wipe - finished")

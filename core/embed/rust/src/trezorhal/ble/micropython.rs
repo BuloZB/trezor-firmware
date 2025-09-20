@@ -23,11 +23,34 @@ extern "C" fn py_erase_bonds() -> Obj {
     unsafe { util::try_or_raise(block) }
 }
 
-extern "C" fn py_unpair() -> Obj {
+extern "C" fn py_unpair(obj: Obj) -> Obj {
+    // Accepts: None OR a 6-byte MAC address (bytes-like)
+    let addr_bytes_opt = if obj == Obj::const_none() {
+        None
+    } else {
+        let bytes: [u8; 6] = unwrap!(util::iter_into_array(obj));
+        Some(bytes)
+    };
+
     let block = || {
-        unpair()?;
+        if let Some(bytes) = addr_bytes_opt {
+            // Scan bonds, unpair on match, and stop.
+            get_bonds(|bonds| -> Result<(), Error> {
+                for b in bonds {
+                    if b.addr == bytes {
+                        return unpair(Some(b));
+                    }
+                }
+                Err(Error::ValueError(c"Address not found among bonds"))
+            })?;
+        } else {
+            // Unpair current connection
+            unpair(None)?;
+        }
+
         Ok(Obj::const_none())
     };
+
     unsafe { util::try_or_raise(block) }
 }
 
@@ -117,6 +140,10 @@ extern "C" fn py_is_pairing_requested() -> Obj {
     is_pairing_requested().into()
 }
 
+extern "C" fn py_is_started() -> Obj {
+    is_started().into()
+}
+
 extern "C" fn py_connection_flags() -> Obj {
     let block = || {
         let mut result = List::with_capacity(4)?;
@@ -142,8 +169,37 @@ extern "C" fn py_connection_flags() -> Obj {
     unsafe { util::try_or_raise(block) }
 }
 
+// Return addr_bytes if connected, otherwise None.
+// addr_bytes: bytes of length 6
+extern "C" fn py_connected_addr() -> Obj {
+    let block = || {
+        if !is_connected() {
+            return Ok(Obj::const_none());
+        }
+        let a = connected_addr();
+        Obj::try_from(&a.addr[..])
+    };
+
+    unsafe { util::try_or_raise(block) }
+}
+
+// Returns a list of addr_bytes, representing the current bonds.
+// addr_bytes: bytes of length 6
+extern "C" fn py_get_bonds() -> Obj {
+    let block = || {
+        get_bonds(|bonds| {
+            let mut result = List::with_capacity(bonds.len())?;
+            for bond in bonds {
+                result.append(Obj::try_from(&bond.addr[..])?)?;
+            }
+            Ok(result.leak().into())
+        })
+    };
+    unsafe { util::try_or_raise(block) }
+}
+
 extern "C" fn py_iface_num(_self: Obj) -> Obj {
-    Obj::small_int(8) // FIXME SYSHANDLE_BLE_IFACE_0
+    Obj::small_int(unwrap!(ffi::syshandle_t_SYSHANDLE_BLE_IFACE_0.try_into()))
 }
 
 extern "C" fn py_iface_write(_self: Obj, msg: Obj) -> Obj {
@@ -183,7 +239,7 @@ extern "C" fn py_iface_read(n_args: usize, args: *const Obj) -> Obj {
 }
 
 static BLE_INTERFACE_TYPE: Type = obj_type! {
-    name: Qstr::MP_QSTR_BleInterface,
+    name: Qstr::MP_QSTR_BLEIF,
     locals: &obj_dict!(obj_map! {
         Qstr::MP_QSTR_iface_num => obj_fn_1!(py_iface_num).as_obj(),
         Qstr::MP_QSTR_write => obj_fn_2!(py_iface_write).as_obj(),
@@ -200,7 +256,7 @@ static BLE_INTERFACE_OBJ: SimpleTypeObj = SimpleTypeObj::new(&BLE_INTERFACE_TYPE
 pub static mp_module_trezorble: Module = obj_module! {
     Qstr::MP_QSTR___name__ => Qstr::MP_QSTR_trezorble.to_obj(),
 
-    /// class BleInterface:
+    /// class BLEIF:
     ///     """
     ///     BLE interface wrapper.
     ///     """
@@ -228,7 +284,7 @@ pub static mp_module_trezorble: Module = obj_module! {
     ///
     /// mock:global
     ///
-    /// interface: BleInterface
+    /// interface: BLEIF
     /// """BLE interface instance."""
     Qstr::MP_QSTR_interface => BLE_INTERFACE_OBJ.as_obj(),
 
@@ -241,12 +297,12 @@ pub static mp_module_trezorble: Module = obj_module! {
     ///     """
     Qstr::MP_QSTR_erase_bonds => obj_fn_0!(py_erase_bonds).as_obj(),
 
-    /// def unpair():
+    /// def unpair(addr: bytes | None):
     ///     """
-    ///     Erases bond for current connection, if any.
+    ///     Erases the bond for the given address or for current connection if addr is None.
     ///     Raises exception if BLE driver reports an error.
     ///     """
-    Qstr::MP_QSTR_unpair => obj_fn_0!(py_unpair).as_obj(),
+    Qstr::MP_QSTR_unpair => obj_fn_1!(py_unpair).as_obj(),
 
     /// def start_comm():
     ///     """
@@ -311,11 +367,31 @@ pub static mp_module_trezorble: Module = obj_module! {
     ///     """
     Qstr::MP_QSTR_is_pairing_requested => obj_fn_0!(py_is_pairing_requested).as_obj(),
 
+    /// def is_started() -> bool:
+    ///     """
+    ///     True if BLE subsystem is started.
+    ///     """
+    Qstr::MP_QSTR_is_started => obj_fn_0!(py_is_started).as_obj(),
+
     /// def connection_flags() -> list[str]:
     ///     """
     ///     Returns current connection state as a list of string flags.
     ///     """
     Qstr::MP_QSTR_connection_flags => obj_fn_0!(py_connection_flags).as_obj(),
+
+    /// def get_bonds() -> list[bytes]:
+    ///     """
+    ///     Returns a list of addr_bytes, representing the current bonds.
+    ///     addr_bytes: bytes of length 6
+    ///     """
+    Qstr::MP_QSTR_get_bonds => obj_fn_0!(py_get_bonds).as_obj(),
+
+    /// def connected_addr() -> bytes | None:
+    ///     """
+    ///     If connected, returns addr_bytes, otherwise None.
+    ///     addr_bytes: bytes of length 6
+    ///     """
+    Qstr::MP_QSTR_connected_addr => obj_fn_0!(py_connected_addr).as_obj(),
 
     /// def allow_pairing(code: int):
     ///     """

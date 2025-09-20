@@ -17,8 +17,8 @@ use super::firmware::{
     AllowedTextContent, ConfirmHomescreen, ConfirmHomescreenMsg, DeviceMenuMsg, DeviceMenuScreen,
     Homescreen, HomescreenMsg, MnemonicInput, MnemonicKeyboard, MnemonicKeyboardMsg, PinKeyboard,
     PinKeyboardMsg, ProgressScreen, SelectWordCountMsg, SelectWordCountScreen, SelectWordMsg,
-    SelectWordScreen, SetBrightnessScreen, TextScreen, TextScreenMsg, ValueInput, ValueInputScreen,
-    ValueInputScreenMsg,
+    SelectWordScreen, SetBrightnessScreen, StringKeyboard, StringKeyboardMsg, TextScreen,
+    TextScreenMsg, ValueInput, ValueInputScreen, ValueInputScreenMsg,
 };
 
 impl ComponentMsgObj for PinKeyboard<'_> {
@@ -26,6 +26,15 @@ impl ComponentMsgObj for PinKeyboard<'_> {
         match msg {
             PinKeyboardMsg::Confirmed => self.pin().try_into(),
             PinKeyboardMsg::Cancelled => Ok(CANCELLED.as_obj()),
+        }
+    }
+}
+
+impl ComponentMsgObj for StringKeyboard {
+    fn msg_try_into_obj(&self, msg: Self::Msg) -> Result<Obj, Error> {
+        match msg {
+            StringKeyboardMsg::Confirmed => self.string().try_into(),
+            StringKeyboardMsg::Cancelled => Ok(CANCELLED.as_obj()),
         }
     }
 }
@@ -150,22 +159,18 @@ impl ComponentMsgObj for DeviceMenuScreen {
         match msg {
             // Root menu
             DeviceMenuMsg::BackupFailed => Ok(BACKUP_FAILED.as_obj()),
-            // Bluetooth
-            DeviceMenuMsg::Bluetooth => Ok(BLUETOOTH.as_obj()),
             // "Pair & Connect"
             DeviceMenuMsg::DevicePair => Ok(DEVICE_PAIR.as_obj()),
             DeviceMenuMsg::DeviceDisconnect => Ok(DEVICE_DISCONNECT.as_obj()),
-            DeviceMenuMsg::DeviceConnect(index) => {
-                Ok(new_tuple(&[DEVICE_CONNECT.as_obj(), index.try_into()?])?)
-            }
             DeviceMenuMsg::DeviceUnpair(index) => {
-                Ok(new_tuple(&[DEVICE_UNPAIR.as_obj(), index.try_into()?])?)
+                Ok(new_tuple(&[DEVICE_UNPAIR.as_obj(), index.into()])?)
             }
             DeviceMenuMsg::DeviceUnpairAll => Ok(DEVICE_UNPAIR_ALL.as_obj()),
             // Security menu
             DeviceMenuMsg::PinCode => Ok(PIN_CODE.as_obj()),
             DeviceMenuMsg::PinRemove => Ok(PIN_REMOVE.as_obj()),
-            DeviceMenuMsg::AutoLockDelay => Ok(AUTO_LOCK_DELAY.as_obj()),
+            DeviceMenuMsg::AutoLockBattery => Ok(AUTO_LOCK_BATTERY.as_obj()),
+            DeviceMenuMsg::AutoLockUSB => Ok(AUTO_LOCK_USB.as_obj()),
             DeviceMenuMsg::WipeCode => Ok(WIPE_CODE.as_obj()),
             DeviceMenuMsg::WipeRemove => Ok(WIPE_REMOVE.as_obj()),
             DeviceMenuMsg::CheckBackup => Ok(CHECK_BACKUP.as_obj()),
@@ -175,7 +180,15 @@ impl ComponentMsgObj for DeviceMenuScreen {
             DeviceMenuMsg::HapticFeedback => Ok(HAPTIC_FEEDBACK.as_obj()),
             DeviceMenuMsg::LedEnabled => Ok(LED_ENABLED.as_obj()),
             DeviceMenuMsg::WipeDevice => Ok(WIPE_DEVICE.as_obj()),
-            // nothing selected
+            // Power settings
+            DeviceMenuMsg::TurnOff => Ok(TURN_OFF.as_obj()),
+            DeviceMenuMsg::Reboot => Ok(REBOOT.as_obj()),
+            DeviceMenuMsg::RebootToBootloader => Ok(REBOOT_TO_BOOTLOADER.as_obj()),
+            // Misc
+            DeviceMenuMsg::MenuRefresh(submenu_id) => {
+                let submenu_idx: u8 = submenu_id.into();
+                Ok(new_tuple(&[MENU_REFRESH.as_obj(), submenu_idx.into()])?)
+            }
             DeviceMenuMsg::Close => Ok(CANCELLED.as_obj()),
         }
     }

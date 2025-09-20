@@ -30,6 +30,10 @@
 #include <sys/backup_ram.h>
 #endif
 
+#ifdef USE_RGB_LED
+#include <io/rgb_led.h>
+#endif
+
 #include <sys/systick.h>
 
 #include "bootui.h"
@@ -63,7 +67,7 @@ static bool wipe_bonds(protob_io_t* iface) {
     return false;
   }
 
-  uint32_t deadline = ticks_timeout(100);
+  uint32_t deadline = ticks_timeout(300);
 
   while (true) {
     ble_get_state(&state);
@@ -87,7 +91,16 @@ workflow_result_t workflow_wipe_device(protob_io_t* iface) {
     recv_msg_wipe_device(iface, &msg_recv);
   }
 
+#ifdef USE_RGB_LED
+  rgb_led_set_color(RGBLED_RED);
+#endif
+
   confirm_result_t response = ui_screen_wipe_confirm();
+
+#ifdef USE_RGB_LED
+  rgb_led_set_color(RGBLED_OFF);
+#endif
+
   if (CONFIRM != response) {
     if (iface != NULL) {
       send_user_abort(iface, "Wipe cancelled");
@@ -97,11 +110,22 @@ workflow_result_t workflow_wipe_device(protob_io_t* iface) {
   ui_screen_wipe();
   secbool wipe_result = erase_device(ui_screen_wipe_progress);
 
+  if (sectrue != wipe_result) {
+    send_error_conditionally(iface, "Could not erase flash");
+  }
+
 #ifdef USE_BACKUP_RAM
   if (!backup_ram_erase_protected()) {
     return WF_ERROR;
   }
 #endif
+
+  // sending success earlier to notify host before bonds deletion causes
+  // disconnect
+  if (iface != NULL) {
+    send_msg_success(iface, NULL);
+    systick_delay_ms(100);
+  }
 
 #ifdef USE_BLE
   if (!wipe_bonds(iface)) {
@@ -110,14 +134,10 @@ workflow_result_t workflow_wipe_device(protob_io_t* iface) {
 #endif
 
   if (sectrue != wipe_result) {
-    send_error_conditionally(iface, "Could not erase flash");
     screen_wipe_fail();
     return WF_ERROR;
   }
 
-  if (iface != NULL) {
-    send_msg_success(iface, NULL);
-  }
   screen_wipe_success();
   return WF_OK_DEVICE_WIPED;
 }

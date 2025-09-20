@@ -179,6 +179,20 @@ def bootloader_locked() -> bool | None:
     Returns True/False if the the bootloader is locked/unlocked and None if
     the feature is not supported.
     """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
+def notify_send(event: int) -> None:
+    """
+    Sends a notification to host
+    """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
+def nrf_get_version() -> VersionTuple:
+    """
+    Reads version of nRF firmware
+    """
 SCM_REVISION: bytes
 """Git commit hash of the firmware."""
 VERSION: VersionTuple
@@ -203,6 +217,8 @@ USE_BUTTON: bool
 """Whether the hardware supports two-button input."""
 USE_POWER_MANAGER: bool
 """Whether the hardware has a battery."""
+USE_NRF: bool
+"""Whether the hardware has a nRF chip."""
 MODEL: str
 """Model name."""
 MODEL_FULL_NAME: str
@@ -223,6 +239,12 @@ UI_LAYOUT: str
 """UI layout identifier ("BOLT"-T, "CAESAR"-TS3, "DELIZIA"-TS5)."""
 USE_THP: bool
 """Whether the firmware supports Trezor-Host Protocol (version 2)."""
+NOTIFY_BOOT: int
+"""Notification event: boot completed."""
+NOTIFY_UNLOCK: int
+"""Notification event: device unlocked from hardlock"""
+NOTIFY_LOCK: int
+"""Notification event: device locked to hardlock"""
 if __debug__:
     DISABLE_ANIMATION: bool
     """Whether the firmware should disable animations."""
