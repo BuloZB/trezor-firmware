@@ -8,6 +8,7 @@ from trezor.wire import ActionCancelled
 from ..common import draw_simple, interact, raise_if_cancelled, with_info
 
 if TYPE_CHECKING:
+    from buffer_types import AnyBytes, StrOrBytes
     from typing import (
         Any,
         Awaitable,
@@ -217,7 +218,7 @@ def lock_time_disabled_warning() -> Awaitable[None]:
 
 
 def confirm_homescreen(
-    image: bytes,
+    image: AnyBytes,
 ) -> Awaitable[None]:
 
     from trezor import workflow
@@ -666,7 +667,7 @@ async def should_show_more(
 def confirm_blob(
     br_name: str,
     title: str,
-    data: bytes | str,
+    data: StrOrBytes,
     description: str | None = None,
     subtitle: str | None = None,
     verb: str | None = None,
@@ -1647,7 +1648,7 @@ def request_passphrase_on_device(max_len: int) -> Awaitable[str]:
         ButtonRequestType.PassphraseEntry,
         raise_on_cancel=ActionCancelled("Passphrase entry cancelled"),
     )
-    return result  # type: ignore ["UiResult" is incompatible with "str"]
+    return result  # type: ignore ["UiResult" is not assignable to "str"]
 
 
 def request_pin_on_device(
@@ -1676,7 +1677,7 @@ def request_pin_on_device(
         ButtonRequestType.PinEntry,
         raise_on_cancel=PinCancelled,
     )
-    return result  # type: ignore ["UiResult" is incompatible with "str"]
+    return result  # type: ignore ["UiResult" is not assignable to "str"]
 
 
 async def confirm_reenter_pin(is_wipe_code: bool = False) -> None:
@@ -1735,19 +1736,12 @@ async def pin_wipe_code_exists_popup(
 
 
 def confirm_set_new_code(
-    br_name: str,
-    title: str,
-    description: str,
-    information: str,
     is_wipe_code: bool,
-    br_code: ButtonRequestType = BR_CODE_OTHER,
 ) -> Awaitable[None]:
     return raise_if_cancelled(
-        trezorui_api.flow_confirm_set_new_code(
-            title=title, description=description, is_wipe_code=is_wipe_code
-        ),
-        br_name,
-        br_code,
+        trezorui_api.flow_confirm_set_new_code(is_wipe_code=is_wipe_code),
+        "set_wipe_code" if is_wipe_code else "set_pin",
+        BR_CODE_OTHER,
     )
 
 

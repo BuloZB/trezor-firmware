@@ -15,7 +15,6 @@ from . import (
     CODEC_V1,
     PING,
     PacketHeader,
-    ThpError,
     ThpErrorType,
     channel_manager,
     checksum,
@@ -28,7 +27,13 @@ from .checksum import CHECKSUM_LENGTH
 if __debug__:
     from trezor import log
 
+
+if utils.USE_BLE:
+    import trezorble as ble
+    from trezor.workflow import idle_timer
+
 if TYPE_CHECKING:
+    from buffer_types import AnyBuffer, AnyBytes
     from trezorio import WireInterface
     from typing import Awaitable, Generator, Iterable, NoReturn
 
@@ -94,9 +99,12 @@ class InterfaceContext:
         """
         # Uses `yield` instead of `await` to avoid allocations.
         packet_len = yield self._read
+        if utils.USE_BLE and self._iface is ble.interface:
+            # prevent auto-lock while handling longer workflows on Bluetooth
+            idle_timer.touch()
         return self, packet_len
 
-    async def handle_packet(self, packet: memoryview) -> Channel | None:
+    async def handle_packet(self, packet: AnyBuffer) -> Channel | None:
         """
         Reassemble a valid THP payload and return its channel, if reassembly succeeds.
         Otherwise, returns `None` and should be called again (with the next packet).
@@ -130,19 +138,19 @@ class InterfaceContext:
             update_channel_last_used(channel.channel_id)
             return channel
 
-    def write_payload(self, header: PacketHeader, payload: bytes) -> Awaitable[None]:
+    def write_payload(self, header: PacketHeader, payload: AnyBytes) -> Awaitable[None]:
         checksum_bytes = checksum.compute(
             payload, checksum.compute_int(header.to_bytes())
         )
         return self._write_payload_chunks(header, payload, checksum_bytes)
 
     def _write_payload_chunks(
-        self, header: PacketHeader, *chunks: bytes
+        self, header: PacketHeader, *chunks: AnyBytes
     ) -> Awaitable[None]:
         fragments = header.fragment_payload(self._iface.TX_PACKET_LEN, *chunks)
         return self._write_packets(fragments)
 
-    async def _write_packets(self, fragments: Iterable[bytes]) -> None:
+    async def _write_packets(self, fragments: Iterable[AnyBytes]) -> None:
         packet_len = self._iface.TX_PACKET_LEN
         for packet in fragments:
             assert len(packet) == packet_len
@@ -154,7 +162,7 @@ class InterfaceContext:
 
             assert n_written == packet_len
 
-    async def _handle_codec_v1(self, packet: bytes) -> None:
+    async def _handle_codec_v1(self, packet: AnyBytes) -> None:
         # If the received packet is not an initial codec_v1 packet, do not send error message
         if packet[1:3] == b"##":
             response = bytearray(self._iface.TX_PACKET_LEN)
@@ -163,15 +171,25 @@ class InterfaceContext:
             utils.memcpy(response, 0, b"?##\x00\x03\x00\x00\x00\x14\x08\x11", 0)
             await self._write_packets([response])
 
-    async def _handle_broadcast(self, packet: bytes) -> None:
+    async def _handle_broadcast(self, packet: AnyBytes) -> None:
         ctrl_byte, _, payload_length = ustruct.unpack(">BHH", packet)
 
         packet = packet[: PacketHeader.INIT_LENGTH + payload_length]
         if not checksum.is_valid(packet[-CHECKSUM_LENGTH:], packet[:-CHECKSUM_LENGTH]):
-            raise ThpError("Invalid checksum")
+            if __debug__:
+                log.debug(
+                    __name__, "Invalid checksum: %s", utils.hexlify_if_bytes(packet)
+                )
+            return
 
         if payload_length != _BROADCAST_PAYLOAD_LENGTH:
-            raise ThpError("Invalid length in broadcast channel packet")
+            if __debug__:
+                log.debug(
+                    __name__,
+                    "Invalid length in broadcast channel packet: %d",
+                    payload_length,
+                )
+            return
 
         nonce = packet[PacketHeader.INIT_LENGTH : -CHECKSUM_LENGTH]
 
@@ -180,7 +198,13 @@ class InterfaceContext:
             return await self.write_payload(response_header, nonce)
 
         if ctrl_byte != CHANNEL_ALLOCATION_REQ:
-            raise ThpError("Unexpected ctrl_byte in a broadcast channel packet")
+            if __debug__:
+                log.debug(
+                    __name__,
+                    "Unexpected ctrl_byte in a broadcast channel packet: %d",
+                    ctrl_byte,
+                )
+            return
 
         channel_cache = channel_manager.create_new_channel(self._iface)
         response_data = get_channel_allocation_response(
@@ -211,13 +235,11 @@ class InterfaceContext:
         Currently supported by BLE (used for caching THP host names).
         """
         if utils.USE_BLE:
-            import trezorble as ble
-
             if self._iface is ble.interface:
                 return ble.connected_addr()
 
         return None
 
 
-def _get_ctrl_byte(packet: bytes) -> int:
+def _get_ctrl_byte(packet: AnyBytes) -> int:
     return packet[0]

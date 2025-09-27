@@ -385,6 +385,7 @@ class LayoutContent(UnstructuredJSONReader):
         assert (
             "PinKeyboard" in self.all_components()
             or "PassphraseKeyboard" in self.all_components()
+            or "StringKeyboard" in self.all_components()
         )
         style_str = self.find_unique_value_by_key(
             "display_style", default="", only_type=str
@@ -396,8 +397,14 @@ class LayoutContent(UnstructuredJSONReader):
 
     def passphrase(self) -> str:
         """Get passphrase from the layout."""
-        assert "PassphraseKeyboard" in self.all_components()
-        return self.find_unique_value_by_key("passphrase", default="", only_type=str)
+        if "StringKeyboard" in self.all_components():
+            return self.find_unique_value_by_key("content", default="", only_type=str)
+        elif "PassphraseKeyboard" in self.all_components():
+            return self.find_unique_value_by_key(
+                "passphrase", default="", only_type=str
+            )
+        else:
+            raise ValueError("No passphrase component in layout")
 
     def page_count(self) -> int:
         """Get number of pages for the layout."""
@@ -913,7 +920,7 @@ class DebugLink:
         im.save(img_location)
         self.t1_screenshot_counter += 1
 
-    def check_gc_info(self, fail_on_gc_leak: bool = True):
+    def check_gc_info(self, fail_on_gc_leak: bool = True) -> None:
         """Fetch GC heap information and check for leaks."""
         if not self.has_gc_info:
             return
@@ -982,7 +989,7 @@ class DebugUI:
         self.passphrase = None
         self.reset_input_flow()
 
-    def reset_input_flow(self):
+    def reset_input_flow(self) -> None:
         self.input_flow: InputFlowType | object = self.default_input_flow()
         next(self.input_flow)  # start default input flow generator
 
@@ -1434,7 +1441,7 @@ class TrezorClientDebugLink(TrezorClient):
             assert isinstance(self.protocol, ProtocolV2Channel)
             self.protocol.sync_responses()
 
-    def mnemonic_callback(self, _) -> str:
+    def mnemonic_callback(self, _: t.Any) -> str:
         word, pos = self.debug.read_recovery_word()
         if word:
             return word
@@ -1771,7 +1778,7 @@ class DisplayStyle(Enum):
 
 
 class ScreenButtons:
-    def __init__(self, layout_type: LayoutType):
+    def __init__(self, layout_type: LayoutType) -> None:
         assert layout_type in (LayoutType.Bolt, LayoutType.Delizia, LayoutType.Eckhart)
         self.layout_type = layout_type
 
@@ -2087,7 +2094,7 @@ PASSPHRASE_SPECIAL = ("_<>", ".:@", "/|\\", "!()", "+%&", "-[]", "?{}", ",'`", "
 
 
 class ButtonActions:
-    def __init__(self, debuglink: DebugLink):
+    def __init__(self, debuglink: DebugLink) -> None:
         self.debuglink = debuglink
 
     def _passphrase_choices(self, char: str) -> "tuple[str, ...]":

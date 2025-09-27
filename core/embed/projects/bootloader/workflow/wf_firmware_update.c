@@ -43,6 +43,8 @@
 #include "emulator.h"
 #endif
 
+#define MESSAGE_RX_TIMEOUT 10000
+
 typedef enum {
   UPLOAD_OK = 0,
   UPLOAD_IN_PROGRESS = 1,
@@ -84,9 +86,10 @@ typedef struct {
   uint32_t erase_offset;                // offset of flash memory to erase
   int32_t firmware_upload_chunk_retry;  // retry counter
   size_t headers_offset;                // offset of headers in the first block
-  size_t read_offset;   // offset of the next read data in the chunk buffer
-  uint32_t chunk_size;  // size of already received chunk data
-  bool confirmed;       // true if the firmware is confirmed by the user
+  size_t read_offset;       // offset of the next read data in the chunk buffer
+  uint32_t chunk_size;      // size of already received chunk data
+  bool confirmed;           // true if the firmware is confirmed by the user
+  bool wireless_transport;  // whether the transport is over BLE
 #ifdef USE_SECMON_VERIFICATION
   size_t secmon_code_offset;     // offset of the secmon code in the first block
   size_t secmon_code_size;       // size of the secmon code
@@ -176,9 +179,10 @@ static void fw_data_received(size_t len, void *ctx) {
   if (context->confirmed) {
     ui_screen_install_progress_upload(
         1000 *
-        (context->firmware_block * IMAGE_CHUNK_SIZE + context->chunk_size) /
-        (context->firmware_block * IMAGE_CHUNK_SIZE +
-         context->firmware_remaining));
+            (context->firmware_block * IMAGE_CHUNK_SIZE + context->chunk_size) /
+            (context->firmware_block * IMAGE_CHUNK_SIZE +
+             context->firmware_remaining),
+        context->wireless_transport);
   }
 }
 
@@ -402,7 +406,7 @@ static upload_status_t process_msg_FirmwareUpload(protob_io_t *iface,
         return UPLOAD_ERR_USER_ABORT;
       }
 
-      ui_screen_install_start();
+      ui_screen_install_start(ctx->wireless_transport);
       ctx->confirmed = true;
 
       // if firmware is not upgrade, erase storage
@@ -606,6 +610,8 @@ workflow_result_t workflow_firmware_update(protob_io_t *iface) {
     return WF_ERROR;
   }
 
+  ctx.wireless_transport = iface->wire->wireless;
+
   ctx.firmware_remaining = msg.has_length ? msg.length : 0;
   if ((ctx.firmware_remaining > 0) &&
       ((ctx.firmware_remaining % sizeof(uint32_t)) == 0) &&
@@ -631,6 +637,8 @@ workflow_result_t workflow_firmware_update(protob_io_t *iface) {
 
   upload_status_t s = UPLOAD_IN_PROGRESS;
 
+  uint32_t msg_deadline = ticks_timeout(MESSAGE_RX_TIMEOUT);
+
   while (true) {
     sysevents_t awaited = {0};
     sysevents_t signalled = {0};
@@ -640,6 +648,11 @@ workflow_result_t workflow_firmware_update(protob_io_t *iface) {
     sysevents_poll(&awaited, &signalled, ticks_timeout(100));
 
     if (awaited.read_ready != signalled.read_ready) {
+      if (ticks_expired(msg_deadline)) {
+        // timeout
+        ui_screen_fail();
+        return WF_ERROR;
+      }
       continue;
     }
 
@@ -650,6 +663,8 @@ workflow_result_t workflow_firmware_update(protob_io_t *iface) {
       return WF_ERROR;
     }
     s = process_msg_FirmwareUpload(iface, &ctx);
+
+    msg_deadline = ticks_timeout(MESSAGE_RX_TIMEOUT);
 
     if (s < 0 && s != UPLOAD_ERR_USER_ABORT) {  // error, but not user abort
       if (s == UPLOAD_ERR_BOOTLOADER_LOCKED) {
@@ -663,7 +678,7 @@ workflow_result_t workflow_firmware_update(protob_io_t *iface) {
       systick_delay_ms(100);
       return WF_CANCELLED;
     } else if (s == UPLOAD_OK) {  // last chunk received
-      ui_screen_install_progress_upload(1000);
+      ui_screen_install_progress_upload(1000, ctx.wireless_transport);
       ui_screen_done(4, sectrue);
       ui_screen_done(3, secfalse);
       systick_delay_ms(1000);

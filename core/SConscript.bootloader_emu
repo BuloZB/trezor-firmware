@@ -68,6 +68,7 @@ SOURCE_MOD_CRYPTO += [
     'vendor/trezor-crypto/ed25519-donna/modm-donna-32bit.c',
     'vendor/trezor-crypto/memzero.c',
     'vendor/trezor-crypto/rand.c',
+    'vendor/trezor-crypto/rand_insecure.c',
     'vendor/trezor-crypto/sha2.c',
 ]
 
@@ -77,7 +78,6 @@ CPPPATH_MOD += [
 ]
 
 SOURCE_MOD += [
-    'embed/upymod/modtrezorcrypto/rand.c',
     'embed/gfx/bitblt/gfx_bitblt.c',
     'embed/gfx/bitblt/gfx_bitblt_mono8.c',
     'embed/gfx/bitblt/gfx_bitblt_rgb565.c',

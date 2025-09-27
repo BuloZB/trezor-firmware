@@ -32,9 +32,11 @@
 #define LOG_MODULE_NAME ble_connection
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
-#define PPCP_SUSPEND BT_LE_CONN_PARAM(200, 400, 1, 600)
+#define PPCP_SUSPEND BT_LE_CONN_PARAM(50, 100, 0, 600)
 #define PPCP_HIGH_SPEED BT_LE_CONN_PARAM(12, 12, 0, 400)
-#define PPCP_LOW_SPEED BT_LE_CONN_PARAM(24, 100, 0, 400)
+#define PPCP_LOW_SPEED BT_LE_CONN_PARAM(24, 36, 0, 400)
+
+static K_MUTEX_DEFINE(conn_mutex);
 
 static struct bt_conn *current_conn = NULL;
 static struct bt_conn *next_conn = NULL;
@@ -62,6 +64,15 @@ static void le_param_updated(struct bt_conn *conn, uint16_t interval,
           interval_ms, (interval * 125) % 100, latency, timeout_ms);
 }
 
+static void connection_update_params(void) {
+  struct bt_conn *conn = connection_get_current();
+  if (conn != NULL) {
+    const struct bt_le_conn_param *param =
+        high_speed_requested ? PPCP_HIGH_SPEED : PPCP_LOW_SPEED;
+    bt_conn_le_param_update(conn, param);
+  }
+}
+
 void connected(struct bt_conn *conn, uint8_t err) {
   char addr[BT_ADDR_LE_STR_LEN];
 
@@ -71,10 +82,6 @@ void connected(struct bt_conn *conn, uint8_t err) {
   }
 
   show_params(conn);
-
-  const struct bt_le_conn_param *param =
-      high_speed_requested ? PPCP_HIGH_SPEED : PPCP_LOW_SPEED;
-  bt_conn_le_param_update(conn, param);
 
   // Prefer 2M both directions; 0 options = no specific constraints
   // const struct bt_conn_le_phy_param phy_2m = {
@@ -101,6 +108,14 @@ void connected(struct bt_conn *conn, uint8_t err) {
   } else {
     current_conn = bt_conn_ref(conn);
   }
+  k_mutex_lock(&conn_mutex, K_FOREVER);
+
+  connection_update_params();
+
+  k_mutex_unlock(&conn_mutex);
+
+  ble_reconfigure_tx_power();
+
   advertising_stop();
 
   ble_management_send_status_event();
@@ -174,28 +189,42 @@ void connection_disconnect(void) {
 struct bt_conn *connection_get_current(void) { return current_conn; }
 
 void connection_suspend(void) {
+  k_mutex_lock(&conn_mutex, K_FOREVER);
   struct bt_conn *conn = connection_get_current();
 
   if (conn != NULL) {
     const struct bt_le_conn_param *param = PPCP_SUSPEND;
     bt_conn_le_param_update(conn, param);
   }
+
+  k_mutex_unlock(&conn_mutex);
 }
 
 void connection_resume(void) {
-  struct bt_conn *conn = connection_get_current();
-
-  if (conn != NULL) {
-    const struct bt_le_conn_param *param =
-        high_speed_requested ? PPCP_HIGH_SPEED : PPCP_LOW_SPEED;
-    bt_conn_le_param_update(conn, param);
-  }
+  k_mutex_lock(&conn_mutex, K_FOREVER);
+  connection_update_params();
+  k_mutex_unlock(&conn_mutex);
 }
 
 bool connection_is_bonded(void) { return bonded_connection; }
 
 bool connection_is_high_speed(void) { return high_speed_requested; }
 
-void connection_set_high_speed(void) { high_speed_requested = true; }
+void connection_set_high_speed(void) {
+  k_mutex_lock(&conn_mutex, K_FOREVER);
 
-void connection_set_low_speed(void) { high_speed_requested = false; }
+  high_speed_requested = true;
+
+  connection_update_params();
+  k_mutex_unlock(&conn_mutex);
+}
+
+void connection_set_low_speed(void) {
+  k_mutex_lock(&conn_mutex, K_FOREVER);
+
+  high_speed_requested = false;
+
+  connection_update_params();
+
+  k_mutex_unlock(&conn_mutex);
+}

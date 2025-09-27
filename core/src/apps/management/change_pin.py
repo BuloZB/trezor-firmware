@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from trezor import TR, config, wire
+from trezor import TR, config, utils, wire
 
 if TYPE_CHECKING:
     from typing import Awaitable
@@ -56,6 +56,8 @@ async def change_pin(msg: ChangePin) -> Success:
         else:
             await error_pin_invalid()
 
+    utils.notify_send(utils.NOTIFY_PIN_CHANGE)
+
     if newpin:
         if curpin:
             msg_wire = "PIN changed"
@@ -93,10 +95,6 @@ def _require_confirm_change_pin(msg: ChangePin) -> Awaitable[None]:
 
     if not msg.remove and not has_pin:  # setting new pin
         return confirm_set_new_code(
-            "set_pin",
-            TR.pin__title_settings,
-            TR.pin__turn_on,
-            TR.pin__info,
             is_wipe_code=False,
         )
 

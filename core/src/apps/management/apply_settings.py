@@ -8,9 +8,10 @@ from trezor.ui.layouts import confirm_action
 from trezor.wire import DataError
 
 if TYPE_CHECKING:
+    from buffer_types import AnyBytes
+
     from trezor.enums import SafetyCheckLevel
     from trezor.messages import ApplySettings, Success
-
 
 BRT_PROTECT_CALL = ButtonRequestType.ProtectCall  # CACHE
 
@@ -35,7 +36,7 @@ async def _load_homescreen(length: int) -> bytearray:
     return buf
 
 
-def _validate_homescreen(homescreen: bytes) -> None:
+def _validate_homescreen(homescreen: AnyBytes) -> None:
     if homescreen == b"":
         return
 
@@ -91,8 +92,16 @@ async def apply_settings(msg: ApplySettings) -> Success:
     if homescreen_length is not None:
         if homescreen is not None:
             raise ProcessError("Mutually exclusive settings")
+        if utils.USE_BLE:
+            from trezorble import set_high_speed
 
-        homescreen = await _load_homescreen(homescreen_length)
+            set_high_speed(True)
+
+        try:
+            homescreen = await _load_homescreen(homescreen_length)
+        finally:
+            if utils.USE_BLE:
+                set_high_speed(False)
 
     if homescreen is not None:
         _validate_homescreen(homescreen)
@@ -161,10 +170,12 @@ async def apply_settings(msg: ApplySettings) -> Success:
 
     reload_settings_from_storage()
 
+    utils.notify_send(utils.NOTIFY_SETTING_CHANGE)
+
     return Success(message="Settings applied")
 
 
-async def _require_confirm_change_homescreen(homescreen: bytes) -> None:
+async def _require_confirm_change_homescreen(homescreen: AnyBytes) -> None:
     from trezor.ui.layouts import confirm_homescreen
 
     await confirm_homescreen(homescreen)

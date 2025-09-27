@@ -34,11 +34,14 @@ use crate::{
     util::interpolate,
 };
 
+#[cfg(feature = "ble")]
+use crate::ui::component::{BLEHandler, BLEHandlerMode};
+
 use super::{
     component::Button,
     firmware::{
         ActionBar, Bip39Input, ConfirmHomescreen, DeviceMenuScreen, DurationInput, Header,
-        HeaderMsg, Hint, Homescreen, MnemonicKeyboard, PinKeyboard, ProgressScreen,
+        HeaderMsg, Hint, Homescreen, LabelInput, MnemonicKeyboard, PinKeyboard, ProgressScreen,
         SelectWordCountScreen, SelectWordScreen, SetBrightnessScreen, ShortMenuVec, Slip39Input,
         StringKeyboard, TextScreen, TextScreenMsg, ValueInputScreen, VerticalMenu,
         VerticalMenuScreen, VerticalMenuScreenMsg,
@@ -790,12 +793,8 @@ impl FirmwareUI for UIEckhart {
         Ok(flow)
     }
 
-    fn flow_confirm_set_new_code(
-        title: TString<'static>,
-        description: TString<'static>,
-        is_wipe_code: bool,
-    ) -> Result<impl LayoutMaybeTrace, Error> {
-        let flow = flow::confirm_set_new_code::new_set_new_code(title, description, is_wipe_code)?;
+    fn flow_confirm_set_new_code(is_wipe_code: bool) -> Result<impl LayoutMaybeTrace, Error> {
+        let flow = flow::confirm_set_new_code::new_set_new_code(is_wipe_code)?;
         Ok(flow)
     }
 
@@ -982,7 +981,8 @@ impl FirmwareUI for UIEckhart {
         allow_empty: bool,
         prefill: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let layout = RootComponent::new(StringKeyboard::new(prompt, max_len, allow_empty, prefill));
+        let input = LabelInput::new(max_len, prefill, true, allow_empty);
+        let layout = RootComponent::new(StringKeyboard::new(prompt, input));
         Ok(layout)
     }
 
@@ -1201,32 +1201,37 @@ impl FirmwareUI for UIEckhart {
     }
 
     fn show_device_menu(
-        init_submenu: Option<u8>,
-        failed_backup: bool,
-        paired_devices: heapless::Vec<TString<'static>, MAX_PAIRED_DEVICES>,
+        init_submenu_idx: Option<u8>,
+        backup_failed: bool,
+        backup_needed: bool,
+        paired_devices: heapless::Vec<
+            (TString<'static>, Option<[TString<'static>; 2]>),
+            MAX_PAIRED_DEVICES,
+        >,
         connected_idx: Option<u8>,
-        pin_code: Option<bool>,
-        auto_lock_delay: Option<[TString<'static>; 2]>,
-        wipe_code: Option<bool>,
-        check_backup: bool,
+        pin_enabled: Option<bool>,
+        auto_lock: Option<[TString<'static>; 2]>,
+        wipe_code_enabled: Option<bool>,
+        backup_check_allowed: bool,
         device_name: Option<TString<'static>>,
-        screen_brightness: Option<TString<'static>>,
-        haptic_feedback: Option<bool>,
+        brightness: Option<TString<'static>>,
+        haptics_enabled: Option<bool>,
         led_enabled: Option<bool>,
         about_items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let layout = RootComponent::new(DeviceMenuScreen::new(
-            init_submenu,
-            failed_backup,
+            init_submenu_idx,
+            backup_failed,
+            backup_needed,
             paired_devices,
             connected_idx,
-            pin_code,
-            auto_lock_delay,
-            wipe_code,
-            check_backup,
+            pin_enabled,
+            auto_lock,
+            wipe_code_enabled,
+            backup_check_allowed,
             device_name,
-            screen_brightness,
-            haptic_feedback,
+            brightness,
+            haptics_enabled,
             led_enabled,
             about_items,
         )?);
@@ -1257,7 +1262,7 @@ impl FirmwareUI for UIEckhart {
             .with_header(Header::new(TR::thp__pair_new_device.into()).with_close_button())
             .with_action_bar(ActionBar::new_text_only(TR::thp__continue_on_host.into()));
         #[cfg(feature = "ble")]
-        let screen = crate::ui::component::BLEHandler::new(screen, true);
+        let screen = BLEHandler::new(screen, BLEHandlerMode::WaitingForPairingRequest);
         let layout = RootComponent::new(screen);
         Ok(layout)
     }
@@ -1275,11 +1280,26 @@ impl FirmwareUI for UIEckhart {
             .add_newline()
             .add_alignment(Alignment::Center)
             .add_text_with_font(code, fonts::FONT_SATOSHI_EXTRALIGHT_72);
-        let screen = crate::ui::component::BLEHandler::new(
+        let screen = BLEHandler::new(
             TextScreen::new(FormattedText::new(ops))
                 .with_header(Header::new(title))
                 .with_action_bar(ActionBar::new_cancel_confirm()),
-            false,
+            BLEHandlerMode::WaitingForPairingCancel,
+        );
+        let layout = RootComponent::new(screen);
+        Ok(layout)
+    }
+
+    #[cfg(feature = "ble")]
+    fn wait_ble_host_confirmation() -> Result<impl LayoutMaybeTrace, Error> {
+        let screen = BLEHandler::new(
+            TextScreen::new(
+                Paragraph::new(&theme::TEXT_REGULAR, TR::ble__waiting_for_host)
+                    .into_paragraphs()
+                    .with_placement(LinearPlacement::vertical()),
+            )
+            .with_header(Header::new(TR::ble__pairing_title.into()).with_close_button()),
+            BLEHandlerMode::WaitingForPairingCompletion,
         );
         let layout = RootComponent::new(screen);
         Ok(layout)

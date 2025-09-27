@@ -136,9 +136,9 @@ include_icon!(ICON_BATTERY_LOW, "layout_eckhart/res/battery/low.toif");
 include_icon!(ICON_BATTERY_EMPTY, "layout_eckhart/res/battery/empty.toif");
 
 // Border overlay icons for bootloader screens and hold to confirm animation
-include_icon!(ICON_BORDER_BL, "layout_eckhart/res/border/BL_1.toif");
-include_icon!(ICON_BORDER_BR, "layout_eckhart/res/border/BR_1.toif");
-include_icon!(ICON_BORDER_TOP, "layout_eckhart/res/border/TOP_1.toif");
+include_icon!(ICON_BORDER_BL, "layout_eckhart/res/border/BL.toif");
+include_icon!(ICON_BORDER_BR, "layout_eckhart/res/border/BR.toif");
+include_icon!(ICON_BORDER_TOP, "layout_eckhart/res/border/TOP.toif");
 
 // Icons for number input screen
 include_icon!(ICON_PLUS, "layout_eckhart/res/plus.toif");
@@ -164,10 +164,12 @@ include_icon!(ICON_SECURED, "layout_eckhart/res/secured.toif");
 // Regulatory screen icons
 include_icon!(ICON_UKRAINE, "layout_eckhart/res/ukraine.toif");
 include_icon!(ICON_JAPAN, "layout_eckhart/res/japan.toif");
+include_icon!(ICON_JAPAN_2, "layout_eckhart/res/japan_2.toif");
 include_icon!(ICON_KOREA, "layout_eckhart/res/korea_full.toif");
 include_icon!(ICON_EUROPE, "layout_eckhart/res/europe.toif");
 include_icon!(ICON_RCM, "layout_eckhart/res/rcm.toif");
 include_icon!(ICON_FCC, "layout_eckhart/res/fcc.toif");
+include_icon!(ICON_TAIWAN, "layout_eckhart/res/taiwan.toif");
 
 // Square icon for BLE connection items
 include_icon!(ICON_SQUARE, "layout_eckhart/res/square.toif");

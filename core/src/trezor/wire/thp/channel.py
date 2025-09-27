@@ -4,6 +4,7 @@ from micropython import const
 from typing import TYPE_CHECKING
 
 from storage.cache_common import (
+    CHANNEL_ACK_LATENCY_MS,
     CHANNEL_HANDSHAKE_HASH,
     CHANNEL_HOST_STATIC_PUBKEY,
     CHANNEL_IFACE,
@@ -26,14 +27,7 @@ from trezor.loop import Timeout, race, sleep
 from trezor.wire.context import UnexpectedMessageException
 
 from ..protocol_common import Message
-from . import (
-    ACK_MESSAGE,
-    ENCRYPTED,
-    ChannelState,
-    PacketHeader,
-    ThpDecryptionError,
-    ThpError,
-)
+from . import ACK_MESSAGE, ENCRYPTED, ChannelState, PacketHeader, ThpDecryptionError
 from . import alternating_bit_protocol as ABP
 from . import control_byte, crypto, memory_manager
 from .checksum import CHECKSUM_LENGTH, is_valid
@@ -46,6 +40,7 @@ if __debug__:
     from . import state_to_str
 
 if TYPE_CHECKING:
+    from buffer_types import AnyBuffer, AnyBytes
     from typing import Any, Awaitable, Callable
 
     from trezor.messages import ThpPairingCredential
@@ -113,7 +108,15 @@ class Reassembler:
             return False
 
         if self.bytes_read > self.buffer_len:
-            raise ThpError("read more bytes than expected")
+            if __debug__:
+                log.warning(
+                    __name__,
+                    "Reassembled %d bytes, %d expected",
+                    self.bytes_read,
+                    self.buffer_len,
+                )
+            self.reset()
+            return False
 
         if not is_checksum_valid(buffer):
             return False
@@ -263,8 +266,12 @@ class Channel:
 
             if expected_ctrl_byte is None or not expected_ctrl_byte(ctrl_byte):
                 if __debug__:
-                    self._log("Unexpected control byte: ", utils.hexlify_if_bytes(msg))
-                raise ThpError("Unexpected control byte")
+                    self._log(
+                        "Unexpected control byte - ignoring ",
+                        utils.hexlify_if_bytes(msg),
+                        logger=log.warning,
+                    )
+                continue
 
             # 2: Handle message with unexpected sequential bit
             if seq_bit != ABP.get_expected_receive_seq_bit(self.channel_cache):
@@ -273,7 +280,7 @@ class Channel:
                         "Received message with an unexpected sequential bit",
                     )
                 await send_ack(self, ack_bit=seq_bit)
-                raise ThpError("Received message with an unexpected sequential bit")
+                continue
 
             # 3: Send ACK in response
             await send_ack(self, ack_bit=seq_bit)
@@ -321,7 +328,7 @@ class Channel:
         assert msg is not None
         return msg
 
-    def reassemble(self, packet: utils.BufferType) -> bool:
+    def reassemble(self, packet: AnyBuffer) -> bool:
         """
         Process current packet, returning `True` when a valid message is reassembled.
         The parsed message can retrieved via the `message` field (if it's not `None`).
@@ -379,6 +386,8 @@ class Channel:
         msg: protobuf.MessageType,
         session_id: int = 0,
     ) -> None:
+        assert ABP.is_sending_allowed(self.channel_cache)
+
         if __debug__:
             self._log(
                 f"write message: {msg.MESSAGE_NAME}",
@@ -404,14 +413,10 @@ class Channel:
 
         return await self.write_encrypted_payload(ENCRYPTED, buffer[:payload_length])
 
-    def write_handshake_message(
-        self, ctrl_byte: int, payload: bytes
-    ) -> Awaitable[None]:
-        return self.write_encrypted_payload(ctrl_byte, payload)
-
-    async def write_encrypted_payload(self, ctrl_byte: int, payload: bytes) -> None:
+    async def write_encrypted_payload(self, ctrl_byte: int, payload: AnyBytes) -> None:
+        ack_latency_ms = self.channel_cache.get_int(CHANNEL_ACK_LATENCY_MS) or 0
         if __debug__:
-            self._log("write_encrypted_payload_loop")
+            self._log(f"Sending {len(payload)} bytes, latency: {ack_latency_ms} ms")
 
         assert ABP.is_sending_allowed(self.channel_cache)
 
@@ -435,8 +440,8 @@ class Channel:
                     log.error(__name__, "Sending is stuck for %d ms", _WRITE_TIMEOUT_MS)
                 break
 
-            # starting from 200ms till ~3.52s
-            timeout_ms = round(10300 - 1010000 / (100 + i))
+            # Channel's estimated latency + a variable delay (from 200ms till ~3.52s)
+            timeout_ms = ack_latency_ms + round(10300 - 1010000 / (100 + i))
             try:
                 # wait and return after receiving an ACK, or raise in case of an unexpected message.
                 await self.recv_payload(expected_ctrl_byte=None, timeout_ms=timeout_ms)
@@ -444,6 +449,12 @@ class Channel:
                 if __debug__:
                     log.warning(__name__, "Retransmit after %d ms", timeout_ms)
                 continue
+
+            ack_latency_ms = utime.ticks_diff(utime.ticks_ms(), self.last_write_ms)
+            # Limit estimated latency to avoid integer overflows and too long delays
+            ack_latency_ms = max(0, min(800, ack_latency_ms))
+            self.channel_cache.set_int(CHANNEL_ACK_LATENCY_MS, ack_latency_ms)
+
             # `ABP.set_sending_allowed()` will be called after a valid ACK
             if ABP.is_sending_allowed(self.channel_cache):
                 ABP.set_send_seq_bit_to_opposite(self.channel_cache)
@@ -452,7 +463,7 @@ class Channel:
         # restart event loop due to unresponsive channel
         raise Timeout("THP retransmission timeout")
 
-    def _encrypt(self, buffer: utils.BufferType, noise_payload_len: int) -> None:
+    def _encrypt(self, buffer: AnyBuffer, noise_payload_len: int) -> None:
         if __debug__:
             self._log("encrypt")
 

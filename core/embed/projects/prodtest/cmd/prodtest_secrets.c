@@ -22,12 +22,12 @@
 #include <string.h>
 
 #include <rtl/cli.h>
+#include <sec/rng.h>
 #include <sec/secret.h>
 #include <sec/secret_keys.h>
 
 #include "common.h"
 #include "memzero.h"
-#include "rand.h"
 #include "secbool.h"
 #include "secure_channel.h"
 
@@ -48,32 +48,6 @@
 
 #include <../vendor/mldsa-native/mldsa/sign.h>
 
-secbool generate_random_secret(uint8_t* secret, size_t length) {
-  random_buffer(secret, length);
-
-  uint8_t buffer[length];
-#ifdef USE_OPTIGA
-  if (!optiga_random_buffer(buffer, length)) {
-    return secfalse;
-  }
-  for (size_t i = 0; i < length; i++) {
-    secret[i] ^= buffer[i];
-  }
-#endif
-
-#ifdef USE_TROPIC
-  if (LT_OK != lt_random_value_get(tropic_get_handle(), buffer, length)) {
-    return secfalse;
-  }
-  for (size_t i = 0; i < length; i++) {
-    secret[i] ^= buffer[i];
-  }
-#endif
-
-  memzero(buffer, sizeof(buffer));
-  return sectrue;
-}
-
 secbool set_random_secret(uint8_t slot, size_t length) {
   uint8_t secret[length];
   uint8_t secret_read[length];
@@ -87,7 +61,7 @@ secbool set_random_secret(uint8_t slot, size_t length) {
     goto cleanup;
   }
 
-  if (generate_random_secret(secret, sizeof(secret)) != sectrue) {
+  if (!rng_fill_buffer_strong(secret, sizeof(secret))) {
     goto cleanup;
   }
 
@@ -247,7 +221,7 @@ static bool check_device_cert_chain(cli_t* cli, const uint8_t* chain,
   }
 
   uint8_t rnd[MLDSA_RNDBYTES] = {0};
-  random_buffer(rnd, sizeof(rnd));
+  rng_fill_buffer(rnd, sizeof(rnd));
 
   // The challenge is intentionally constant zero.
   const uint8_t ENCODED_EMPTY_CONTEXT_STRING[] = {0, 0};
@@ -308,8 +282,14 @@ static void prodtest_secrets_certdev_write(cli_t* cli) {
     return;
   }
 
-  secret_write(prefixed_certificate, SECRET_MCU_DEVICE_CERT_OFFSET,
-               sizeof(prefixed_certificate));
+  secbool result =
+      secret_write(prefixed_certificate, SECRET_MCU_DEVICE_CERT_OFFSET,
+                   sizeof(prefixed_certificate));
+
+  if (sectrue != result) {
+    cli_error(cli, CLI_ERROR, "secret_write() failed.");
+    return;
+  }
 
   cli_ok(cli, "");
 #endif

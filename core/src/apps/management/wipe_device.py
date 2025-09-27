@@ -1,18 +1,17 @@
+import utime
 from typing import TYPE_CHECKING
 
 from trezor import utils
 from trezor.wire.context import get_context, try_get_ctx_ids
 
 if TYPE_CHECKING:
-    from typing import NoReturn
-
     from trezor.messages import WipeDevice
 
 if __debug__:
     from trezor import log
 
 
-async def wipe_device(msg: WipeDevice) -> NoReturn:
+async def wipe_device(msg: WipeDevice) -> None:
     import storage
     from trezor import TR, config, translations
     from trezor.enums import ButtonRequestType
@@ -60,8 +59,14 @@ async def wipe_device(msg: WipeDevice) -> NoReturn:
     # reload settings
     reload_settings_from_storage()
 
+    # notify host about the wipe
+    utils.notify_send(utils.NOTIFY_WIPE)
+
     if utils.USE_BLE:
         from trezorble import erase_bonds
+
+        # wait for the notification to be sent
+        utime.sleep_ms(300)
 
         # raise an exception if bonds erasing fails
         erase_bonds()

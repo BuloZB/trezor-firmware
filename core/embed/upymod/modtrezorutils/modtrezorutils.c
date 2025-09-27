@@ -55,7 +55,7 @@
 #include <sys/stack_utils.h>
 #endif
 
-/// def consteq(sec: bytes, pub: bytes) -> bool:
+/// def consteq(sec: AnyBytes, pub: AnyBytes) -> bool:
 ///     """
 ///     Compares the private information in `sec` with public, user-provided
 ///     information in `pub`.  Runs in constant time, corresponding to a length
@@ -85,9 +85,9 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_trezorutils_consteq_obj,
                                  mod_trezorutils_consteq);
 
 /// def memcpy(
-///     dst: bytearray | memoryview,
+///     dst: AnyBuffer,
 ///     dst_ofs: int,
-///     src: bytes,
+///     src: AnyBytes,
 ///     src_ofs: int,
 ///     n: int | None = None,
 /// ) -> int:
@@ -127,7 +127,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_trezorutils_memcpy_obj, 4, 5,
                                            mod_trezorutils_memcpy);
 
 /// def memzero(
-///     dst: bytearray | memoryview,
+///     dst: AnyBuffer,
 /// ) -> None:
 ///     """
 ///     Zeroes all bytes at `dst`.
@@ -158,7 +158,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_trezorutils_halt_obj, 0, 1,
                                            mod_trezorutils_halt);
 
 /// def firmware_hash(
-///     challenge: bytes | None = None,
+///     challenge: AnyBytes | None = None,
 ///     callback: Callable[[int, int], None] | None = None,
 /// ) -> bytes:
 ///     """
@@ -460,7 +460,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_check_heap_fragmentation_obj,
 
 /// def reboot_to_bootloader(
 ///     boot_command : int = 0,
-///     boot_args : bytes | None = None,
+///     boot_args : AnyBytes | None = None,
 /// ) -> None:
 ///     """
 ///     Reboots to bootloader.
@@ -512,12 +512,12 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(
 /// class FirmwareHeaderInfo(NamedTuple):
 ///     version: VersionTuple
 ///     vendor: str
-///     fingerprint: bytes
-///     hash: bytes
+///     fingerprint: AnyBytes
+///     hash: AnyBytes
 
 /// mock:global
 
-/// def check_firmware_header(header : bytes) -> FirmwareHeaderInfo:
+/// def check_firmware_header(header : AnyBytes) -> FirmwareHeaderInfo:
 ///     """Parses incoming firmware header and returns information about it."""
 STATIC mp_obj_t mod_trezorutils_check_firmware_header(mp_obj_t header) {
   mp_buffer_info_t header_buf = {0};
@@ -685,6 +685,21 @@ STATIC mp_obj_tuple_t mod_trezorutils_version_obj = {
 /// """Notification event: device unlocked from hardlock"""
 /// NOTIFY_LOCK: int
 /// """Notification event: device locked to hardlock"""
+/// NOTIFY_DISCONNECT: int
+/// """Notification event: user-initiated disconnect from host"""
+/// NOTIFY_SETTING_CHANGE: int
+/// """Notification event: change of settings"""
+/// NOTIFY_SOFTLOCK: int
+/// """Notification event: device soft-locked"""
+/// NOTIFY_SOFTUNLOCK: int
+/// """Notification event: device soft-unlocked"""
+/// NOTIFY_PIN_CHANGE: int
+/// """Notification event: PIN changed on the device"""
+/// NOTIFY_WIPE: int
+/// """Notification event: factory reset (wipe) invoked"""
+/// NOTIFY_UNPAIR: int
+/// """Notification event: BLE bonding for current connection deleted"""
+///
 /// if __debug__:
 ///     DISABLE_ANIMATION: bool
 ///     """Whether the firmware should disable animations."""
@@ -712,6 +727,14 @@ STATIC const mp_rom_map_elem_t mp_module_trezorutils_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_NOTIFY_BOOT), MP_ROM_INT(NOTIFY_BOOT)},
     {MP_ROM_QSTR(MP_QSTR_NOTIFY_UNLOCK), MP_ROM_INT(NOTIFY_UNLOCK)},
     {MP_ROM_QSTR(MP_QSTR_NOTIFY_LOCK), MP_ROM_INT(NOTIFY_LOCK)},
+    {MP_ROM_QSTR(MP_QSTR_NOTIFY_DISCONNECT), MP_ROM_INT(NOTIFY_DISCONNECT)},
+    {MP_ROM_QSTR(MP_QSTR_NOTIFY_SETTING_CHANGE),
+     MP_ROM_INT(NOTIFY_SETTING_CHANGE)},
+    {MP_ROM_QSTR(MP_QSTR_NOTIFY_SOFTLOCK), MP_ROM_INT(NOTIFY_SOFTLOCK)},
+    {MP_ROM_QSTR(MP_QSTR_NOTIFY_SOFTUNLOCK), MP_ROM_INT(NOTIFY_SOFTUNLOCK)},
+    {MP_ROM_QSTR(MP_QSTR_NOTIFY_PIN_CHANGE), MP_ROM_INT(NOTIFY_PIN_CHANGE)},
+    {MP_ROM_QSTR(MP_QSTR_NOTIFY_WIPE), MP_ROM_INT(NOTIFY_WIPE)},
+    {MP_ROM_QSTR(MP_QSTR_NOTIFY_UNPAIR), MP_ROM_INT(NOTIFY_UNPAIR)},
 #ifdef USE_NRF
     {MP_ROM_QSTR(MP_QSTR_nrf_get_version),
      MP_ROM_PTR(&mod_trezorutils_nrf_get_version_obj)},

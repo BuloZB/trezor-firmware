@@ -1,6 +1,6 @@
 import builtins
 from micropython import const
-from typing import Sequence
+from typing import TYPE_CHECKING
 
 from storage.cache_common import (
     CHANNEL_HOST_STATIC_PUBKEY,
@@ -11,6 +11,10 @@ from storage.cache_common import (
     SESSION_STATE,
     DataCache,
 )
+
+if TYPE_CHECKING:
+    from buffer_types import AnyBytes
+    from typing import Sequence
 
 # THP specific constants
 _MAX_CHANNELS_COUNT = const(10)
@@ -59,6 +63,7 @@ class ChannelCache(ThpDataCache):
             8,  # CHANNEL_NONCE_RECEIVE
             8,  # CHANNEL_NONCE_SEND
             32,  # CHANNEL_HOST_STATIC_PUBKEY
+            2,  # CHANNEL_ACK_LATENCY_MS
         )
         super().__init__()
         self.set_int(CHANNEL_SYNC, 0x80)
@@ -162,14 +167,14 @@ def get_new_channel() -> ChannelCache:
     return _CHANNELS[index]
 
 
-def update_channel_last_used(channel_id: bytes) -> None:
+def update_channel_last_used(channel_id: AnyBytes) -> None:
     for channel in _CHANNELS:
         if channel.channel_id == channel_id:
             channel.last_usage = _get_usage_counter_and_increment()
             return
 
 
-def update_session_last_used(channel_id: bytes, session_id: bytes) -> None:
+def update_session_last_used(channel_id: AnyBytes, session_id: AnyBytes) -> None:
     for session in _SESSIONS:
         if session.channel_id == channel_id and session.session_id == session_id:
             session.last_usage = _get_usage_counter_and_increment()
@@ -384,7 +389,7 @@ def clear_all() -> None:
         channel.clear()
 
 
-def clear_all_except_one_session_keys(excluded: tuple[bytes, bytes]) -> None:
+def clear_all_except_one_session_keys(excluded: tuple[AnyBytes, AnyBytes]) -> None:
     cid, sid = excluded
 
     for channel in _CHANNELS:

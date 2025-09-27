@@ -1,10 +1,12 @@
 from typing import *
+from buffer_types import *
 # Wakeup flags:
 WAKEUP_FLAG_BUTTON: int
 WAKEUP_FLAG_POWER: int
 WAKEUP_FLAG_BLE: int
 WAKEUP_FLAG_NFC: int
 WAKEUP_FLAG_RTC: int
+WAKEUP_FLAG_USB: int
 
 # Power manager event flags:
 EVENT_POWER_STATUS_CHANGED: int

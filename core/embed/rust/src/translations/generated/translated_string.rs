@@ -418,8 +418,6 @@ pub enum TranslatedString {
     #[cfg(feature = "universal_fw")]
     ethereum__amount_sent = 271,  // "Amount sent:"
     #[cfg(feature = "universal_fw")]
-    ethereum__contract = 272,  // {"Bolt": "Contract", "Caesar": "Contract", "Delizia": "Contract", "Eckhart": "Call contract"}
-    #[cfg(feature = "universal_fw")]
     ethereum__data_size_template = 273,  // "Size: {0} bytes"
     #[cfg(feature = "universal_fw")]
     ethereum__gas_limit = 274,  // "Gas limit"
@@ -1549,6 +1547,10 @@ pub enum TranslatedString {
     pin__wipe_code_exists_title = 1157,  // "Wipe code set"
     wipe_code__pin_not_set_description = 1158,  // "PIN must be set before enabling wipe code."
     wipe_code__cancel_setup = 1159,  // {"Bolt": "Cancel wipe code setup", "Caesar": "Cancel wipe code setup", "Delizia": "Cancel wipe code setup", "Eckhart": "Cancel wipe code setup?"}
+    homescreen__backup_needed_info = 1160,  // "Open Trezor Suite and create a wallet backup. This is the only way to recover access to your assets."
+    ble__host_info = 1161,  // "Host info"
+    ble__mac_address = 1162,  // "MAC address"
+    ble__waiting_for_host = 1163,  // "Waiting for host..."
 }
 
 impl TranslatedString {
@@ -1972,18 +1974,6 @@ impl TranslatedString {
             (Self::eos__voter, "Voter:"),
             #[cfg(feature = "universal_fw")]
             (Self::ethereum__amount_sent, "Amount sent:"),
-            #[cfg(feature = "universal_fw")]
-            #[cfg(feature = "layout_bolt")]
-            (Self::ethereum__contract, "Contract"),
-            #[cfg(feature = "universal_fw")]
-            #[cfg(feature = "layout_caesar")]
-            (Self::ethereum__contract, "Contract"),
-            #[cfg(feature = "universal_fw")]
-            #[cfg(feature = "layout_delizia")]
-            (Self::ethereum__contract, "Contract"),
-            #[cfg(feature = "universal_fw")]
-            #[cfg(feature = "layout_eckhart")]
-            (Self::ethereum__contract, "Call contract"),
             #[cfg(feature = "universal_fw")]
             (Self::ethereum__data_size_template, "Size: {0} bytes"),
             #[cfg(feature = "universal_fw")]
@@ -3542,6 +3532,10 @@ impl TranslatedString {
             (Self::wipe_code__cancel_setup, "Cancel wipe code setup"),
             #[cfg(feature = "layout_eckhart")]
             (Self::wipe_code__cancel_setup, "Cancel wipe code setup?"),
+            (Self::homescreen__backup_needed_info, "Open Trezor Suite and create a wallet backup. This is the only way to recover access to your assets."),
+            (Self::ble__host_info, "Host info"),
+            (Self::ble__mac_address, "MAC address"),
+            (Self::ble__waiting_for_host, "Waiting for host..."),
     ];
 
     #[cfg(feature = "micropython")]
@@ -3630,7 +3624,9 @@ impl TranslatedString {
         (Qstr::MP_QSTR_ble__forget_this_description, Self::ble__forget_this_description),
         (Qstr::MP_QSTR_ble__forget_this_device, Self::ble__forget_this_device),
         (Qstr::MP_QSTR_ble__forget_this_success, Self::ble__forget_this_success),
+        (Qstr::MP_QSTR_ble__host_info, Self::ble__host_info),
         (Qstr::MP_QSTR_ble__limit_reached, Self::ble__limit_reached),
+        (Qstr::MP_QSTR_ble__mac_address, Self::ble__mac_address),
         (Qstr::MP_QSTR_ble__manage_paired, Self::ble__manage_paired),
         (Qstr::MP_QSTR_ble__pair_new, Self::ble__pair_new),
         (Qstr::MP_QSTR_ble__pair_title, Self::ble__pair_title),
@@ -3640,6 +3636,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_ble__unpair_current, Self::ble__unpair_current),
         (Qstr::MP_QSTR_ble__unpair_title, Self::ble__unpair_title),
         (Qstr::MP_QSTR_ble__version, Self::ble__version),
+        (Qstr::MP_QSTR_ble__waiting_for_host, Self::ble__waiting_for_host),
         (Qstr::MP_QSTR_brightness__change_title, Self::brightness__change_title),
         (Qstr::MP_QSTR_brightness__changed_title, Self::brightness__changed_title),
         (Qstr::MP_QSTR_brightness__title, Self::brightness__title),
@@ -4050,8 +4047,6 @@ impl TranslatedString {
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_ethereum__approve_unlimited_template, Self::ethereum__approve_unlimited_template),
         #[cfg(feature = "universal_fw")]
-        (Qstr::MP_QSTR_ethereum__contract, Self::ethereum__contract),
-        #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_ethereum__contract_address, Self::ethereum__contract_address),
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_ethereum__data_size_template, Self::ethereum__data_size_template),
@@ -4185,6 +4180,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_haptic_feedback__enable, Self::haptic_feedback__enable),
         (Qstr::MP_QSTR_haptic_feedback__subtitle, Self::haptic_feedback__subtitle),
         (Qstr::MP_QSTR_haptic_feedback__title, Self::haptic_feedback__title),
+        (Qstr::MP_QSTR_homescreen__backup_needed_info, Self::homescreen__backup_needed_info),
         (Qstr::MP_QSTR_homescreen__click_to_connect, Self::homescreen__click_to_connect),
         (Qstr::MP_QSTR_homescreen__click_to_unlock, Self::homescreen__click_to_unlock),
         (Qstr::MP_QSTR_homescreen__firmware_type, Self::homescreen__firmware_type),

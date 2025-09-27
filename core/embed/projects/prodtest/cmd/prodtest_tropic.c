@@ -116,8 +116,7 @@ static struct lt_config_t irreversible_configuration = {
         // | WRITE_PKEY_SLOT_1        | 0 (bit 8)     | 0 (bit 9)     | 1 (bit 10)    | 1 (bit 11)    |
         // | WRITE_PKEY_SLOT_2        | 0 (bit 16)    | 0 (bit 17)    | 1 (bit 18)    | 1 (bit 19)    |
         // | WRITE_PKEY_SLOT_3        | 0 (bit 24)    | 0 (bit 25)    | 1 (bit 26)    | 1 (bit 27)    |
-        ~0U & ~BIT(0) & ~BIT(1) & ~BIT(8) & ~BIT(9) & ~BIT(16) & ~BIT(17) &
-            ~BIT(24) & ~BIT(25),
+        ~0U & ~BIT(0) & ~BIT(1) & ~BIT(8) & ~BIT(9) & ~BIT(16) & ~BIT(17) & ~BIT(24) & ~BIT(25),
         // # CFG_UAP_PAIRING_KEY_READ (0x24)
         // | Setting                  | Pairing Key 0 | Pairing Key 1 | Pairing Key 2 | Pairing Key 3 |
         // |--------------------------|---------------|---------------|---------------|---------------|
@@ -266,11 +265,11 @@ static struct lt_config_t irreversible_configuration = {
         // # CFG_UAP_MAC_AND_DESTROY (0x160)
         // | Setting                  | Pairing Key 0 | Pairing Key 1 | Pairing Key 2 | Pairing Key 3 |
         // |--------------------------|---------------|---------------|---------------|---------------|
-        // | MACANDD_0_31             | 0 (bit 0)     | 1 (bit 1)     | 1 (bit 2)     | 1 (bit 3)     |
-        // | MACANDD_32_63            | 0 (bit 8)     | 1 (bit 9)     | 1 (bit 10)    | 1 (bit 11)    |
+        // | MACANDD_0_31             | 0 (bit 0)     | 0 (bit 1)     | 1 (bit 2)     | 1 (bit 3)     |
+        // | MACANDD_32_63            | 0 (bit 8)     | 0 (bit 9)     | 1 (bit 10)    | 1 (bit 11)    |
         // | MACANDD_64_95            | 0 (bit 16)    | 1 (bit 17)    | 1 (bit 18)    | 1 (bit 19)    |
         // | MACANDD_96_127           | 0 (bit 24)    | 1 (bit 25)    | 1 (bit 26)    | 1 (bit 27)    |
-        ~0U & ~BIT(0) & ~BIT(8) & ~BIT(16) & ~BIT(24),
+        ~0U & ~BIT(0) & ~BIT(1) & ~BIT(8) & ~BIT(9) & ~BIT(16) & ~BIT(24),
     }};
 
 // TODO: Adjust the configuration to match the revision of the provisioned
@@ -334,8 +333,7 @@ static struct lt_config_t reversible_configuration = {
         // | READ_PKEY_SLOT_1         | 0 (bit 8)     | 1 (bit 9)     | 1 (bit 10)    | 0 (bit 11)    |
         // | READ_PKEY_SLOT_2         | 0 (bit 16)    | 1 (bit 17)    | 1 (bit 18)    | 0 (bit 19)    |
         // | READ_PKEY_SLOT_3         | 0 (bit 24)    | 1 (bit 25)    | 1 (bit 26)    | 0 (bit 27)    |
-        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) |
-            BIT(26),
+        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) | BIT(26),
         // # CFG_UAP_PAIRING_KEY_INVALIDATE (0x28)
         // | Setting                  | Pairing Key 0 | Pairing Key 1 | Pairing Key 2 | Pairing Key 3 |
         // |--------------------------|---------------|---------------|---------------|---------------|
@@ -343,8 +341,7 @@ static struct lt_config_t reversible_configuration = {
         // | INVALIDATE_PKEY_SLOT_1   |   0 (bit 8)   |   1 (bit 9)   |   1 (bit 10)  |   0 (bit 11)  |
         // | INVALIDATE_PKEY_SLOT_2   |   0 (bit 16)  |   1 (bit 17)  |   1 (bit 18)  |   0 (bit 19)  |
         // | INVALIDATE_PKEY_SLOT_3   |   0 (bit 24)  |   1 (bit 25)  |   1 (bit 26)  |   0 (bit 27)  |
-        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) |
-            BIT(26),
+        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) | BIT(26),
         // # CFG_UAP_R_CONFIG_WRITE_ERASE (0x30)
         // | Setting                  | Pairing Key 0 | Pairing Key 1 | Pairing Key 2 | Pairing Key 3 |
         // |--------------------------|---------------|---------------|---------------|---------------|
@@ -425,8 +422,7 @@ static struct lt_config_t reversible_configuration = {
         // | READ_ECCKEY_SLOT_8_15    | 0 (bit 8)     | 1 (bit 9)     | 1 (bit 10)    | 0 (bit 11)    |
         // | READ_ECCKEY_SLOT_16_23   | 0 (bit 16)    | 1 (bit 17)    | 1 (bit 18)    | 0 (bit 19)    |
         // | READ_ECCKEY_SLOT_24_31   | 0 (bit 24)    | 1 (bit 25)    | 1 (bit 26)    | 0 (bit 27)    |
-        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) |
-            BIT(26),
+        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) | BIT(26),
         // # CFG_UAP_ECC_KEY_ERASE (0x13c)
         // | Setting                  | Pairing Key 0 | Pairing Key 1 | Pairing Key 2 | Pairing Key 3 |
         // |--------------------------|---------------|---------------|---------------|---------------|
@@ -434,8 +430,7 @@ static struct lt_config_t reversible_configuration = {
         // | ERASE_ECCKEY_SLOT_8_15   | 0 (bit 8)     | 1 (bit 9)     | 1 (bit 10)    | 0 (bit 11)    |
         // | ERASE_ECCKEY_SLOT_16_23  | 0 (bit 16)    | 1 (bit 17)    | 1 (bit 18)    | 0 (bit 19)    |
         // | ERASE_ECCKEY_SLOT_24_31  | 0 (bit 24)    | 1 (bit 25)    | 1 (bit 26)    | 0 (bit 27)    |
-        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) |
-            BIT(26),
+        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) | BIT(26),
         // # CFG_UAP_ECDSA_SIGN (0x140)
         // | Setting                  | Pairing Key 0 | Pairing Key 1 | Pairing Key 2 | Pairing Key 3 |
         // |--------------------------|---------------|---------------|---------------|---------------|
@@ -467,8 +462,7 @@ static struct lt_config_t reversible_configuration = {
         // | MCOUNTER_GET_4_7         | 0 (bit 8)     | 1 (bit 9)     | 1 (bit 10)    | 0 (bit 11)    |
         // | MCOUNTER_GET_8_11        | 0 (bit 16)    | 1 (bit 17)    | 1 (bit 18)    | 0 (bit 19)    |
         // | MCOUNTER_GET_12_15       | 0 (bit 24)    | 1 (bit 25)    | 1 (bit 26)    | 0 (bit 27)    |
-        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) |
-            BIT(26),
+        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) | BIT(26),
         // # CFG_UAP_MCOUNTER_UPDATE (0x158)
         // | Setting                  | Pairing Key 0 | Pairing Key 1 | Pairing Key 2 | Pairing Key 3 |
         // |--------------------------|---------------|---------------|---------------|---------------|
@@ -476,17 +470,15 @@ static struct lt_config_t reversible_configuration = {
         // | MCOUNTER_UPDATE_4_7      | 0 (bit 8)     | 1 (bit 9)     | 1 (bit 10)    | 0 (bit 11)    |
         // | MCOUNTER_UPDATE_8_11     | 0 (bit 16)    | 1 (bit 17)    | 1 (bit 18)    | 0 (bit 19)    |
         // | MCOUNTER_UPDATE_12_15    | 0 (bit 24)    | 1 (bit 25)    | 1 (bit 26)    | 0 (bit 27)    |
-        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) |
-            BIT(26),
+        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) | BIT(26),
         // # CFG_UAP_MAC_AND_DESTROY (0x160)
         // | Setting                  | Pairing Key 0 | Pairing Key 1 | Pairing Key 2 | Pairing Key 3 |
         // |--------------------------|---------------|---------------|---------------|---------------|
-        // | MACANDD_0_31             | 0 (bit 0)     | 1 (bit 1)     | 1 (bit 2)     | 0 (bit 3)     |
-        // | MACANDD_32_63            | 0 (bit 8)     | 1 (bit 9)     | 1 (bit 10)    | 0 (bit 11)    |
+        // | MACANDD_0_31             | 0 (bit 0)     | 0 (bit 1)     | 1 (bit 2)     | 0 (bit 3)     |
+        // | MACANDD_32_63            | 0 (bit 8)     | 0 (bit 9)     | 1 (bit 10)    | 0 (bit 11)    |
         // | MACANDD_64_95            | 0 (bit 16)    | 1 (bit 17)    | 1 (bit 18)    | 0 (bit 19)    |
         // | MACANDD_96_127           | 0 (bit 24)    | 1 (bit 25)    | 1 (bit 26)    | 0 (bit 27)    |
-        BIT(1) | BIT(2) | BIT(9) | BIT(10) | BIT(17) | BIT(18) | BIT(25) |
-            BIT(26),
+        BIT(2) | BIT(10) | BIT(17) | BIT(18) | BIT(25) | BIT(26),
     }};
 // clang-format on
 
@@ -505,8 +497,7 @@ static void prodtest_tropic_get_riscv_fw_version(cli_t* cli) {
   lt_handle_t* tropic_handle = tropic_get_handle();
 
   uint8_t version[LT_L2_GET_INFO_RISCV_FW_SIZE] = {0};
-  if (lt_get_info_riscv_fw_ver(tropic_handle, version, sizeof(version)) !=
-      LT_OK) {
+  if (lt_get_info_riscv_fw_ver(tropic_handle, version) != LT_OK) {
     cli_error(cli, CLI_ERROR, "Unable to get RISCV FW version");
     return;
   }
@@ -524,8 +515,7 @@ static void prodtest_tropic_get_spect_fw_version(cli_t* cli) {
   lt_handle_t* tropic_handle = tropic_get_handle();
 
   uint8_t version[LT_L2_GET_INFO_SPECT_FW_SIZE];
-  if (lt_get_info_spect_fw_ver(tropic_handle, version, sizeof(version)) !=
-      LT_OK) {
+  if (lt_get_info_spect_fw_ver(tropic_handle, version) != LT_OK) {
     cli_error(cli, CLI_ERROR, "Unable to get SPECT FW version");
     return;
   }
@@ -831,26 +821,9 @@ cleanup:
 }
 
 bool prodtest_tropic_factory_session_start(lt_handle_t* tropic_handle) {
-#ifdef TREZOR_EMULATOR
-  curve25519_key factory_private = {
-      0xf0, 0xc4, 0xaa, 0x04, 0x8f, 0x00, 0x13, 0xa0, 0x96, 0x84, 0xdf,
-      0x05, 0xe8, 0xa2, 0x2e, 0xf7, 0x21, 0x38, 0x98, 0x28, 0x2b, 0xa9,
-      0x43, 0x12, 0xf3, 0x13, 0xdf, 0x2d, 0xce, 0x8d, 0x41, 0x64};
-#else
-#ifdef TROPIC_TESTING_KEYS
-  // Testing keys (used in TROPIC01-P2S-P001)
-  curve25519_key factory_private = {
-      0xd0, 0x99, 0x92, 0xb1, 0xf1, 0x7a, 0xbc, 0x4d, 0xb9, 0x37, 0x17,
-      0x68, 0xa2, 0x7d, 0xa0, 0x5b, 0x18, 0xfa, 0xb8, 0x56, 0x13, 0xa7,
-      0x84, 0x2c, 0xa6, 0x4c, 0x79, 0x10, 0xf2, 0x2e, 0x71, 0x6b};
-#else
-  // Production keys
-  curve25519_key factory_private = {
-      0x28, 0x3f, 0x5a, 0x0f, 0xfc, 0x41, 0xcf, 0x50, 0x98, 0xa8, 0xe1,
-      0x7d, 0xb6, 0x37, 0x2c, 0x3c, 0xaa, 0xd1, 0xee, 0xee, 0xdf, 0x0f,
-      0x75, 0xbc, 0x3f, 0xbf, 0xcd, 0x9c, 0xab, 0x3d, 0xe9, 0x72};
-#endif
-#endif
+  curve25519_key factory_private = {0};
+  tropic_get_factory_privkey(factory_private);
+
   curve25519_key factory_public = {0};
   curve25519_scalarmult_basepoint(factory_public, factory_private);
 
@@ -1529,6 +1502,12 @@ static void cert_write(cli_t* cli, uint16_t first_slot, uint16_t slots_count) {
     goto cleanup;
   }
 
+  if (first_slot == TROPIC_DEVICE_CERT_FIRST_SLOT &&
+      !check_device_cert_chain(cli, certificate, certificate_length)) {
+    // Error returned by check_device_cert_chain().
+    goto cleanup;
+  }
+
   ret = data_write(tropic_handle, first_slot, slots_count, certificate,
                    certificate_length);
   if (ret != LT_OK) {
@@ -1545,11 +1524,6 @@ static void cert_write(cli_t* cli, uint16_t first_slot, uint16_t slots_count) {
     goto cleanup;
   }
 
-  if (first_slot == TROPIC_DEVICE_CERT_FIRST_SLOT &&
-      !check_device_cert_chain(cli, certificate, certificate_length)) {
-    // Error returned by check_device_cert_chain().
-    return;
-  }
   // TODO: call `check_device_cert_chain()` for FIDO certificate
 
   cli_ok(cli, "");
@@ -1753,7 +1727,7 @@ static void prodtest_tropic_update_fw(cli_t* cli) {
   cli_trace(cli, "Reading RISC-V FW version");
 
   uint8_t risc_fw_ver[LT_L2_GET_INFO_RISCV_FW_SIZE] = {0};
-  ret = lt_get_info_riscv_fw_ver(h, risc_fw_ver, LT_L2_GET_INFO_RISCV_FW_SIZE);
+  ret = lt_get_info_riscv_fw_ver(h, risc_fw_ver);
 
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR, "Failed to get RISC-V FW version, ret=%s",
@@ -1767,7 +1741,7 @@ static void prodtest_tropic_update_fw(cli_t* cli) {
 
   cli_trace(cli, "Reading SPECT FW version");
   uint8_t spect_fw_ver[LT_L2_GET_INFO_SPECT_FW_SIZE] = {0};
-  ret = lt_get_info_spect_fw_ver(h, spect_fw_ver, LT_L2_GET_INFO_SPECT_FW_SIZE);
+  ret = lt_get_info_spect_fw_ver(h, spect_fw_ver);
 
   if (ret != LT_OK) {
     cli_error(cli, CLI_ERROR, "Failed to get SPECT FW version, ret=%s",

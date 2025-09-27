@@ -1,8 +1,10 @@
 use crate::{
+    error::Error,
     io::BinaryData,
     micropython::{
         buffer::StrBuffer,
         gc::Gc,
+        iter::IterBuf,
         list::List,
         macros::{obj_fn_0, obj_fn_1, obj_fn_kw, obj_module},
         map::Map,
@@ -577,11 +579,9 @@ extern "C" fn new_flow_confirm_set_new_code(
     kwargs: *mut Map,
 ) -> Obj {
     let block = move |_args: &[Obj], kwargs: &Map| {
-        let title: TString = kwargs.get(Qstr::MP_QSTR_title)?.try_into()?;
-        let description: TString = kwargs.get(Qstr::MP_QSTR_description)?.try_into()?;
         let is_wipe_code: bool = kwargs.get(Qstr::MP_QSTR_is_wipe_code)?.try_into()?;
 
-        let layout = ModelUI::flow_confirm_set_new_code(title, description, is_wipe_code)?;
+        let layout = ModelUI::flow_confirm_set_new_code(is_wipe_code)?;
         Ok(LayoutObj::new_root(layout)?.into())
     };
     unsafe { util::try_with_args_and_kwargs(n_args, args, kwargs, block) }
@@ -937,42 +937,63 @@ extern "C" fn new_show_homescreen(n_args: usize, args: *const Obj, kwargs: *mut 
 
 extern "C" fn new_show_device_menu(n_args: usize, args: *const Obj, kwargs: *mut Map) -> Obj {
     let block = move |_args: &[Obj], kwargs: &Map| {
-        let init_submenu: Option<u8> = kwargs.get(Qstr::MP_QSTR_init_submenu)?.try_into_option()?;
-        let failed_backup: bool = kwargs.get(Qstr::MP_QSTR_failed_backup)?.try_into()?;
-        let paired_devices: Obj = kwargs.get(Qstr::MP_QSTR_paired_devices)?;
-        let paired_devices: Vec<TString, MAX_PAIRED_DEVICES> = util::iter_into_vec(paired_devices)?;
+        let init_submenu_idx: Option<u8> = kwargs
+            .get(Qstr::MP_QSTR_init_submenu_idx)?
+            .try_into_option()?;
+        let backup_failed: bool = kwargs.get(Qstr::MP_QSTR_backup_failed)?.try_into()?;
+        let backup_needed: bool = kwargs.get(Qstr::MP_QSTR_backup_needed)?.try_into()?;
+        let paired_obj: Obj = kwargs.get(Qstr::MP_QSTR_paired_devices)?;
+        let mut paired_devices: heapless::Vec<
+            (TString<'static>, Option<[TString; 2]>),
+            MAX_PAIRED_DEVICES,
+        > = heapless::Vec::new();
+        for device in IterBuf::new().try_iterate(paired_obj)? {
+            let [mac, host_info]: [Obj; 2] = util::iter_into_array(device)?;
+            let mac: TString<'static> = mac.try_into()?;
+            let host_info: Option<[TString<'static>; 2]> = host_info
+                .try_into_option()?
+                .map(util::iter_into_array)
+                .transpose()?;
+
+            if paired_devices.push((mac, host_info)).is_err() {
+                return Err(Error::OutOfRange);
+            }
+        }
         let connected_idx: Option<u8> =
             kwargs.get(Qstr::MP_QSTR_connected_idx)?.try_into_option()?;
-        let pin_code: Option<bool> = kwargs.get(Qstr::MP_QSTR_pin_code)?.try_into_option()?;
-        let auto_lock_delay: Option<[TString; 2]> = kwargs
-            .get(Qstr::MP_QSTR_auto_lock_delay)?
+        let pin_enabled: Option<bool> = kwargs.get(Qstr::MP_QSTR_pin_enabled)?.try_into_option()?;
+        let auto_lock: Option<[TString; 2]> = kwargs
+            .get(Qstr::MP_QSTR_auto_lock)?
             .try_into_option()?
             .map(util::iter_into_array)
             .transpose()?;
-        let wipe_code: Option<bool> = kwargs.get(Qstr::MP_QSTR_wipe_code)?.try_into_option()?;
-        let check_backup: bool = kwargs.get(Qstr::MP_QSTR_check_backup)?.try_into()?;
+        let wipe_code_enabled: Option<bool> = kwargs
+            .get(Qstr::MP_QSTR_wipe_code_enabled)?
+            .try_into_option()?;
+        let backup_check_allowed: bool =
+            kwargs.get(Qstr::MP_QSTR_backup_check_allowed)?.try_into()?;
         let device_name: Option<TString> =
             kwargs.get(Qstr::MP_QSTR_device_name)?.try_into_option()?;
-        let screen_brightness: Option<TString> = kwargs
-            .get(Qstr::MP_QSTR_screen_brightness)?
-            .try_into_option()?;
-        let haptic_feedback: Option<bool> = kwargs
-            .get(Qstr::MP_QSTR_haptic_feedback)?
+        let brightness: Option<TString> =
+            kwargs.get(Qstr::MP_QSTR_brightness)?.try_into_option()?;
+        let haptics_enabled: Option<bool> = kwargs
+            .get(Qstr::MP_QSTR_haptics_enabled)?
             .try_into_option()?;
         let led_enabled: Option<bool> = kwargs.get(Qstr::MP_QSTR_led_enabled)?.try_into_option()?;
         let about_items: Obj = kwargs.get(Qstr::MP_QSTR_about_items)?;
         let layout = ModelUI::show_device_menu(
-            init_submenu,
-            failed_backup,
+            init_submenu_idx,
+            backup_failed,
+            backup_needed,
             paired_devices,
             connected_idx,
-            pin_code,
-            auto_lock_delay,
-            wipe_code,
-            check_backup,
+            pin_enabled,
+            auto_lock,
+            wipe_code_enabled,
+            backup_check_allowed,
             device_name,
-            screen_brightness,
-            haptic_feedback,
+            brightness,
+            haptics_enabled,
             led_enabled,
             about_items,
         )?;
@@ -996,6 +1017,27 @@ extern "C" fn new_show_pairing_device_name(
         Ok(layout_obj.into())
     };
     unsafe { util::try_with_args_and_kwargs(n_args, args, kwargs, block) }
+}
+
+// Prefix parameters with `_` to avoid unused variable warning when building
+// without "ble".
+extern "C" fn new_wait_ble_host_confirmation(
+    _n_args: usize,
+    _args: *const Obj,
+    _kwargs: *mut Map,
+) -> Obj {
+    #[cfg(feature = "ble")]
+    {
+        let block = move |_args: &[Obj], _kwargs: &Map| {
+            let layout = ModelUI::wait_ble_host_confirmation()?;
+            let layout_obj = LayoutObj::new_root(layout)?;
+            Ok(layout_obj.into())
+        };
+        unsafe { util::try_with_args_and_kwargs(_n_args, _args, _kwargs, block) }
+    }
+
+    #[cfg(not(feature = "ble"))]
+    unimplemented!()
 }
 
 // Prefix parameters with `_` to avoid unused variable warning when building
@@ -1309,9 +1351,9 @@ pub extern "C" fn upy_backlight_fade(_level: Obj) -> Obj {
 #[no_mangle]
 pub static mp_module_trezorui_api: Module = obj_module! {
     /// from trezor import utils
-    /// from trezor.enums import ButtonRequestType
+    /// from trezor.enums import ButtonRequestType, RecoveryType
     ///
-    /// PropertyType = tuple[str | None, str | bytes | None, bool | None]
+    /// PropertyType = tuple[str | None, StrOrBytes | None, bool | None]
     /// T = TypeVar("T")
     ///
     /// class LayoutObj(Generic[T]):
@@ -1417,7 +1459,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// INFO: UiResult
     Qstr::MP_QSTR_INFO => INFO.as_obj(),
 
-    /// def check_homescreen_format(data: bytes) -> bool:
+    /// def check_homescreen_format(data: AnyBytes) -> bool:
     ///     """Check homescreen format and dimensions."""
     Qstr::MP_QSTR_check_homescreen_format => obj_fn_1!(upy_check_homescreen_format).as_obj(),
 
@@ -1458,7 +1500,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// def confirm_address(
     ///     *,
     ///     title: str,
-    ///     address: str | bytes,
+    ///     address: StrOrBytes,
     ///     address_label: str | None = None,
     ///     verb: str | None = None,
     ///     info_button: bool = False,
@@ -1482,7 +1524,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// def confirm_value(
     ///     *,
     ///     title: str,
-    ///     value: str | bytes,
+    ///     value: StrOrBytes,
     ///     description: str | None,
     ///     is_data: bool = True,
     ///     extra: str | None = None,
@@ -1508,7 +1550,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// def confirm_value_intro(
     ///     *,
     ///     title: str,
-    ///     value: str | bytes,
+    ///     value: StrOrBytes,
     ///     subtitle: str | None = None,
     ///     verb: str | None = None,
     ///     verb_cancel: str | None = None,
@@ -1544,7 +1586,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     title: str,
     ///     app_name: str,
     ///     icon_name: str | None,
-    ///     accounts: list[str | None],
+    ///     accounts: Sequence[str | None],
     /// ) -> LayoutObj[int | UiResult]:
     ///     """FIDO confirmation.
     ///
@@ -1563,7 +1605,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// def confirm_homescreen(
     ///     *,
     ///     title: str,
-    ///     image: bytes,
+    ///     image: AnyBytes,
     /// ) -> LayoutObj[UiResult]:
     ///     """Confirm homescreen."""
     Qstr::MP_QSTR_confirm_homescreen => obj_fn_kw!(0, new_confirm_homescreen).as_obj(),
@@ -1594,7 +1636,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     button: str,
     ///     button_style_confirm: bool = False,
     ///     hold: bool = False,
-    ///     items: Iterable[tuple[str | bytes, bool]],
+    ///     items: Iterable[tuple[StrOrBytes, bool]],
     /// ) -> LayoutObj[UiResult]:
     ///     """Confirm long content with the possibility to go back from any page.
     ///     Meant to be used with confirm_with_info on UI Bolt and Caesar."""
@@ -1604,7 +1646,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     *,
     ///     title: str,
     ///     subtitle: str | None = None,
-    ///     items: list[PropertyType],
+    ///     items: Sequence[PropertyType],
     ///     hold: bool = False,
     ///     verb: str | None = None,
     ///     external_menu: bool = False,
@@ -1624,9 +1666,9 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     fee: str,
     ///     fee_label: str,
     ///     title: str | None = None,
-    ///     account_items: list[PropertyType] | None = None,
+    ///     account_items: Sequence[PropertyType] | None = None,
     ///     account_title: str | None = None,
-    ///     extra_items: list[PropertyType] | None = None,
+    ///     extra_items: Sequence[PropertyType] | None = None,
     ///     extra_title: str | None = None,
     ///     verb_cancel: str | None = None,
     ///     back_button: bool = False,
@@ -1639,7 +1681,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     *,
     ///     title: str,
     ///     subtitle: str | None = None,
-    ///     items: Iterable[tuple[str | bytes, bool]],
+    ///     items: Iterable[tuple[StrOrBytes, bool]],
     ///     verb: str,
     ///     verb_info: str,
     ///     verb_cancel: str | None = None,
@@ -1679,8 +1721,8 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     br_name: str,
     ///     address_item: PropertyType | None,
     ///     extra_item: PropertyType | None,
-    ///     summary_items: list[PropertyType] | None = None,
-    ///     fee_items: list[PropertyType] | None = None,
+    ///     summary_items: Sequence[PropertyType] | None = None,
+    ///     fee_items: Sequence[PropertyType] | None = None,
     ///     summary_title: str | None = None,
     ///     summary_br_code: ButtonRequestType | None = None,
     ///     summary_br_name: str | None = None,
@@ -1691,8 +1733,6 @@ pub static mp_module_trezorui_api: Module = obj_module! {
 
     /// def flow_confirm_set_new_code(
     ///     *,
-    ///     title: str,
-    ///     description: str,
     ///     is_wipe_code: bool,
     /// ) -> LayoutObj[UiResult]:
     ///     """Confirm new PIN/wipe code setup with an option to cancel action."""
@@ -1710,7 +1750,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     case_sensitive: bool,
     ///     account: str | None,
     ///     path: str | None,
-    ///     xpubs: list[tuple[str, str]],
+    ///     xpubs: Sequence[tuple[str, str]],
     ///     br_code: ButtonRequestType,
     ///     br_name: str,
     /// ) -> LayoutObj[UiResult]:
@@ -1739,7 +1779,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     *,
     ///     title: str,
     ///     verb: str,
-    ///     items: list[str],
+    ///     items: Sequence[str],
     /// ) -> LayoutObj[UiResult]:
     ///     """Show multiple texts, each on its own page. TR specific."""
     Qstr::MP_QSTR_multiple_pages_texts => obj_fn_kw!(0, new_multiple_pages_texts).as_obj(),
@@ -1842,7 +1882,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// def select_word_count(
     ///     *,
     ///     recovery_type: RecoveryType,
-    /// ) -> LayoutObj[int | str | UIResult]:  # TR returns str
+    /// ) -> LayoutObj[int | str | UiResult]:  # TR returns str
     ///     """Select a mnemonic word count from the options: 12, 18, 20, 24, or 33.
     ///     For unlocking a repeated backup, select between 20 and 33."""
     Qstr::MP_QSTR_select_word_count => obj_fn_kw!(0, new_select_word_count).as_obj(),
@@ -1859,7 +1899,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     details_title: str,
     ///     account: str | None,
     ///     path: str | None,
-    ///     xpubs: list[tuple[str, str]],
+    ///     xpubs: Sequence[tuple[str, str]],
     /// ) -> LayoutObj[UiResult]:
     ///     """Show address details - QR code, account, path, cosigner xpubs."""
     Qstr::MP_QSTR_show_address_details => obj_fn_kw!(0, new_show_address_details).as_obj(),
@@ -1917,19 +1957,20 @@ pub static mp_module_trezorui_api: Module = obj_module! {
 
     /// def show_device_menu(
     ///     *,
-    ///     init_submenu: int | None,
-    ///     failed_backup: bool,
-    ///     paired_devices: Iterable[str],
+    ///     init_submenu_idx: int | None,
+    ///     backup_failed: bool,
+    ///     backup_needed: bool,
+    ///     paired_devices: Iterable[tuple[str, tuple[str, str] | None]],
     ///     connected_idx: int | None,
-    ///     pin_code: bool | None,
-    ///     auto_lock_delay: tuple[str, str] | None,
-    ///     wipe_code: bool | None,
-    ///     check_backup: bool,
+    ///     pin_enabled: bool | None,
+    ///     auto_lock: tuple[str, str] | None,
+    ///     wipe_code_enabled: bool | None,
+    ///     backup_check_allowed: bool,
     ///     device_name: str | None,
-    ///     screen_brightness: str | None,
-    ///     haptic_feedback: bool | None,
+    ///     brightness: str | None,
+    ///     haptics_enabled: bool | None,
     ///     led_enabled: bool | None,
-    ///     about_items: list[tuple[str | None, str | bytes | None, bool | None]],
+    ///     about_items: Sequence[tuple[str | None, StrOrBytes | None, bool | None]],
     /// ) -> LayoutObj[UiResult | DeviceMenuResult | tuple[DeviceMenuResult, int]]:
     ///     """Show the device menu."""
     Qstr::MP_QSTR_show_device_menu => obj_fn_kw!(0, new_show_device_menu).as_obj(),
@@ -1952,6 +1993,13 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     """BLE pairing: second screen (pairing code).
     ///     Returns on BLEEvent::{PairingCanceled, Disconnected}."""
     Qstr::MP_QSTR_show_ble_pairing_code => obj_fn_kw!(0, new_show_ble_pairing_code).as_obj(),
+
+    /// def wait_ble_host_confirmation(
+    ///     *,
+    /// ) -> LayoutObj[UiResult]:
+    ///     """Pairing device: third screen (waiting for host confirmation).
+    ///     Returns on BLEEvent::{PairingCanceled, Disconnected}."""
+    Qstr::MP_QSTR_wait_ble_host_confirmation => obj_fn_kw!(0, new_wait_ble_host_confirmation).as_obj(),
 
     /// def confirm_thp_pairing(
     ///     *,
@@ -1984,7 +2032,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// def show_info_with_cancel(
     ///     *,
     ///     title: str,
-    ///     items: list[PropertyType],
+    ///     items: Sequence[PropertyType],
     ///     horizontal: bool = False,
     ///     chunkify: bool = False,
     /// ) -> LayoutObj[UiResult]:
@@ -2031,7 +2079,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// def show_properties(
     ///     *,
     ///     title: str,
-    ///     value: list[PropertyType] | str,
+    ///     value: Sequence[PropertyType] | str,
     /// ) -> LayoutObj[None]:
     ///     """Show a list of key-value pairs, or a monospace string."""
     Qstr::MP_QSTR_show_properties => obj_fn_kw!(0, new_show_properties).as_obj(),
@@ -2135,26 +2183,26 @@ pub static mp_module_trezorui_api: Module = obj_module! {
 
     /// class DeviceMenuResult:
     ///     """Result of a device menu operation."""
-    ///     BackupFailed: ClassVar[DeviceMenuResult]
-    ///     DeviceDisconnect: ClassVar[DeviceMenuResult]
-    ///     DevicePair: ClassVar[DeviceMenuResult]
-    ///     DeviceUnpair: ClassVar[DeviceMenuResult]
-    ///     DeviceUnpairAll: ClassVar[DeviceMenuResult]
-    ///     PinCode: ClassVar[DeviceMenuResult]
-    ///     PinRemove: ClassVar[DeviceMenuResult]
-    ///     AutoLockBattery: ClassVar[DeviceMenuResult]
-    ///     AutoLockUSB: ClassVar[DeviceMenuResult]
-    ///     WipeCode: ClassVar[DeviceMenuResult]
-    ///     WipeRemove: ClassVar[DeviceMenuResult]
+    ///     ReviewFailedBackup: ClassVar[DeviceMenuResult]
+    ///     DisconnectDevice: ClassVar[DeviceMenuResult]
+    ///     PairDevice: ClassVar[DeviceMenuResult]
+    ///     UnpairDevice: ClassVar[DeviceMenuResult]
+    ///     UnpairAllDevices: ClassVar[DeviceMenuResult]
+    ///     SetOrChangePin: ClassVar[DeviceMenuResult]
+    ///     RemovePin: ClassVar[DeviceMenuResult]
+    ///     SetAutoLockBattery: ClassVar[DeviceMenuResult]
+    ///     SetAutoLockUSB: ClassVar[DeviceMenuResult]
+    ///     SetOrChangeWipeCode: ClassVar[DeviceMenuResult]
+    ///     RemoveWipeCode: ClassVar[DeviceMenuResult]
     ///     CheckBackup: ClassVar[DeviceMenuResult]
-    ///     DeviceName: ClassVar[DeviceMenuResult]
-    ///     ScreenBrightness: ClassVar[DeviceMenuResult]
-    ///     HapticFeedback: ClassVar[DeviceMenuResult]
-    ///     LedEnabled: ClassVar[DeviceMenuResult]
+    ///     SetDeviceName: ClassVar[DeviceMenuResult]
+    ///     SetBrightness: ClassVar[DeviceMenuResult]
+    ///     ToggleHaptics: ClassVar[DeviceMenuResult]
+    ///     ToggleLed: ClassVar[DeviceMenuResult]
     ///     WipeDevice: ClassVar[DeviceMenuResult]
     ///     Reboot: ClassVar[DeviceMenuResult]
     ///     RebootToBootloader: ClassVar[DeviceMenuResult]
     ///     TurnOff: ClassVar[DeviceMenuResult]
-    ///     MenuRefresh: ClassVar[DeviceMenuResult]
+    ///     RefreshMenu: ClassVar[DeviceMenuResult]
     Qstr::MP_QSTR_DeviceMenuResult => DEVICE_MENU_RESULT.as_obj(),
 };

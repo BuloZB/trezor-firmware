@@ -3239,6 +3239,7 @@ class Features(protobuf.MessageType):
         53: protobuf.Field("recovery_type", "RecoveryType", repeated=False, required=False, default=None),
         54: protobuf.Field("optiga_sec", "uint32", repeated=False, required=False, default=None),
         55: protobuf.Field("soc", "uint32", repeated=False, required=False, default=None),
+        56: protobuf.Field("firmware_corrupted", "bool", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -3297,6 +3298,7 @@ class Features(protobuf.MessageType):
         recovery_type: Optional["RecoveryType"] = None,
         optiga_sec: Optional["int"] = None,
         soc: Optional["int"] = None,
+        firmware_corrupted: Optional["bool"] = None,
     ) -> None:
         self.capabilities: Sequence["Capability"] = capabilities if capabilities is not None else []
         self.major_version = major_version
@@ -3351,6 +3353,7 @@ class Features(protobuf.MessageType):
         self.recovery_type = recovery_type
         self.optiga_sec = optiga_sec
         self.soc = soc
+        self.firmware_corrupted = firmware_corrupted
 
 
 class LockDevice(protobuf.MessageType):
@@ -8354,21 +8357,21 @@ class ThpEndResponse(protobuf.MessageType):
 class ThpCredentialMetadata(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = None
     FIELDS = {
-        1: protobuf.Field("host_name", "string", repeated=False, required=False, default=None),
+        1: protobuf.Field("host_name", "string", repeated=False, required=True),
         2: protobuf.Field("autoconnect", "bool", repeated=False, required=False, default=None),
-        3: protobuf.Field("app_name", "string", repeated=False, required=False, default=None),
+        3: protobuf.Field("app_name", "string", repeated=False, required=True),
     }
 
     def __init__(
         self,
         *,
-        host_name: Optional["str"] = None,
+        host_name: "str",
+        app_name: "str",
         autoconnect: Optional["bool"] = None,
-        app_name: Optional["str"] = None,
     ) -> None:
         self.host_name = host_name
-        self.autoconnect = autoconnect
         self.app_name = app_name
+        self.autoconnect = autoconnect
 
 
 class ThpPairingCredential(protobuf.MessageType):
@@ -8424,6 +8427,7 @@ class ThpPairedCacheEntry(protobuf.MessageType):
     FIELDS = {
         1: protobuf.Field("mac_addr", "bytes", repeated=False, required=True),
         2: protobuf.Field("host_name", "string", repeated=False, required=True),
+        3: protobuf.Field("app_name", "string", repeated=False, required=True),
     }
 
     def __init__(
@@ -8431,9 +8435,11 @@ class ThpPairedCacheEntry(protobuf.MessageType):
         *,
         mac_addr: "bytes",
         host_name: "str",
+        app_name: "str",
     ) -> None:
         self.mac_addr = mac_addr
         self.host_name = host_name
+        self.app_name = app_name
 
 
 class WebAuthnListResidentCredentials(protobuf.MessageType):

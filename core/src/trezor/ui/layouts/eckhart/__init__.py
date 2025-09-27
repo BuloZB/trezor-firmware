@@ -8,6 +8,7 @@ from trezor.wire import ActionCancelled
 from ..common import draw_simple, interact, raise_if_cancelled, with_info
 
 if TYPE_CHECKING:
+    from buffer_types import AnyBytes, StrOrBytes
     from typing import (
         Any,
         Awaitable,
@@ -207,7 +208,7 @@ def lock_time_disabled_warning() -> Awaitable[None]:
 
 
 def confirm_homescreen(
-    image: bytes,
+    image: AnyBytes,
 ) -> Awaitable[None]:
     return raise_if_cancelled(
         trezorui_api.confirm_homescreen(
@@ -689,7 +690,7 @@ async def should_show_more(
 def confirm_blob(
     br_name: str,
     title: str,
-    data: bytes | str,
+    data: StrOrBytes,
     description: str | None = None,
     subtitle: str | None = None,
     verb: str | None = None,
@@ -1282,6 +1283,7 @@ if not utils.BITCOIN_ONLY:
             br_code=br_code,
             verb=TR.buttons__continue,
             info_items=items,
+            cancel=True,
         )
 
     def confirm_solana_tx(
@@ -1707,7 +1709,7 @@ def request_passphrase_on_device(max_len: int) -> Awaitable[str]:
         ButtonRequestType.PassphraseEntry,
         raise_on_cancel=ActionCancelled("Passphrase entry cancelled"),
     )
-    return result  # type: ignore ["UiResult" is incompatible with "str"]
+    return result  # type: ignore ["UiResult" is not assignable to "str"]
 
 
 def request_pin_on_device(
@@ -1740,7 +1742,7 @@ def request_pin_on_device(
         ButtonRequestType.PinEntry,
         raise_on_cancel=PinCancelled,
     )
-    return result  # type: ignore ["UiResult" is incompatible with "str"]
+    return result  # type: ignore ["UiResult" is not assignable to "str"]
 
 
 async def confirm_reenter_pin(is_wipe_code: bool = False) -> None:
@@ -1799,19 +1801,12 @@ async def pin_wipe_code_exists_popup(
 
 
 def confirm_set_new_code(
-    br_name: str,
-    title: str,
-    description: str,
-    information: str,
     is_wipe_code: bool,
-    br_code: ButtonRequestType = BR_CODE_OTHER,
 ) -> Awaitable[None]:
     return raise_if_cancelled(
-        trezorui_api.flow_confirm_set_new_code(
-            title=title, description=information, is_wipe_code=is_wipe_code
-        ),
-        br_name,
-        br_code,
+        trezorui_api.flow_confirm_set_new_code(is_wipe_code=is_wipe_code),
+        "set_wipe_code" if is_wipe_code else "set_pin",
+        BR_CODE_OTHER,
     )
 
 

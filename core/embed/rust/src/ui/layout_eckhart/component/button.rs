@@ -65,20 +65,13 @@ impl Button {
             ButtonContent::TextAndSubtext {
                 subtext,
                 subtext_style,
-                subtext_is_marquee,
                 ..
-            } => {
-                if subtext_is_marquee {
-                    Some(Marquee::new(
-                        subtext,
-                        subtext_style.text_font,
-                        subtext_style.text_color,
-                        subtext_style.background_color,
-                    ))
-                } else {
-                    None
-                }
-            }
+            } => Some(Marquee::new(
+                subtext,
+                subtext_style.text_font,
+                subtext_style.text_color,
+                subtext_style.background_color,
+            )),
             _ => None,
         };
         Self {
@@ -127,13 +120,13 @@ impl Button {
             .with_radius(Self::MENU_ITEM_RADIUS)
     }
 
-    pub fn new_single_line_menu_item_with_subtext_marquee(
+    pub fn new_single_line_menu_item_with_subtext(
         text: TString<'static>,
         stylesheet: ButtonStyleSheet,
         subtext: TString<'static>,
         subtext_style: &'static TextStyle,
     ) -> Self {
-        Self::with_single_line_text_and_subtext_marquee(text, subtext, subtext_style, None)
+        Self::with_single_line_text_and_subtext(text, subtext, subtext_style, None)
             .with_text_align(Self::MENU_ITEM_ALIGNMENT)
             .with_content_offset(Self::MENU_ITEM_CONTENT_OFFSET)
             .styled(stylesheet)
@@ -147,30 +140,35 @@ impl Button {
         subtext: Option<TString<'static>>,
         connected: bool,
     ) -> Self {
-        let (icon, subtext_style) = if connected {
+        let icon_color = if connected {
+            theme::GREEN_LIGHT
+        } else {
+            theme::GREY_DARK
+        };
+        let (subtext, subtext_style) = if let Some(subtext) = subtext {
+            (subtext, &theme::TEXT_MENU_ITEM_SUBTITLE)
+        } else if connected {
             (
-                (theme::ICON_SQUARE, theme::GREEN_LIGHT),
+                TR::words__connected.into(),
                 &theme::TEXT_MENU_ITEM_SUBTITLE_GREEN,
             )
         } else {
             (
-                (theme::ICON_SQUARE, theme::GREY_DARK),
+                TR::words__disconnected.into(),
                 &theme::TEXT_MENU_ITEM_SUBTITLE,
             )
         };
-        let subtext = subtext.unwrap_or_else(|| {
-            if connected {
-                TR::words__connected.into()
-            } else {
-                TR::words__disconnected.into()
-            }
-        });
 
-        Self::with_text_and_subtext(text, subtext, subtext_style, Some(icon))
-            .with_text_align(Self::MENU_ITEM_ALIGNMENT)
-            .with_content_offset(Self::MENU_ITEM_CONTENT_OFFSET)
-            .styled(stylesheet)
-            .with_radius(Self::MENU_ITEM_RADIUS)
+        Self::with_text_and_subtext(
+            text,
+            subtext,
+            subtext_style,
+            Some((theme::ICON_SQUARE, icon_color)),
+        )
+        .with_text_align(Self::MENU_ITEM_ALIGNMENT)
+        .with_content_offset(Self::MENU_ITEM_CONTENT_OFFSET)
+        .styled(stylesheet)
+        .with_radius(Self::MENU_ITEM_RADIUS)
     }
 
     pub const fn with_single_line_text(text: TString<'static>) -> Self {
@@ -195,13 +193,13 @@ impl Button {
         ))
     }
 
-    pub fn with_single_line_text_and_subtext_marquee(
+    pub fn with_single_line_text_and_subtext(
         text: TString<'static>,
         subtext: TString<'static>,
         subtext_style: &'static TextStyle,
         icon: Option<(Icon, Color)>,
     ) -> Self {
-        Self::new(ButtonContent::single_line_text_and_marquee_subtext(
+        Self::new(ButtonContent::single_line_text_and_subtext(
             text,
             subtext,
             subtext_style,
@@ -523,7 +521,6 @@ impl Button {
                 single_line,
                 subtext,
                 subtext_style,
-                subtext_is_marquee,
                 icon,
             } => {
                 let text_baseline_height = self.baseline_text_height();
@@ -564,13 +561,12 @@ impl Button {
                 subtext.map(|subtext| {
                     let subtext_fits =
                         subtext_style.text_font.text_width(subtext) <= available_width;
-                    #[cfg(feature = "ui_debug")]
-                    {
-                        if !subtext_fits && !subtext_is_marquee {
-                            fatal_error!(&uformat!(len: 128, "Subtext too long: '{}'", subtext));
-                        }
-                    }
-                    if subtext_fits || !subtext_is_marquee || self.subtext_marquee.is_none() {
+                    if self.subtext_marquee.is_some() && !subtext_fits {
+                        let Some(m) = &self.subtext_marquee else {
+                            unreachable!();
+                        };
+                        m.render(target);
+                    } else {
                         shape::Text::new(
                             render_origin(if single_line_text {
                                 text_baseline_height / 2
@@ -588,8 +584,6 @@ impl Button {
                         .with_align(self.text_align)
                         .with_alpha(alpha)
                         .render(target);
-                    } else if let Some(m) = &self.subtext_marquee {
-                        m.render(target);
                     }
                 });
 
@@ -652,15 +646,22 @@ impl Component for Button {
 
     fn place(&mut self, bounds: Rect) -> Rect {
         self.area = bounds;
-        let subtext_start =
-            self.baseline_text_height() * 2 + constant::LINE_SPACE + self.baseline_subtext_height();
-        if let Some(m) = &mut self.subtext_marquee {
-            m.place(
-                self.area
+
+        if let ButtonContent::TextAndSubtext { icon, .. } = self.content {
+            let subtext_start = (bounds.height() + self.content_height(bounds.width())) / 2
+                - self.baseline_subtext_height();
+            if let Some(m) = self.subtext_marquee.as_mut() {
+                let mut marquee_area = self
+                    .area
                     .inset(Insets::top(subtext_start))
-                    .inset(Insets::sides(self.content_offset.x)),
-            );
+                    .inset(Insets::sides(self.content_offset.x));
+                if icon.is_some() {
+                    marquee_area = marquee_area.inset(Insets::right(Self::CONN_ICON_WIDTH));
+                }
+                m.place(marquee_area);
+            }
         }
+
         self.area
     }
 
@@ -816,7 +817,6 @@ pub enum ButtonContent {
         single_line: bool,
         subtext: TString<'static>,
         subtext_style: &'static TextStyle,
-        subtext_is_marquee: bool,
         icon: Option<(Icon, Color)>,
     },
     Icon(Icon),
@@ -850,12 +850,11 @@ impl ButtonContent {
             single_line: false,
             subtext,
             subtext_style,
-            subtext_is_marquee: false,
             icon,
         }
     }
 
-    pub const fn single_line_text_and_marquee_subtext(
+    pub const fn single_line_text_and_subtext(
         text: TString<'static>,
         subtext: TString<'static>,
         subtext_style: &'static TextStyle,
@@ -866,7 +865,6 @@ impl ButtonContent {
             single_line: true,
             subtext,
             subtext_style,
-            subtext_is_marquee: true,
             icon,
         }
     }

@@ -246,9 +246,9 @@ message ThpEndResponse {}
  */
  message ThpCredentialMetadata {
     option (internal_only) = true;
-    optional string host_name = 1;     // Human-readable host name (browser name for web apps)
+    required string host_name = 1;     // Human-readable host name (browser name for web apps)
     optional bool autoconnect = 2;     // Whether host is allowed to autoconnect without user confirmation
-    optional string app_name = 3;      // Human-readable application name
+    required string app_name = 3;      // Human-readable application name
 }
 
 /**
@@ -288,5 +288,6 @@ message ThpPairedCache {
         option (internal_only) = true;
         required bytes mac_addr = 1;    // 6-byte MAC address
         required string host_name = 2;  // Human-readable host name (≤32 bytes)
+        required string app_name = 3;   // Human-readable application name (≤32 bytes)
     }
 }

@@ -44,8 +44,7 @@ static bool encode_pairing_code(uint32_t code, uint8_t *outbuf) {
   return true;
 }
 
-workflow_result_t workflow_ble_pairing_request(const vendor_header *const vhdr,
-                                               const image_header *const hdr) {
+workflow_result_t workflow_ble_pairing_request(const fw_info_t *fw) {
   if (!ble_iface_start_pairing()) {
     return WF_OK_PAIRING_FAILED;
   }
@@ -62,8 +61,7 @@ workflow_result_t workflow_ble_pairing_request(const vendor_header *const vhdr,
   screen_pairing_mode(ui_get_initial_setup(), name, strlen(name), &layout);
 
   uint32_t code = 0;
-  workflow_result_t res =
-      workflow_host_control(vhdr, hdr, &layout, &code, NULL);
+  workflow_result_t res = workflow_host_control(fw, &layout, &code, NULL);
 
 #ifdef USE_RGB_LED
   rgb_led_effect_stop();
@@ -131,8 +129,7 @@ workflow_result_t workflow_ble_pairing_request(const vendor_header *const vhdr,
   return WF_OK_PAIRING_COMPLETED;
 }
 
-workflow_result_t workflow_wireless_setup(const vendor_header *const vhdr,
-                                          const image_header *const hdr,
+workflow_result_t workflow_wireless_setup(const fw_info_t *fw,
                                           protob_ios_t *ios) {
   if (!ble_iface_start_pairing()) {
     return WF_OK_PAIRING_FAILED;
@@ -150,7 +147,7 @@ workflow_result_t workflow_wireless_setup(const vendor_header *const vhdr,
   screen_wireless_setup(name, strlen(name), &layout);
 
   uint32_t code = 0;
-  workflow_result_t res = workflow_host_control(vhdr, hdr, &layout, &code, ios);
+  workflow_result_t res = workflow_host_control(fw, &layout, &code, ios);
 
 #ifdef USE_RGB_LED
   rgb_led_effect_stop();

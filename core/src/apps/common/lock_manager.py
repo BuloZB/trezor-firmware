@@ -43,7 +43,7 @@ else:
         set_homescreen()
 
     def notify_suspend() -> None:
-        """Signal that the the device should be suspended in the next cycle.
+        """Signal that the device should be suspended in the next cycle.
 
         Notifies an asynchronous task to perform the suspend in a separate thread.
         """
@@ -60,22 +60,30 @@ else:
 
         The function will only return after Trezor has woken up.
         """
-        from trezor.ui import CURRENT_LAYOUT
+        from trezor.ui import CURRENT_LAYOUT, display
 
         global _SHOULD_SUSPEND
 
         # fadeout the screen
         backlight_fade(BacklightLevels.NONE)
         # suspend the device
-        wakeup_flag = suspend_device()
+        suspend_device()
 
-        if wakeup_flag == io.pm.WAKEUP_FLAG_BUTTON:
-            workflow.idle_timer.touch()
-            if CURRENT_LAYOUT is not None:
-                CURRENT_LAYOUT.repaint()
+        # reconfigure drivers
+        display.orientation(storage_device.get_rotation())
+        if utils.USE_HAPTIC:
+            io.haptic.haptic_set_enabled(storage_device.get_haptic_feedback())
+        if utils.USE_RGB_LED:
+            io.rgb_led.rgb_led_set_enabled(storage_device.get_rgb_led())
+
+        # redraw the screen and touch idle timer
+        workflow.idle_timer.touch()
+        if CURRENT_LAYOUT is not None:
+            CURRENT_LAYOUT.repaint()
 
         _SHOULD_SUSPEND = False
         set_homescreen()
+        backlight_fade(BacklightLevels.NORMAL)
 
     async def _suspend_and_resume_task() -> None:
         """Task to suspend Trezor and handle wakeup.
@@ -142,6 +150,7 @@ def lock_device(interrupt_workflow: bool = True) -> None:
         if interrupt_workflow:
             workflow.close_others()
         # TODO: should we suspend the device here?
+        utils.notify_send(utils.NOTIFY_SOFTLOCK)
 
 
 def lock_device_if_unlocked() -> None:
@@ -183,6 +192,7 @@ async def unlock_device() -> None:
     _SCREENSAVER_IS_ON = False
     set_homescreen()
     remove_filter(_pinlock_filter)
+    utils.notify_send(utils.NOTIFY_SOFTUNLOCK)
 
 
 def _pinlock_filter(msg_type: int, prev_handler: Handler[Msg]) -> Handler[Msg]:

@@ -29,8 +29,7 @@
 #include "wire/wire_iface_usb.h"
 #include "workflow.h"
 
-workflow_result_t workflow_auto_update(const vendor_header *const vhdr,
-                                       const image_header *const hdr) {
+workflow_result_t workflow_auto_update(const fw_info_t *fw) {
   ui_set_initial_setup(true);
 
   workflow_result_t res = WF_CANCELLED;
@@ -44,7 +43,7 @@ workflow_result_t workflow_auto_update(const vendor_header *const vhdr,
   c_layout_t layout;
   memset(&layout, 0, sizeof(layout));
   screen_connect(true, false, &layout);
-  res = workflow_host_control(vhdr, hdr, &layout, &ui_result, &ios);
+  res = workflow_host_control(fw, &layout, &ui_result, &ios);
 
   if (res == WF_OK_UI_ACTION && ui_result == CONNECT_CANCEL) {
     bootargs_set(BOOT_COMMAND_NONE, NULL, 0);

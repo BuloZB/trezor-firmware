@@ -205,11 +205,7 @@ pub trait FirmwareUI {
         cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
-    fn flow_confirm_set_new_code(
-        title: TString<'static>,
-        description: TString<'static>,
-        is_wipe_code: bool,
-    ) -> Result<impl LayoutMaybeTrace, Error>;
+    fn flow_confirm_set_new_code(is_wipe_code: bool) -> Result<impl LayoutMaybeTrace, Error>;
 
     #[allow(clippy::too_many_arguments)]
     fn flow_get_address(
@@ -362,17 +358,21 @@ pub trait FirmwareUI {
 
     #[allow(clippy::too_many_arguments)]
     fn show_device_menu(
-        init_submenu: Option<u8>,
-        failed_backup: bool,
-        paired_devices: heapless::Vec<TString<'static>, MAX_PAIRED_DEVICES>,
+        init_submenu_idx: Option<u8>,
+        backup_failed: bool,
+        backup_needed: bool,
+        paired_devices: heapless::Vec<
+            (TString<'static>, Option<[TString<'static>; 2]>),
+            MAX_PAIRED_DEVICES,
+        >,
         connected_idx: Option<u8>,
-        pin_code: Option<bool>,
-        auto_lock_delay: Option<[TString<'static>; 2]>,
-        wipe_code: Option<bool>,
-        check_backup: bool,
+        pin_enabled: Option<bool>,
+        auto_lock: Option<[TString<'static>; 2]>,
+        wipe_code_enabled: Option<bool>,
+        backup_check_allowed: bool,
         device_name: Option<TString<'static>>,
-        screen_brightness: Option<TString<'static>>,
-        haptic_feedback: Option<bool>,
+        brightness: Option<TString<'static>>,
+        haptics_enabled: Option<bool>,
         led_enabled: Option<bool>,
         about_items: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error>;
@@ -388,6 +388,9 @@ pub trait FirmwareUI {
         description: TString<'static>,
         code: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error>;
+
+    #[cfg(feature = "ble")]
+    fn wait_ble_host_confirmation() -> Result<impl LayoutMaybeTrace, Error>;
 
     fn show_thp_pairing_code(
         title: TString<'static>,
