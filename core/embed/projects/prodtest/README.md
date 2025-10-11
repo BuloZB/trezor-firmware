@@ -98,10 +98,12 @@ OK
 ### ping
 The `ping` command serves as a no-operation request, and the device responds with `OK` to acknowledge receipt.
 
+`ping [<text>]`
+
 Example:
 ```
-ping
-OK
+ping ABC
+OK ABC
 ```
 
 ### reboot
@@ -638,6 +640,7 @@ Currently, three values are required during production:
 `otp-variant-write <unit_color> <unit_btconly> <unit_packaging>`.
 
 In non-production firmware, you must include `--execute` as the last parameter to write the data to the OTP memory. Conversely, in production firmware, you can use `--dry-run` as the last parameter to simulate the command without actually writing to the OTP memory.
+You can also use `--rework` to fix an incorrectly written value. This is only usable once.
 
 Example (to write 3 bytes into OTP memory):
 ```

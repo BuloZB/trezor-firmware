@@ -38,6 +38,15 @@ DEFAULT_SESSION_ID: int = 0
 
 MAX_RETRANSMISSION_COUNT = 50
 
+TREZOR_STATE_UNPAIRED = b"\x00"
+TREZOR_STATE_PAIRED = b"\x01"
+TREZOR_STATE_PAIRED_AUTOCONNECT = b"\x02"
+TREZOR_STATES = [
+    TREZOR_STATE_UNPAIRED,
+    TREZOR_STATE_PAIRED,
+    TREZOR_STATE_PAIRED_AUTOCONNECT,
+]
+
 if t.TYPE_CHECKING:
     pass
 MT = t.TypeVar("MT", bound=protobuf.MessageType)
@@ -216,12 +225,14 @@ class ProtocolV2Channel(Channel):
         self._read_ack()
         return self._read_handshake_completion_response()
 
-    def _send_handshake_init_request(self) -> None:
-        ha_init_req_header = MessageHeader(0, self.channel_id, 36)
-        host_ephemeral_pubkey = self._noise.write_message()
+    def _send_handshake_init_request(self, try_to_unlock: bool = True) -> None:
+        payload = self._noise.write_message(bytes([try_to_unlock]))
+        ha_init_req_header = MessageHeader(
+            0, self.channel_id, len(payload) + CHECKSUM_LENGTH
+        )
 
         thp_io.write_payload_to_wire_and_add_checksum(
-            self.transport, ha_init_req_header, host_ephemeral_pubkey
+            self.transport, ha_init_req_header, payload
         )
 
     def _read_handshake_init_response(self) -> bytes:
@@ -269,9 +280,9 @@ class ProtocolV2Channel(Channel):
         if not header.is_handshake_comp_response():
             LOG.error("Received message is not a valid handshake completion response")
         trezor_state = self._noise.decrypt(bytes(data))
-        assert trezor_state == b"\x00" or trezor_state == b"\x01"
+        assert trezor_state in TREZOR_STATES
         self._send_ack_bit(bit=1)
-        self._is_paired = bool(int.from_bytes(trezor_state, "big"))
+        self._is_paired = trezor_state != TREZOR_STATE_UNPAIRED
 
     def _read_ack(self) -> None:
         header, payload = self._read_until_valid_crc_check()

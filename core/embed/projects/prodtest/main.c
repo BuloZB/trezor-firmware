@@ -129,7 +129,12 @@ static ssize_t console_read(void *context, char *buf, size_t size) {
 }
 
 static ssize_t console_write(void *context, const char *buf, size_t size) {
-  return syshandle_write_blocking(SYSHANDLE_USB_VCP, buf, size, 100);
+  static uint32_t timeout = 2000;
+  int rc = syshandle_write_blocking(SYSHANDLE_USB_VCP, buf, size, timeout);
+  // Do not wait too long if the host is not connected.
+  // This is a workaround that needs to be fixed properly later.
+  timeout = rc < size ? 100 : 2000;
+  return rc;
 }
 
 static void usb_vcp_intr_callback(void) { cli_abort(&g_cli); }
@@ -187,6 +192,7 @@ static void drivers_init(void) {
 #endif
 #ifdef USE_TROPIC
   tropic_init();
+  tropic_wait_for_ready();
 #endif
 #ifdef USE_HW_REVISION
   hw_revision_init();
@@ -199,8 +205,8 @@ void prodtest_show_homescreen(void) {
 
   static char device_sn[MAX_DEVICE_SN_SIZE] = {0};
   size_t device_sn_size = 0;
-  if (get_device_sn((uint8_t *)device_sn, sizeof(device_sn) - 1,
-                    &device_sn_size)) {
+  if (unit_properties_get_sn((uint8_t *)device_sn, sizeof(device_sn) - 1,
+                             &device_sn_size)) {
     screen_prodtest_welcome(&g_layout.layout, device_sn, device_sn_size);
   } else {
     screen_prodtest_welcome(&g_layout.layout, NULL, 0);

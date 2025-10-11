@@ -5,12 +5,11 @@ use crate::{
     error::Error,
     io::BinaryData,
     strutil::TString,
-    time::ShortDuration,
     translations::TR,
     ui::{
         component::{text::TextStyle, Component, Event, EventCtx, Label, Never, Swipe},
         display::{image::ImageInfo, Color},
-        geometry::{Alignment, Direction, Insets, Offset, Rect},
+        geometry::{Alignment, Direction, Offset, Rect},
         layout::util::get_user_custom_image,
         shape::{self, Renderer},
         util::animation_disabled,
@@ -19,15 +18,13 @@ use crate::{
 
 use super::{
     super::{
-        component::{Button, ButtonContent, ButtonMsg, FuelGauge},
+        component::{Button, ButtonContent, FuelGauge},
         fonts,
     },
     constant::{HEIGHT, SCREEN, WIDTH},
     theme::{self, firmware::button_homebar_style, ScreenBackground},
     ActionBar, ActionBarMsg, Hint,
 };
-
-const LOCK_HOLD_DURATION: ShortDuration = ShortDuration::from_millis(3000);
 
 /// Full-screen component for the homescreen and lockscreen.
 pub struct Homescreen {
@@ -41,14 +38,10 @@ pub struct Homescreen {
     image: Option<BinaryData<'static>>,
     /// LED color
     led_color: Option<Color>,
-    /// Whether the PIN is set and device can be locked
-    lockable: bool,
     /// Whether the homescreen is locked
     locked: bool,
     /// Whether the homescreen is a boot screen
     bootscreen: bool,
-    /// Hold to lock button placed everywhere except the `action_bar`
-    virtual_locking_button: Button,
     /// Fuel gauge (battery status indicator) rendered in the `action_bar` area
     fuel_gauge: FuelGauge,
     /// Swipe component for vertical swiping
@@ -62,11 +55,9 @@ pub enum HomescreenMsg {
 }
 
 impl Homescreen {
-    const HOMELABEL_INSETS: Insets = Insets::top(38);
-
     pub fn new(
         label: TString<'static>,
-        lockable: bool,
+        _lockable: bool,
         locked: bool,
         bootscreen: bool,
         coinjoin_authorized: bool,
@@ -105,11 +96,9 @@ impl Homescreen {
             action_bar: ActionBar::new_single(btn),
             image,
             led_color,
-            lockable,
             locked,
             bootscreen,
-            virtual_locking_button: Button::empty().with_long_press(LOCK_HOLD_DURATION),
-            fuel_gauge: FuelGauge::on_charging_change_or_attach()
+            fuel_gauge: FuelGauge::homescreen_bar()
                 .with_alignment(Alignment::Center)
                 .with_font(fonts::FONT_SATOSHI_MEDIUM_26),
             swipe: Swipe::new().up(),
@@ -159,13 +148,6 @@ impl Homescreen {
             b.set_content(bar_content)
         }
     }
-
-    fn event_hold(&mut self, ctx: &mut EventCtx, event: Event) -> bool {
-        if let Some(ButtonMsg::LongPressed) = self.virtual_locking_button.event(ctx, event) {
-            return true;
-        }
-        false
-    }
 }
 
 impl Drop for Homescreen {
@@ -192,16 +174,13 @@ impl Component for Homescreen {
         } else {
             rest
         };
-        let label_area = rest.inset(theme::SIDE_INSETS).inset(Self::HOMELABEL_INSETS);
+        let label_area = rest.inset(theme::CONTENT_INSETS_NO_HEADER);
 
         self.label.place(label_area);
         self.action_bar.place(bar_area);
         self.fuel_gauge.place(bar_area);
         // Swipe component is placed in the action bar touch area
         self.swipe.place(self.action_bar.touch_area());
-        // Locking button is placed everywhere except the action bar
-        let locking_area = bounds.inset(Insets::bottom(self.action_bar.touch_area().height()));
-        self.virtual_locking_button.place(locking_area);
         bounds
     }
 
@@ -222,11 +201,7 @@ impl Component for Homescreen {
             };
         }
 
-        if self.lockable {
-            Self::event_hold(self, ctx, event).then_some(HomescreenMsg::Dismissed)
-        } else {
-            None
-        }
+        None
     }
 
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {

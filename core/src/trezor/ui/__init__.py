@@ -227,7 +227,8 @@ class Layout(Generic[T]):
         not_closed = set()
         for task in self.tasks:
             if not _close_all and task is self.button_request_task:
-                # keep `ButtonRequest` handler alive to avoid THP desync
+                # Keep `ButtonRequest` handler alive.
+                # It will be awaited and closed in `get_result()`.
                 not_closed.add(task)
                 continue
             if task != loop.this_task:
@@ -264,11 +265,12 @@ class Layout(Generic[T]):
         is_done = None
         try:
             if self.context is not None and self.result_box.is_empty():
-                is_done = loop.mailbox()
+                is_done = loop.mailbox()  # (see below)
                 self.button_request_task = self._handle_button_requests(is_done)
                 self._start_task(self.button_request_task)
 
             result = await self.result_box
+            assert CURRENT_LAYOUT is None  # the screen is blank now
 
             if is_done is not None:
                 # Make sure ButtonRequest is ACKed, before the result is returned.
@@ -279,7 +281,8 @@ class Layout(Generic[T]):
                     self.button_request_box.put(None, replace=True)
                     await is_done
                 except Exception as e:
-                    log.exception(__name__, e)
+                    if __debug__:
+                        log.exception(__name__, e)
 
             return result
         finally:
@@ -332,18 +335,18 @@ class Layout(Generic[T]):
 
     def _button_request(self) -> bool:
         """Process a button request coming out of the Rust layout."""
-        if __debug__ and not self.button_request_box.is_empty():
-            raise wire.FirmwareError(
-                "button request already pending -- "
-                "don't forget to yield your input flow from time to time ^_^"
-            )
-
         res = self.layout.button_request()
         if res is None:
             return False
 
         if self.context is None:
             return False
+
+        if __debug__ and not self.button_request_box.is_empty():
+            raise wire.FirmwareError(
+                "button request already pending -- "
+                "don't forget to yield your input flow from time to time ^_^"
+            )
 
         # in production, we don't want this to fail, hence replace=True
         self.button_request_box.put(res, replace=True)
@@ -453,43 +456,41 @@ class Layout(Generic[T]):
             finally:
                 touch.close()
 
-    async def _handle_button_requests(self, is_done: loop.mailbox[None]) -> None:
+    async def _handle_button_requests(self, is_done: loop.mailbox[None] | None) -> None:
         try:
             if self.context is None:
                 return
             while True:
-                try:
-                    # The following task will raise `UnexpectedMessageException` on any message.
-                    unexpected_read = self.context.read(())
-                    result = await loop.race(unexpected_read, self.button_request_box)
-                    if result is None:
-                        return  # exit the loop when the layout is done.
-                    assert isinstance(result, tuple)
-                    br_code, br_name = result
+                # The following task will raise `UnexpectedMessageException` on any message.
+                unexpected_read = self.context.read(())
+                result = await loop.race(unexpected_read, self.button_request_box)
+                if result is None:
+                    return  # exit the loop when the layout is done.
+                assert isinstance(result, tuple)
+                br_code, br_name = result
 
-                    if __debug__:
-                        log.info(__name__, "ButtonRequest sent: %s", br_name)
-                    await self.context.call(
-                        ButtonRequest(
-                            code=br_code, pages=self.layout.page_count(), name=br_name
-                        ),
-                        ButtonAck,
-                    )
-                    if __debug__:
-                        log.info(__name__, "ButtonRequest acked: %s", br_name)
+                if __debug__:
+                    log.info(__name__, "ButtonRequest sent: %s", br_name)
+                await self.context.call(
+                    ButtonRequest(
+                        code=br_code, pages=self.layout.page_count(), name=br_name
+                    ),
+                    ButtonAck,
+                )
+                if __debug__:
+                    log.info(__name__, "ButtonRequest acked: %s", br_name)
 
-                    if (
-                        self.button_request_ack_pending
-                        and self.state is LayoutState.TRANSITIONING
-                    ):
-                        self.button_request_ack_pending = False
-                        self.state = LayoutState.ATTACHED
-                        if __debug__:
-                            self.notify_debuglink(self)
-                except Exception:
-                    raise
+                if (
+                    self.button_request_ack_pending
+                    and self.state is LayoutState.TRANSITIONING
+                ):
+                    self.button_request_ack_pending = False
+                    self.state = LayoutState.ATTACHED
+                    if __debug__:
+                        self.notify_debuglink(self)
         finally:
-            is_done.put(None)
+            if is_done is not None:
+                is_done.put(None)
 
     if utils.USE_BLE:
 

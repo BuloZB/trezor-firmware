@@ -467,8 +467,7 @@ impl FirmwareUI for UIEckhart {
                 StrOrBytes::Str("".into())
             },
             font: if chunkify {
-                let value: TString = value.try_into()?;
-                theme::get_chunkified_text_style(value.len())
+                &theme::TEXT_MONO_ADDRESS_CHUNKS
             } else if is_data {
                 &theme::TEXT_MONO_ADDRESS
             } else {
@@ -478,7 +477,8 @@ impl FirmwareUI for UIEckhart {
             extra_font: &theme::TEXT_SMALL,
         }
         .into_paragraphs()
-        .with_placement(LinearPlacement::vertical());
+        .with_placement(LinearPlacement::vertical())
+        .with_spacing(theme::PROP_INNER_SPACING);
 
         let mut right_button = if hold {
             let verb = verb.unwrap_or(TR::buttons__hold_to_confirm.into());
@@ -516,9 +516,8 @@ impl FirmwareUI for UIEckhart {
             .with_subtitle(subtitle.unwrap_or(TString::empty()))
             .with_action_bar(action_bar);
         if page_counter {
-            screen = screen.with_hint(Hint::new_page_counter());
-        }
-        if let Some(warning_footer) = warning_footer {
+            screen = screen.with_pagination_hint();
+        } else if let Some(warning_footer) = warning_footer {
             screen = screen.with_hint(Hint::new_warning_caution(warning_footer));
         }
         LayoutObj::new(screen)
@@ -675,7 +674,7 @@ impl FirmwareUI for UIEckhart {
         let font = if chunkify {
             &theme::TEXT_MONO_ADDRESS_CHUNKS
         } else if text_mono {
-            &theme::TEXT_MONO_LIGHT
+            &theme::TEXT_MONO_LIGHT_ELLIPSIS
         } else {
             &theme::TEXT_REGULAR
         };
@@ -1204,6 +1203,7 @@ impl FirmwareUI for UIEckhart {
         init_submenu_idx: Option<u8>,
         backup_failed: bool,
         backup_needed: bool,
+        ble_enabled: bool,
         paired_devices: heapless::Vec<
             (TString<'static>, Option<[TString<'static>; 2]>),
             MAX_PAIRED_DEVICES,
@@ -1223,6 +1223,7 @@ impl FirmwareUI for UIEckhart {
             init_submenu_idx,
             backup_failed,
             backup_needed,
+            ble_enabled,
             paired_devices,
             connected_idx,
             pin_enabled,
@@ -1260,7 +1261,9 @@ impl FirmwareUI for UIEckhart {
         }
         let screen = TextScreen::new(FormattedText::new(ops))
             .with_header(Header::new(TR::thp__pair_new_device.into()).with_close_button())
-            .with_action_bar(ActionBar::new_text_only(TR::thp__continue_on_host.into()));
+            .with_action_bar(ActionBar::new_text_only(
+                TR::instructions__continue_in_app.into(),
+            ));
         #[cfg(feature = "ble")]
         let screen = BLEHandler::new(screen, BLEHandlerMode::WaitingForPairingRequest);
         let layout = RootComponent::new(screen);

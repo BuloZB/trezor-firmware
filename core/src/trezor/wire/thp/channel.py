@@ -66,8 +66,7 @@ _PREEMPT_TIMEOUT_MS = const(1_000)
 
 
 class Reassembler:
-    def __init__(self, cid: int, read_buf: ThpBuffer) -> None:
-        self.cid = cid
+    def __init__(self, read_buf: ThpBuffer) -> None:
         self.thp_read_buf = read_buf
         self.reset()
 
@@ -95,13 +94,8 @@ class Reassembler:
             _, _, payload_length = ustruct.unpack(PacketHeader.INIT_FORMAT, packet)
             self.buffer_len = payload_length + PacketHeader.INIT_LENGTH
 
-            if control_byte.is_ack(ctrl_byte):
-                # don't allocate buffer for ACKs (since they are small)
-                buffer = packet[: self.buffer_len]
-                self.bytes_read = len(buffer)
-            else:
-                buffer = self.thp_read_buf.get(self.buffer_len)
-                self._buffer_packet_data(buffer, packet, 0)
+            buffer = self.thp_read_buf.get(self.buffer_len)
+            self._buffer_packet_data(buffer, packet, 0)
 
         assert len(buffer) == self.buffer_len
         if self.bytes_read < self.buffer_len:
@@ -173,7 +167,7 @@ class Channel:
 
         # Shared variables
         self.sessions: dict[int, GenericSessionContext] = {}
-        self.reassembler = Reassembler(self.get_channel_id_int(), self.read_buf)
+        self.reassembler = Reassembler(self.read_buf)
         self.last_write_ms: int = utime.ticks_ms()
 
         # Temporary objects

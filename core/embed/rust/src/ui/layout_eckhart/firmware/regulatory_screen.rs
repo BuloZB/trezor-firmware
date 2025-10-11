@@ -136,6 +136,7 @@ impl crate::trace::Trace for RegulatoryScreen {
         t.child("Header", &self.header);
         t.child("Content", &self.content);
         t.child("ActionBar", &self.action_bar);
+        t.int("page_count", self.content.pager().total() as i64);
     }
 }
 
@@ -147,7 +148,7 @@ struct RegulatoryContent {
 }
 
 impl RegulatoryContent {
-    const SCREENS: usize = 9;
+    const SCREENS: usize = 8;
     const ZONES: [RegulatoryZone; RegulatoryContent::SCREENS] = [
         RegulatoryZone {
             name: Some("United States"),
@@ -185,12 +186,13 @@ impl RegulatoryContent {
             icon1: Some(theme::ICON_UKRAINE),
             icon2: None,
         },
-        RegulatoryZone {
-            name: Some("Japan"),
-            content: "",
-            icon1: Some(theme::ICON_JAPAN),
-            icon2: Some(theme::ICON_JAPAN_2),
-        },
+        // TODO: add Japan when certification completed
+        // RegulatoryZone {
+        //     name: Some("Japan"),
+        //     content: "",
+        //     icon1: Some(theme::ICON_JAPAN),
+        //     icon2: Some(theme::ICON_JAPAN_2),
+        // },
         RegulatoryZone {
             name: Some("South Korea"),
             content: "",
@@ -316,5 +318,11 @@ impl Component for RegulatoryContent {
 impl crate::trace::Trace for RegulatoryContent {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("RegulatoryContent");
+
+        let current = self.pager.current();
+        let zone = &RegulatoryContent::ZONES[current as usize];
+
+        t.string("subtitle", zone.name.unwrap_or_default().into());
+        t.string("content", zone.content.into());
     }
 }

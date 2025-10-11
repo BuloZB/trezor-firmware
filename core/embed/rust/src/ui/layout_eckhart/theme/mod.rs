@@ -12,7 +12,7 @@ pub use firmware::*;
 use crate::ui::{
     component::text::TextStyle,
     display::Color,
-    geometry::{Grid, Insets, Offset, Rect},
+    geometry::{Grid, Insets, Offset, Point, Rect},
     util::include_icon,
 };
 
@@ -60,6 +60,18 @@ pub const LED_ORANGE: Color = Color::rgb(0xBC, 0x2A, 0x06);
 pub const LED_RED: Color = Color::rgb(0x64, 0x06, 0x03);
 pub const LED_YELLOW: Color = Color::rgb(0x16, 0x10, 0x00);
 pub const LED_BLUE: Color = Color::rgb(0x05, 0x05, 0x32);
+pub const fn color_to_led_color(color: Color) -> Color {
+    match color {
+        WHITE => LED_WHITE,
+        GREEN_LIME => LED_GREEN_LIME,
+        GREEN_LIGHT => LED_GREEN_LIGHT,
+        ORANGE => LED_ORANGE,
+        RED => LED_RED,
+        YELLOW => LED_YELLOW,
+        BLUE => LED_BLUE,
+        _ => color,
+    }
+}
 
 // Common constants
 pub const PADDING: i16 = 24; // [px]
@@ -131,7 +143,14 @@ include_icon!(
 // Battery icons
 include_icon!(ICON_BATTERY_ZAP, "layout_eckhart/res/battery/zap.toif");
 include_icon!(ICON_BATTERY_FULL, "layout_eckhart/res/battery/full.toif");
-include_icon!(ICON_BATTERY_MID, "layout_eckhart/res/battery/mid.toif");
+include_icon!(
+    ICON_BATTERY_MID_PLUS,
+    "layout_eckhart/res/battery/mid_plus.toif"
+);
+include_icon!(
+    ICON_BATTERY_MID_MINUS,
+    "layout_eckhart/res/battery/mid_minus.toif"
+);
 include_icon!(ICON_BATTERY_LOW, "layout_eckhart/res/battery/low.toif");
 include_icon!(ICON_BATTERY_EMPTY, "layout_eckhart/res/battery/empty.toif");
 
@@ -193,3 +212,10 @@ pub const TEXT_SMALL_GREY_EXTRA_LIGHT: TextStyle = TextStyle {
     text_color: GREY_EXTRA_LIGHT,
     ..TEXT_SMALL
 };
+
+/// Where to place main content if no Header is used on the Screen
+pub const CONTENT_INSETS_NO_HEADER: Insets = Insets::new(38, PADDING, ACTION_BAR_HEIGHT, PADDING);
+/// Where to place main text of progress screens of bootloader and firmware
+pub const PROGRESS_TEXT_ORIGIN: Point = super::constant::SCREEN
+    .top_left()
+    .ofs(Offset::new(PADDING, CONTENT_INSETS_NO_HEADER.top));

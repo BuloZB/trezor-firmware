@@ -63,6 +63,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_TR;
   MP_QSTR_TRANSITIONING;
   MP_QSTR_TX_PACKET_LEN;
+  MP_QSTR_ToggleBluetooth;
   MP_QSTR_ToggleHaptics;
   MP_QSTR_ToggleLed;
   MP_QSTR_TranslationsHeader;
@@ -181,6 +182,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_bitcoin__unverified_external_inputs;
   MP_QSTR_bitcoin__valid_signature;
   MP_QSTR_bitcoin__voting_rights;
+  MP_QSTR_ble__apps_connected;
   MP_QSTR_ble__disable;
   MP_QSTR_ble__enable;
   MP_QSTR_ble__forget_all;
@@ -194,6 +196,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ble__limit_reached;
   MP_QSTR_ble__mac_address;
   MP_QSTR_ble__manage_paired;
+  MP_QSTR_ble__must_be_enabled;
   MP_QSTR_ble__pair_new;
   MP_QSTR_ble__pair_title;
   MP_QSTR_ble__pairing_match;
@@ -203,6 +206,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ble__unpair_title;
   MP_QSTR_ble__version;
   MP_QSTR_ble__waiting_for_host;
+  MP_QSTR_ble_enabled;
   MP_QSTR_ble_event;
   MP_QSTR_bootscreen;
   MP_QSTR_br_code;
@@ -348,6 +352,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_flow_get_pubkey;
   MP_QSTR_get;
   MP_QSTR_get_bonds;
+  MP_QSTR_get_enabled;
   MP_QSTR_get_language;
   MP_QSTR_get_transition_out;
   MP_QSTR_haptic_feedback__disable;
@@ -795,6 +800,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_send__transaction_signed;
   MP_QSTR_send__you_are_contributing;
   MP_QSTR_set_brightness;
+  MP_QSTR_set_enabled;
   MP_QSTR_set_high_speed;
   MP_QSTR_set_name;
   MP_QSTR_setting__adjust;
@@ -834,6 +840,8 @@ static void _librust_qstrs(void) {
   MP_QSTR_sign_message__message_size;
   MP_QSTR_sign_message__verify_address;
   MP_QSTR_skip_first_paint;
+  MP_QSTR_sn__action;
+  MP_QSTR_sn__title;
   MP_QSTR_start_advertising;
   MP_QSTR_start_comm;
   MP_QSTR_storage_msg__processing;
@@ -860,7 +868,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_thp__connect;
   MP_QSTR_thp__connect_app;
   MP_QSTR_thp__connect_title;
-  MP_QSTR_thp__continue_on_host;
   MP_QSTR_thp__nfc_text;
   MP_QSTR_thp__pair;
   MP_QSTR_thp__pair_app;

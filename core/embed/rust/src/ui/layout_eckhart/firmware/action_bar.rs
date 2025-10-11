@@ -38,6 +38,8 @@ pub struct ActionBar {
     prev_button: Button,
     /// Right button for paginated content
     next_button: Button,
+    /// Whether we are waiting for the finalize animation to complete
+    awaiting_finalize: bool,
 }
 
 pub enum ActionBarMsg {
@@ -207,6 +209,19 @@ impl ActionBar {
                 );
                 self.place_buttons(self.area);
             }
+        } else if self.mode == Mode::Single {
+            // On the first of multiple pages, enable grayed-out left button
+            if (new_is_first && !new_is_single) && (!old_is_first || old_is_single) {
+                self.left_button = Some(
+                    Button::with_icon(theme::ICON_CHEVRON_UP)
+                        .with_expanded_touch_area(Self::BUTTON_EXPAND_TOUCH)
+                        .with_content_offset(Self::BUTTON_CONTENT_OFFSET)
+                        .initially_enabled(false),
+                );
+            } else if (!new_is_first || new_is_single) && (old_is_first && !old_is_single) {
+                self.left_button = None;
+            }
+            self.place_buttons(self.area);
         } else if (old_is_last != new_is_last) || (new_is_first != old_is_first) {
             self.place_buttons(self.area);
         }
@@ -265,6 +280,7 @@ impl ActionBar {
             next_button: Button::with_icon(theme::ICON_CHEVRON_DOWN)
                 .with_expanded_touch_area(Self::BUTTON_EXPAND_TOUCH)
                 .with_content_offset(Self::BUTTON_CONTENT_OFFSET.neg()),
+            awaiting_finalize: false,
         }
     }
 
@@ -326,18 +342,21 @@ impl ActionBar {
                 self.right_button.place(bounds);
             }
             Mode::Single => {
-                let (left_area, right_area) = if !self.pager.is_first() {
-                    self.next_button
-                        .set_content_offset(Self::BUTTON_CONTENT_OFFSET.neg());
-                    // Small `prev_button` when not on first page
+                let (left_area, right_area) = if self.pager.is_single() {
+                    // Only `right_button` without pagination
+                    (Rect::zero(), bounds)
+                } else if self.pager.is_last() {
+                    // Las page with `prev_button` and `right_button`
                     let (left, rest) = bounds.split_left(Self::LEFT_SMALL_BUTTON_WIDTH);
                     let (_, right) = rest.split_left(Self::SPACER_WIDTH);
                     (left, right)
                 } else {
-                    self.next_button.set_content_offset(Offset::zero());
-                    (Rect::zero(), bounds)
+                    // Equal-sized buttons
+                    let (left, _, right) = bounds.split_center(Self::SPACER_WIDTH);
+                    (left, right)
                 };
                 self.right_button.place(right_area);
+                self.left_button.place(left_area);
                 self.prev_button.place(left_area);
                 self.next_button.place(right_area);
             }
@@ -367,20 +386,8 @@ impl ActionBar {
             }
         }
     }
-}
 
-impl Component for ActionBar {
-    type Msg = ActionBarMsg;
-
-    fn place(&mut self, bounds: Rect) -> Rect {
-        debug_assert_eq!(bounds.height(), Self::ACTION_BAR_HEIGHT);
-        self.place_buttons(bounds);
-        self.area = bounds;
-        bounds
-    }
-
-    fn event(&mut self, ctx: &mut EventCtx, event: Event) -> Option<Self::Msg> {
-        self.htc_anim.event(ctx, event);
+    fn handle_event_buttons(&mut self, ctx: &mut EventCtx, event: Event) -> Option<ActionBarMsg> {
         match &self.mode {
             Mode::Timeout => {
                 if self
@@ -469,13 +476,51 @@ impl Component for ActionBar {
                     }
                 }
             }
-        }
+        };
         None
+    }
+}
+
+impl Component for ActionBar {
+    type Msg = ActionBarMsg;
+
+    fn place(&mut self, bounds: Rect) -> Rect {
+        debug_assert_eq!(bounds.height(), Self::ACTION_BAR_HEIGHT);
+        self.place_buttons(bounds);
+        self.area = bounds;
+        bounds
+    }
+
+    fn event(&mut self, ctx: &mut EventCtx, event: Event) -> Option<Self::Msg> {
+        let htc_event = self.htc_anim.event(ctx, event);
+
+        if let Some(super::HoldToConfirmMsg::Finalized) = htc_event {
+            return Some(ActionBarMsg::Confirmed);
+        }
+
+        if self.awaiting_finalize {
+            // Ignore button input while finalizing animation runs
+            return None;
+        }
+
+        let result = self.handle_event_buttons(ctx, event);
+
+        match (result, self.htc_anim.as_mut()) {
+            (Some(ActionBarMsg::Confirmed), Some(htc_anim)) => {
+                self.awaiting_finalize = true;
+                htc_anim.finalize();
+                ctx.request_anim_frame();
+                ctx.request_paint();
+                None
+            }
+            (Some(msg), _) => Some(msg),
+            _ => None,
+        }
     }
 
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
         let show_divider = match self.mode {
-            Mode::Single => !self.pager.is_first(),
+            Mode::Single => !self.pager.is_single(),
             Mode::Double { .. } => true,
             Mode::Timeout => false,
             Mode::PaginateOnly => !self.pager.is_single(),

@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    theme::{self, ScreenBackground, SIDE_INSETS},
+    theme::{self, ScreenBackground, CONTENT_INSETS_NO_HEADER, SIDE_INSETS},
     ActionBar, ActionBarMsg, FidoAccountName, FidoCredential, Header, HeaderMsg, Hint,
 };
 
@@ -38,6 +38,7 @@ pub struct TextScreen<T> {
     action_bar: Option<ActionBar>,
     page_limit: Option<u16>,
     background: Option<ScreenBackground>,
+    pagination_hint: bool,
     // TODO: swipe handling
     // TODO: animations
 }
@@ -55,7 +56,6 @@ where
     const SUBTITLE_HEIGHT: i16 = 44;
     const SUBTITLE_DOUBLE_HEIGHT: i16 = 76;
     const SUBTITLE_STYLE: TextStyle = theme::TEXT_MEDIUM_EXTRA_LIGHT;
-    const CONTENT_INSETS_NO_HEADER: Insets = Insets::top(38);
 
     pub fn new(content: T) -> Self {
         Self {
@@ -66,6 +66,7 @@ where
             action_bar: Some(ActionBar::new_paginate_only()),
             page_limit: None,
             background: None,
+            pagination_hint: false,
         }
     }
 
@@ -83,6 +84,11 @@ where
 
     pub fn with_hint(mut self, hint: Hint<'static>) -> Self {
         self.hint = Some(hint);
+        self
+    }
+
+    pub fn with_pagination_hint(mut self) -> Self {
+        self.pagination_hint = true;
         self
     }
 
@@ -168,7 +174,7 @@ where
             rest
         };
 
-        let mut content_area = if let Some(hint) = &mut self.hint {
+        let rest = if let Some(hint) = &mut self.hint {
             let (rest, hint_area) = rest.split_bottom(hint.height());
             hint.place(hint_area);
             rest
@@ -176,17 +182,29 @@ where
             rest
         };
 
-        // Introduce side insets + top padding if the header is not present
-        content_area = content_area.inset(SIDE_INSETS);
-        content_area = if self.header.is_none() {
-            content_area.inset(Self::CONTENT_INSETS_NO_HEADER)
-        } else {
-            content_area
+        let compute_content_area = |area: Rect, has_header: bool| {
+            let mut area = area.inset(SIDE_INSETS);
+            if !has_header {
+                area = area.inset(Insets::top(CONTENT_INSETS_NO_HEADER.top));
+            }
+            area
         };
 
+        // Introduce side insets + top padding if the header is not present
+        let content_area = compute_content_area(rest, self.header.is_some());
         self.content.place(content_area);
-
         self.update_page(0);
+
+        if self.pagination_hint && self.hint.is_none() && self.content.pager().total() > 1 {
+            let mut hint = Hint::new_page_counter();
+            let (rest, hint_area) = rest.split_bottom(hint.height());
+            hint.place(hint_area);
+            self.hint = Some(hint);
+            let content_area = compute_content_area(rest, self.header.is_some());
+            self.content.place(content_area);
+            self.update_page(0);
+        }
+
         bounds
     }
 

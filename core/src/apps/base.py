@@ -38,9 +38,6 @@ if TYPE_CHECKING:
         )
 
 
-_SCREENSAVER_IS_ON = False
-
-
 def busy_expiry_ms() -> int:
     """
     Returns the time left until the busy state expires or 0 if the device is not in the busy state.
@@ -221,6 +218,14 @@ def get_features() -> Features:
         f.display_rotation = storage_device.get_rotation()
         f.experimental_features = storage_device.get_experimental_features()
         f.hide_passphrase_from_host = storage_device.get_hide_passphrase_from_host()
+
+        if utils.USE_POWER_MANAGER:
+            f.auto_lock_delay_battery_ms = (
+                storage_device.get_autolock_delay_battery_ms()
+            )
+
+        if utils.USE_RGB_LED:
+            f.led = storage_device.get_rgb_led()
 
     return f
 

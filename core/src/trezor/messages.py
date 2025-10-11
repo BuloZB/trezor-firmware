@@ -2087,6 +2087,8 @@ if TYPE_CHECKING:
         optiga_sec: "int | None"
         soc: "int | None"
         firmware_corrupted: "bool | None"
+        auto_lock_delay_battery_ms: "int | None"
+        led: "bool | None"
 
         def __init__(
             self,
@@ -2144,6 +2146,8 @@ if TYPE_CHECKING:
             optiga_sec: "int | None" = None,
             soc: "int | None" = None,
             firmware_corrupted: "bool | None" = None,
+            auto_lock_delay_battery_ms: "int | None" = None,
+            led: "bool | None" = None,
         ) -> None:
             pass
 
@@ -2757,6 +2761,26 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["SetBrightness"]:
+            return isinstance(msg, cls)
+
+    class GetSerialNumber(protobuf.MessageType):
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["GetSerialNumber"]:
+            return isinstance(msg, cls)
+
+    class SerialNumber(protobuf.MessageType):
+        serial_number: "str"
+
+        def __init__(
+            self,
+            *,
+            serial_number: "str",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["SerialNumber"]:
             return isinstance(msg, cls)
 
     class Slip39Group(protobuf.MessageType):

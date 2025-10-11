@@ -84,8 +84,8 @@ def configure(
         paths += ["embed/io/backlight/inc"]
 
     if "input" in features_wanted:
-        sources += ["embed/io/touch/ft6x36/ft6x36.c"]
-        sources += ["embed/io/touch/ft6x36/panels/lx250a2410a.c"]
+        sources += ["embed/io/touch/ft3168/ft3168.c"]
+        sources += ["embed/io/touch/ft3168/panels/lx250a2410a.c"]
         sources += ["embed/io/touch/touch_poll.c"]
         paths += ["embed/io/touch/inc"]
         features_available.append("touch")
@@ -223,8 +223,8 @@ def configure(
         defines += [("LT_USE_TREZOR_CRYPTO", "1")]
         defines += [("LT_HELPERS", "1")]
 
-        paths += ["vendor/libtropic/TROPIC01_fw_update_files/boot_v_1_0_1/fw_v_1_0_0"]
-        defines += [("ABAB", "1")]
+        paths += ["vendor/libtropic/TROPIC01_fw_update_files/boot_v_2_0_1/fw_v_1_0_0"]
+        defines += [("ACAB", "1")]
 
     if "sbu" in features_wanted:
         sources += ["embed/io/sbu/stm32/sbu.c"]
@@ -312,6 +312,9 @@ def configure(
         ]
         paths += ["embed/sec/iwdg/inc"]
         defines += [("USE_IWDG", "1")]
+
+    if "serial_number" in features_wanted:
+        defines += [("USE_SERIAL_NUMBER", "1")]
 
     env.get("ENV")["LINKER_SCRIPT"] = linker_script
     env.get("ENV")["MEMORY_LAYOUT"] = memory_layout

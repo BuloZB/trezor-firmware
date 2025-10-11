@@ -18,6 +18,8 @@
  */
 
 #ifdef KERNEL
+#include <stdint.h>
+#include "embed/io/ble/inc/io/ble.h"
 
 #include <trezor_rtl.h>
 
@@ -310,6 +312,14 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       unit_properties_get__verified(props);
     } break;
 
+    case SYSCALL_UNIT_PROPERTIES_GET_SN: {
+      uint8_t *device_sn = (uint8_t *)args[0];
+      size_t max_device_sn_size = args[1];
+      size_t *device_sn_size = (size_t *)args[2];
+      args[0] = unit_properties_get_sn__verified(device_sn, max_device_sn_size,
+                                                 device_sn_size);
+    } break;
+
 #ifdef LOCKABLE_BOOTLOADER
     case SYSCALL_SECRET_BOOTLOADER_LOCKED: {
       args[0] = secret_bootloader_locked();
@@ -590,9 +600,35 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       ble_start();
     } break;
 
-    case SYSCALL_BLE_ISSUE_COMMAND: {
-      ble_command_t *command = (ble_command_t *)args[0];
-      args[0] = ble_issue_command__verified(command);
+    case SYSCALL_BLE_SWITCH_ON: {
+      args[0] = ble_switch_on();
+    } break;
+
+    case SYSCALL_BLE_SWITCH_OFF: {
+      args[0] = ble_switch_off();
+    } break;
+
+    case SYSCALL_BLE_ENTER_PAIRING_MODE: {
+      const uint8_t *name = (const uint8_t *)args[0];
+      size_t name_len = (size_t)args[1];
+      args[0] = ble_enter_pairing_mode__verified(name, name_len);
+    } break;
+
+    case SYSCALL_BLE_DISCONNECT: {
+      args[0] = ble_disconnect();
+    } break;
+
+    case SYSCALL_BLE_ERASE_BONDS: {
+      args[0] = ble_erase_bonds();
+    } break;
+
+    case SYSCALL_BLE_ALLOW_PAIRING: {
+      const uint8_t *code = (const uint8_t *)args[0];
+      args[0] = ble_allow_pairing__verified(code);
+    } break;
+
+    case SYSCALL_BLE_REJECT_PAIRING: {
+      args[0] = ble_reject_pairing();
     } break;
 
     case SYSCALL_BLE_GET_STATE: {
@@ -646,6 +682,16 @@ __attribute((no_stack_protector)) void syscall_handler(uint32_t *args,
       bool enable = args[0];
       ble_set_high_speed(enable);
     } break;
+
+    case SYSCALL_BLE_SET_ENABLED: {
+      bool enabled = (args[0] != 0);
+      ble_set_enabled(enabled);
+    } break;
+
+    case SYSCALL_BLE_GET_ENABLED: {
+      args[0] = ble_get_enabled();
+    } break;
+
 #endif
 
 #ifdef USE_NRF

@@ -107,6 +107,10 @@ secbool __wur sdcard_write_blocks__verified(const uint32_t *src,
 
 void unit_properties_get__verified(unit_properties_t *props);
 
+bool unit_properties_get_sn__verified(uint8_t *device_sn,
+                                      size_t max_device_sn_size,
+                                      size_t *device_sn_size);
+
 // ---------------------------------------------------------------------
 #ifdef USE_OPTIGA
 
@@ -183,7 +187,9 @@ secbool firmware_get_vendor__verified(char *buff, size_t buff_size);
 
 #include <io/ble.h>
 
-bool ble_issue_command__verified(ble_command_t *state);
+bool ble_enter_pairing_mode__verified(const uint8_t *name, size_t name_len);
+
+bool ble_allow_pairing__verified(const uint8_t *pairing_code);
 
 void ble_get_state__verified(ble_state_t *state);
 

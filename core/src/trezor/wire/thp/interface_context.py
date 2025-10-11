@@ -135,6 +135,10 @@ class InterfaceContext:
             channel = self._channels[cid] = Channel(cache, self, buffers)
 
         if channel.reassemble(packet):
+            if __debug__ and channel.reassembler.message is not None:
+                msg_type = "ACK" if control_byte.is_ack(ctrl_byte) else "message"
+                msg = channel.reassembler.message
+                channel._log(f"reassembled valid {msg_type}: {len(msg)} bytes")
             update_channel_last_used(channel.channel_id)
             return channel
 
@@ -223,12 +227,14 @@ class InterfaceContext:
         await self.write_payload(response_header, response_data)
 
     def write_error(self, cid: int, err_type: ThpErrorType) -> Awaitable[None]:
+        if __debug__:
+            log.error(__name__, "(cid: %04x) THP error #%d", cid, err_type)
         msg_data = err_type.to_bytes(1, "big")
         length = len(msg_data) + CHECKSUM_LENGTH
         header = PacketHeader.get_error_header(cid, length)
         return self.write_payload(header, msg_data)
 
-    def connected_addr(self) -> bytes | None:
+    def connected_addr(self) -> AnyBytes | None:
         """
         Return peer MAC address (if connected).
 

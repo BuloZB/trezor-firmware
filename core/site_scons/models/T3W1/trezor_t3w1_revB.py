@@ -84,8 +84,8 @@ def configure(
         paths += ["embed/io/backlight/inc"]
 
     if "input" in features_wanted:
-        sources += ["embed/io/touch/ft6x36/ft6x36.c"]
-        sources += ["embed/io/touch/ft6x36/panels/lx250a2410a.c"]
+        sources += ["embed/io/touch/ft3168/ft3168.c"]
+        sources += ["embed/io/touch/ft3168/panels/lx250a2410a.c"]
         sources += ["embed/io/touch/touch_poll.c"]
         paths += ["embed/io/touch/inc"]
         features_available.append("touch")
@@ -313,6 +313,9 @@ def configure(
         ]
         paths += ["embed/sec/iwdg/inc"]
         defines += [("USE_IWDG", "1")]
+
+    if "serial_number" in features_wanted:
+        defines += [("USE_SERIAL_NUMBER", "1")]
 
     env.get("ENV")["LINKER_SCRIPT"] = linker_script
     env.get("ENV")["MEMORY_LAYOUT"] = memory_layout

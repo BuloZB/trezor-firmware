@@ -2,15 +2,17 @@ from typing import TYPE_CHECKING
 
 import storage.device as storage_device
 from storage.cache_common import APP_COMMON_BUSY_DEADLINE_MS
-from trezor import config, utils, wire, workflow
+from trezor import config, io, utils, wire, workflow
 from trezor.wire import context
 from trezor.wire.message_handler import filters, remove_filter
 
 if utils.USE_POWER_MANAGER:
-    from trezor import io
     from trezor.power_management.autodim import autodim_display
     from trezor.power_management.suspend import suspend_device
     from trezorui_api import BacklightLevels, backlight_fade
+
+if utils.USE_BLE:
+    import trezorble as ble
 
 if TYPE_CHECKING:
     from trezor import protobuf
@@ -29,6 +31,7 @@ else:
 
     _SHOULD_SUSPEND = False
     _notify_power_button: loop.mailbox[None] = loop.mailbox()
+    notify_bootscreen: loop.mailbox[None] = loop.mailbox()
 
     def _schedule_suspend_after_workflow() -> None:
         """Signal that the device should be suspended by the default task after the
@@ -47,6 +50,7 @@ else:
 
         Notifies an asynchronous task to perform the suspend in a separate thread.
         """
+        notify_bootscreen.put(None, replace=True)
         _notify_power_button.put(None, replace=True)
 
     async def _power_handler() -> None:
@@ -83,7 +87,6 @@ else:
 
         _SHOULD_SUSPEND = False
         set_homescreen()
-        backlight_fade(BacklightLevels.NORMAL)
 
     async def _suspend_and_resume_task() -> None:
         """Task to suspend Trezor and handle wakeup.
@@ -168,6 +171,9 @@ def lock_device_if_unlocked() -> None:
 
     if utils.USE_POWER_MANAGER and not utils.EMULATOR:
         if workflow.autolock_interrupts_workflow:
+            if not config.is_unlocked():
+                # locking during PIN entering should restart the workflow, otherwise the keyboard input field is not cleared
+                workflow.close_others()
             # suspend immediately
             suspend_and_resume()
         else:
@@ -216,6 +222,15 @@ def reload_settings_from_storage() -> None:
 
     if utils.USE_POWER_MANAGER:
         configure_autodim()
+
+    if utils.USE_HAPTIC:
+        io.haptic.haptic_set_enabled(storage_device.get_haptic_feedback())
+
+    if utils.USE_RGB_LED:
+        io.rgb_led.rgb_led_set_enabled(storage_device.get_rgb_led())
+
+    if utils.USE_BLE:
+        ble.set_enabled(storage_device.get_ble())
 
     wire.message_handler.EXPERIMENTAL_ENABLED = (
         storage_device.get_experimental_features()

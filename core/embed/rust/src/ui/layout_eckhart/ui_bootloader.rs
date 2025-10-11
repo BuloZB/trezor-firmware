@@ -39,7 +39,6 @@ pub type BootloaderString = String<128>;
 const RESTART_MESSAGE: &str = "Restart";
 
 const SCREEN: Rect = UIEckhart::SCREEN;
-const PROGRESS_TEXT_ORIGIN: Point = SCREEN.top_left().ofs(Offset::new(theme::PADDING, 38));
 const PROGRESS_WAIT_HEIGHT: i16 = 70;
 const PROGRESS_WAIT_ORIGIN: Point = SCREEN
     .bottom_left()
@@ -62,14 +61,13 @@ impl UIEckhart {
         }
         display::sync();
 
-        let mut label = Label::new(text.into(), Alignment::Start, TEXT_NORMAL);
-        let mut wait_msg =
-            Label::new(wait_msg.into(), Alignment::Center, TEXT_SMALL_GREY).vertically_centered();
+        let mut label = Label::left_aligned(text.into(), TEXT_NORMAL);
+        let mut wait_msg = Label::centered(wait_msg.into(), TEXT_SMALL_GREY).vertically_centered();
         render_on_display(None, Some(BLD_BG), |target| {
             render_loader(loader_progress, border, target);
 
             label.place(Rect::from_top_left_and_size(
-                PROGRESS_TEXT_ORIGIN,
+                theme::PROGRESS_TEXT_ORIGIN,
                 Offset::new(
                     SCREEN.width() - 2 * theme::PADDING,
                     4 * FONT_SATOSHI_REGULAR_38.text_height(),
@@ -362,7 +360,7 @@ impl BootloaderUI for UIEckhart {
         ))
         .with_header(BldHeader::new(title_str.as_str().into()).with_menu_button())
         .with_action_bar(BldActionBar::new_single(
-            Button::with_text("Connect to host device".into()).styled(button_confirm()),
+            Button::with_text("Initiate connection".into()).styled(button_confirm()),
         ))
         .with_screen_border(SCREEN_BORDER_BLUE);
 
@@ -410,7 +408,7 @@ impl BootloaderUI for UIEckhart {
         };
 
         let msg = if wireless {
-            "Keep your Trezor close to\nthe host device"
+            "Keep your Trezor close to\nthe connected device"
         } else {
             "Do not disconnect\nyour Trezor"
         };

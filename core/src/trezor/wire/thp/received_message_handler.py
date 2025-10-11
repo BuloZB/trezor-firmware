@@ -31,6 +31,8 @@ from .crypto import PUBKEY_LENGTH, Handshake
 from .session_context import SeedlessSessionContext
 
 if TYPE_CHECKING:
+    from buffer_types import AnyBytes
+
     from trezor.messages import ThpHandshakeCompletionReqNoisePayload
 
     from .channel import Channel
@@ -75,6 +77,7 @@ async def handle_received_message(channel: Channel) -> bool:
         await channel.iface_ctx.write_error(
             channel.get_channel_id_int(), ThpErrorType.DEVICE_LOCKED
         )
+        channel.clear()
     return False
 
 
@@ -86,19 +89,48 @@ async def _handle_state_handshake(
 
     payload = await ctx.recv_payload(control_byte.is_handshake_init_req)
 
-    if len(payload) != PUBKEY_LENGTH:
-        log.error(__name__, "Message received is not a valid handshake init request!")
+    if len(payload) != PUBKEY_LENGTH + 1:
+        if __debug__:
+            log.error(
+                __name__,
+                "Message received is not a valid handshake init request: %d bytes",
+                len(payload),
+            )
         return
 
-    if not config.is_unlocked():
+    host_ephemeral_public_key = payload[:PUBKEY_LENGTH]
+    # show the PIN keyboard to allow the user to unlock the device
+    try_to_unlock = payload[PUBKEY_LENGTH] & 0x01 == 1
+
+    async def _check_unlocked() -> None:
+        if config.is_unlocked():
+            return
+
+        if try_to_unlock:
+            from trezor import workflow
+
+            from apps.common.lock_manager import unlock_device
+
+            # Register the unlock prompt with the workflow management system
+            # (in order to avoid immediately respawning the lockscreen task)
+            try:
+                return await workflow.spawn(unlock_device())
+            except Exception as e:
+                if __debug__:
+                    log.exception(__name__, e)
+
+        # Fail pairing if still locked
         raise ThpDeviceLockedError
+
+    await _check_unlocked()
 
     handshake = Handshake()
 
     trezor_ephemeral_public_key, encrypted_trezor_static_public_key, tag = (
         handshake.handle_th1_crypto(
             get_encoded_device_properties(ctx.iface),
-            host_ephemeral_public_key=payload,
+            host_ephemeral_public_key=host_ephemeral_public_key,
+            payload=payload[PUBKEY_LENGTH:],
         )
     )
 
@@ -124,8 +156,10 @@ async def _handle_state_handshake(
 
     payload = await ctx.recv_payload(control_byte.is_handshake_comp_req)
 
-    if not config.is_unlocked():
-        raise ThpDeviceLockedError
+    # will be `None` on USB interface, to be ignored by `cache_host_info()`
+    mac_addr: AnyBytes | None = ctx.iface_ctx.connected_addr()
+
+    await _check_unlocked()
 
     host_encrypted_static_public_key = payload[: KEY_LENGTH + TAG_LENGTH]
     handshake_completion_request_noise_payload = payload[KEY_LENGTH + TAG_LENGTH :]
@@ -174,8 +208,18 @@ async def _handle_state_handshake(
                 host_static_public_key,
             )
             if paired:
+                from trezor.wire.thp.paired_cache import cache_host_info
+
+                cache_host_info(
+                    mac_addr=mac_addr,
+                    host_name=credential.cred_metadata.host_name,
+                    app_name=credential.cred_metadata.app_name,
+                )
                 trezor_state = _TREZOR_STATE_PAIRED
                 ctx.credential = credential
+                if ctx.is_channel_to_replace():
+                    # When replacing existing channel, user confirmation is not needed
+                    trezor_state = _TREZOR_STATE_PAIRED_AUTOCONNECT
             else:
                 ctx.credential = None
         except DataError as e:
@@ -222,29 +266,6 @@ async def _handle_pairing(ctx: Channel) -> None:
 
     _session_id, message = await ctx.decrypt_message()
     await ctx.connection_context.handle(message)
-
-
-def _should_have_ctrl_byte_encrypted_transport(ctx: Channel) -> bool:
-    return ctx.get_channel_state() not in (
-        ChannelState.UNALLOCATED,
-        ChannelState.TH1,
-        ChannelState.TH2,
-    )
-
-
-def _decode_message(
-    buffer: bytes,
-    msg_type: int,
-    message_name: str | None = None,
-    wire_enum: str = "ThpMessageType",
-) -> protobuf.MessageType:
-    if __debug__:
-        log.debug(__name__, "decode message")
-    if message_name is not None:
-        expected_type = protobuf.type_for_name(message_name)
-    else:
-        expected_type = protobuf.type_for_wire(wire_enum, msg_type)
-    return message_handler.wrap_protobuf_load(buffer, expected_type)
 
 
 def _is_channel_state_pairing(state: int) -> bool:
