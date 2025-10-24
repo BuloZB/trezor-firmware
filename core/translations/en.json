@@ -1,7 +1,7 @@
 {
   "header": {
     "language": "en-US",
-    "version": "2.9.3"
+    "version": "2.9.4"
   },
   "translations": {
     "addr_mismatch__contact_support_at": "Please contact Trezor support at",
@@ -43,8 +43,18 @@
     "authenticate__header": "Authenticate device",
     "auto_lock__change_template": "Auto-lock Trezor after {0} of inactivity?",
     "auto_lock__description": "Set the time before your Trezor locks automatically.",
-    "auto_lock__on_battery": "on battery / wireless charger",
-    "auto_lock__on_usb": "connected to USB",
+    "auto_lock__on_battery": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "",
+      "Eckhart": "on battery / wireless charger"
+    },
+    "auto_lock__on_usb": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "",
+      "Eckhart": "connected to USB"
+    },
     "auto_lock__title": {
       "Bolt": "Auto-lock delay",
       "Caesar": "Auto-lock delay",
@@ -209,7 +219,7 @@
       "Bolt": "",
       "Caesar": "",
       "Delizia": "",
-      "Eckhart": "Pair & connect"
+      "Eckhart": "Pair & Connect"
     },
     "ble__pairing_match": {
       "Bolt": "",
@@ -246,12 +256,6 @@
       "Caesar": "",
       "Delizia": "",
       "Eckhart": "Bluetooth version"
-    },
-    "ble__waiting_for_host": {
-      "Bolt": "",
-      "Caesar": "",
-      "Delizia": "",
-      "Eckhart": "Waiting for connection..."
     },
     "brightness__change_title": "Change display brightness",
     "brightness__changed_title": "Display brightness changed",
@@ -1596,7 +1600,7 @@
     "reset__share_completed_template": "Share #{0} completed",
     "reset__share_words_first": "Write down the first word from the backup.",
     "reset__share_words_title": "Standard backup",
-    "reset__slip39_checklist_more_info_threshold": "The threshold sets the minumum number of shares needed to recover your wallet.",
+    "reset__slip39_checklist_more_info_threshold": "The threshold sets the minimum number of shares needed to recover your wallet.",
     "reset__slip39_checklist_more_info_threshold_example_template": "If you set {0} out of {1} shares, you'll need {2} backup shares to recover your wallet.",
     "reset__slip39_checklist_num_groups": "Number of groups",
     "reset__slip39_checklist_num_groups_x_template": "Number of groups: {0}",
@@ -1650,6 +1654,7 @@
     "reset__you_need_one_share": "For recovery you need 1 share.",
     "reset__your_backup_is_done": "Your backup is done.",
     "ripple__confirm_tag": "Confirm tag",
+    "ripple__destination_tag_missing": "Destination tag is not set. Typically needed when sending to exchanges.",
     "ripple__destination_tag_template": "Destination tag:\n{0}",
     "rotation__change_template": "Change display orientation to {0}?",
     "rotation__east": "east",
@@ -2060,9 +2065,19 @@
     "tutorial__menu": "Find context-specific actions and options in the menu.",
     "tutorial__menu_appendix": "View more info, quit flow, ...",
     "tutorial__middle_click": "Press both left and right at the same\ntime to confirm.",
-    "tutorial__navigation_ts7": "Use the on-screen buttons to navigate and confirm your actions.",
+    "tutorial__navigation_ts7": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "",
+      "Eckhart": "Use the on-screen buttons to navigate and confirm your actions."
+    },
     "tutorial__one_more_step": "One more step",
-    "tutorial__power": "Use the power button on the side to turn your device on or off.",
+    "tutorial__power": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "",
+      "Eckhart": "Use the power button on the side to turn your device on or off."
+    },
     "tutorial__press_and_hold": "Press and hold the right button to\napprove important operations.",
     "tutorial__ready_to_use": "You're ready to\nuse Trezor.",
     "tutorial__ready_to_use_safe5": "You're all set to start using your device!",
@@ -2239,6 +2254,7 @@
     "words__unknown": "Unknown",
     "words__unlimited": "Unlimited",
     "words__unlocked": "Unlocked",
+    "words__waiting_for_host": "Waiting for connection...",
     "words__wallet": "Wallet",
     "words__warning": "Warning",
     "words__wipe": "Wipe",

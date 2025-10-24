@@ -1298,7 +1298,7 @@ pub enum TranslatedString {
     brightness__changed_title = 954,  // "Display brightness changed"
     brightness__change_title = 955,  // "Change display brightness"
     words__title_done = 956,  // "Done"
-    reset__slip39_checklist_more_info_threshold = 957,  // "The threshold sets the minumum number of shares needed to recover your wallet."
+    reset__slip39_checklist_more_info_threshold = 957,  // "The threshold sets the minimum number of shares needed to recover your wallet."
     reset__slip39_checklist_more_info_threshold_example_template = 958,  // "If you set {0} out of {1} shares, you'll need {2} backup shares to recover your wallet."
     passphrase__continue_with_empty_passphrase = 959,  // "Continue with empty passphrase?"
     #[cfg(feature = "universal_fw")]
@@ -1440,7 +1440,7 @@ pub enum TranslatedString {
     instructions__menu_to_continue = 1058,  // "Use menu to continue"
     tutorial__last_one = 1059,  // "Last one"
     tutorial__menu_appendix = 1060,  // "View more info, quit flow, ..."
-    tutorial__navigation_ts7 = 1061,  // "Use the on-screen buttons to navigate and confirm your actions."
+    tutorial__navigation_ts7 = 1061,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Use the on-screen buttons to navigate and confirm your actions."}
     tutorial__suite_restart = 1062,  // "Replay this tutorial anytime from the Trezor Suite app."
     tutorial__welcome_safe7 = 1067,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Welcome\nto Trezor\nSafe 7"}
     tutorial__what_is_tropic = 1068,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "What is TROPIC01?"}
@@ -1477,7 +1477,7 @@ pub enum TranslatedString {
     cardano__sign_message_path_template = 1087,  // "Sign message with {0}"
     ble__manage_paired = 1088,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Manage paired devices"}
     ble__pair_new = 1089,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Pair new device"}
-    ble__pair_title = 1090,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Pair & connect"}
+    ble__pair_title = 1090,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Pair & Connect"}
     ble__version = 1091,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Bluetooth version"}
     homescreen__firmware_type = 1092,  // "Firmware type"
     homescreen__firmware_version = 1093,  // "Firmware version"
@@ -1539,9 +1539,9 @@ pub enum TranslatedString {
     ble__pairing_title = 1149,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Bluetooth pairing"}
     thp__pair_name = 1151,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "{0} is your Trezor's name."}
     thp__pair_new_device = 1152,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Pair with new device"}
-    tutorial__power = 1153,  // "Use the power button on the side to turn your device on or off."
-    auto_lock__on_battery = 1154,  // "on battery / wireless charger"
-    auto_lock__on_usb = 1155,  // "connected to USB"
+    tutorial__power = 1153,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Use the power button on the side to turn your device on or off."}
+    auto_lock__on_battery = 1154,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "on battery / wireless charger"}
+    auto_lock__on_usb = 1155,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "connected to USB"}
     pin__wipe_code_exists_description = 1156,  // "Wipe code must be turned off before turning off PIN protection."
     pin__wipe_code_exists_title = 1157,  // "Wipe code set"
     wipe_code__pin_not_set_description = 1158,  // "PIN must be set before enabling wipe code."
@@ -1549,11 +1549,13 @@ pub enum TranslatedString {
     homescreen__backup_needed_info = 1160,  // "Open Trezor Suite and create a wallet backup. This is the only way to recover access to your assets."
     ble__host_info = 1161,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Connection info"}
     ble__mac_address = 1162,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "MAC address"}
-    ble__waiting_for_host = 1163,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Waiting for connection..."}
+    words__waiting_for_host = 1163,  // "Waiting for connection..."
     ble__apps_connected = 1164,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Apps connected"}
     sn__action = 1165,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Allow connected device to get serial number of your Trezor Safe 7?"}
     sn__title = 1166,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "Serial number"}
     ble__must_be_enabled = 1167,  // {"Bolt": "", "Caesar": "", "Delizia": "", "Eckhart": "The Bluetooth must be turned on to pair with a new device."}
+    #[cfg(feature = "universal_fw")]
+    ripple__destination_tag_missing = 1168,  // "Destination tag is not set. Typically needed when sending to exchanges."
 }
 
 impl TranslatedString {
@@ -4317,7 +4319,7 @@ impl TranslatedString {
             (Self::brightness__changed_title, "Display brightness changed"),
             (Self::brightness__change_title, "Change display brightness"),
             (Self::words__title_done, "Done"),
-            (Self::reset__slip39_checklist_more_info_threshold, "The threshold sets the minumum number of shares needed to recover your wallet."),
+            (Self::reset__slip39_checklist_more_info_threshold, "The threshold sets the minimum number of shares needed to recover your wallet."),
             (Self::reset__slip39_checklist_more_info_threshold_example_template, "If you set {0} out of {1} shares, you'll need {2} backup shares to recover your wallet."),
             (Self::passphrase__continue_with_empty_passphrase, "Continue with empty passphrase?"),
             #[cfg(feature = "universal_fw")]
@@ -4517,6 +4519,13 @@ impl TranslatedString {
             (Self::instructions__menu_to_continue, "Use menu to continue"),
             (Self::tutorial__last_one, "Last one"),
             (Self::tutorial__menu_appendix, "View more info, quit flow, ..."),
+            #[cfg(feature = "layout_bolt")]
+            (Self::tutorial__navigation_ts7, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::tutorial__navigation_ts7, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::tutorial__navigation_ts7, ""),
+            #[cfg(feature = "layout_eckhart")]
             (Self::tutorial__navigation_ts7, "Use the on-screen buttons to navigate and confirm your actions."),
             (Self::tutorial__suite_restart, "Replay this tutorial anytime from the Trezor Suite app."),
             #[cfg(feature = "layout_bolt")]
@@ -4596,7 +4605,7 @@ impl TranslatedString {
             #[cfg(feature = "layout_delizia")]
             (Self::ble__pair_title, ""),
             #[cfg(feature = "layout_eckhart")]
-            (Self::ble__pair_title, "Pair & connect"),
+            (Self::ble__pair_title, "Pair & Connect"),
             #[cfg(feature = "layout_bolt")]
             (Self::ble__version, ""),
             #[cfg(feature = "layout_caesar")]
@@ -4875,8 +4884,29 @@ impl TranslatedString {
             (Self::thp__pair_new_device, ""),
             #[cfg(feature = "layout_eckhart")]
             (Self::thp__pair_new_device, "Pair with new device"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::tutorial__power, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::tutorial__power, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::tutorial__power, ""),
+            #[cfg(feature = "layout_eckhart")]
             (Self::tutorial__power, "Use the power button on the side to turn your device on or off."),
+            #[cfg(feature = "layout_bolt")]
+            (Self::auto_lock__on_battery, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::auto_lock__on_battery, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::auto_lock__on_battery, ""),
+            #[cfg(feature = "layout_eckhart")]
             (Self::auto_lock__on_battery, "on battery / wireless charger"),
+            #[cfg(feature = "layout_bolt")]
+            (Self::auto_lock__on_usb, ""),
+            #[cfg(feature = "layout_caesar")]
+            (Self::auto_lock__on_usb, ""),
+            #[cfg(feature = "layout_delizia")]
+            (Self::auto_lock__on_usb, ""),
+            #[cfg(feature = "layout_eckhart")]
             (Self::auto_lock__on_usb, "connected to USB"),
             (Self::pin__wipe_code_exists_description, "Wipe code must be turned off before turning off PIN protection."),
             (Self::pin__wipe_code_exists_title, "Wipe code set"),
@@ -4906,14 +4936,7 @@ impl TranslatedString {
             (Self::ble__mac_address, ""),
             #[cfg(feature = "layout_eckhart")]
             (Self::ble__mac_address, "MAC address"),
-            #[cfg(feature = "layout_bolt")]
-            (Self::ble__waiting_for_host, ""),
-            #[cfg(feature = "layout_caesar")]
-            (Self::ble__waiting_for_host, ""),
-            #[cfg(feature = "layout_delizia")]
-            (Self::ble__waiting_for_host, ""),
-            #[cfg(feature = "layout_eckhart")]
-            (Self::ble__waiting_for_host, "Waiting for connection..."),
+            (Self::words__waiting_for_host, "Waiting for connection..."),
             #[cfg(feature = "layout_bolt")]
             (Self::ble__apps_connected, ""),
             #[cfg(feature = "layout_caesar")]
@@ -4946,6 +4969,8 @@ impl TranslatedString {
             (Self::ble__must_be_enabled, ""),
             #[cfg(feature = "layout_eckhart")]
             (Self::ble__must_be_enabled, "The Bluetooth must be turned on to pair with a new device."),
+            #[cfg(feature = "universal_fw")]
+            (Self::ripple__destination_tag_missing, "Destination tag is not set. Typically needed when sending to exchanges."),
     ];
 
     #[cfg(feature = "micropython")]
@@ -5048,7 +5073,6 @@ impl TranslatedString {
         (Qstr::MP_QSTR_ble__unpair_current, Self::ble__unpair_current),
         (Qstr::MP_QSTR_ble__unpair_title, Self::ble__unpair_title),
         (Qstr::MP_QSTR_ble__version, Self::ble__version),
-        (Qstr::MP_QSTR_ble__waiting_for_host, Self::ble__waiting_for_host),
         (Qstr::MP_QSTR_brightness__change_title, Self::brightness__change_title),
         (Qstr::MP_QSTR_brightness__changed_title, Self::brightness__changed_title),
         (Qstr::MP_QSTR_brightness__title, Self::brightness__title),
@@ -6033,6 +6057,8 @@ impl TranslatedString {
         #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_ripple__confirm_tag, Self::ripple__confirm_tag),
         #[cfg(feature = "universal_fw")]
+        (Qstr::MP_QSTR_ripple__destination_tag_missing, Self::ripple__destination_tag_missing),
+        #[cfg(feature = "universal_fw")]
         (Qstr::MP_QSTR_ripple__destination_tag_template, Self::ripple__destination_tag_template),
         (Qstr::MP_QSTR_rotation__change_template, Self::rotation__change_template),
         (Qstr::MP_QSTR_rotation__east, Self::rotation__east),
@@ -6487,6 +6513,7 @@ impl TranslatedString {
         (Qstr::MP_QSTR_words__unknown, Self::words__unknown),
         (Qstr::MP_QSTR_words__unlimited, Self::words__unlimited),
         (Qstr::MP_QSTR_words__unlocked, Self::words__unlocked),
+        (Qstr::MP_QSTR_words__waiting_for_host, Self::words__waiting_for_host),
         (Qstr::MP_QSTR_words__wallet, Self::words__wallet),
         (Qstr::MP_QSTR_words__warning, Self::words__warning),
         (Qstr::MP_QSTR_words__wipe, Self::words__wipe),
