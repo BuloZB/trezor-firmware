@@ -73,12 +73,15 @@ void tropic_deinit(void);
 #include "libtropic.h"
 lt_handle_t* tropic_get_handle(void);
 
-lt_ret_t tropic_start_custom_session(const uint8_t* stpub,
-                                     const pkey_index_t pkey_index,
-                                     const uint8_t* shipriv,
-                                     const uint8_t* shipub);
+lt_ret_t tropic_custom_session_start(pkey_index_t pairing_key_index);
+
+lt_ret_t tropic_session_invalidate(void);
 
 bool tropic_wait_for_ready(void);
+
+bool tropic_get_pubkey(curve25519_key pubkey);
+
+bool tropic_get_cert_chain_ptr(uint8_t const** cert_chain, size_t* length);
 #endif
 
 #endif
@@ -104,28 +107,40 @@ bool tropic_data_multi_read(uint16_t first_slot, uint16_t slot_count,
 
 bool tropic_random_buffer(void* buffer, size_t length);
 
+void tropic_random_buffer_time(uint32_t* time_ms);
+
 #ifdef USE_STORAGE
+void tropic_session_start_time(uint32_t* time_ms);
+
 bool tropic_pin_stretch(tropic_ui_progress_t ui_progress, uint16_t pin_index,
                         uint8_t stretched_pin[TROPIC_MAC_AND_DESTROY_SIZE]);
+
+void tropic_pin_stretch_time(uint32_t* time_ms);
 
 bool tropic_pin_reset_slots(
     tropic_ui_progress_t ui_progress, uint16_t pin_index,
     const uint8_t reset_key[TROPIC_MAC_AND_DESTROY_SIZE]);
+
+void tropic_pin_reset_slots_time(uint32_t* time_ms, uint16_t pin_index);
 
 bool tropic_pin_set(
     tropic_ui_progress_t ui_progress,
     uint8_t stretched_pins[PIN_MAX_TRIES][TROPIC_MAC_AND_DESTROY_SIZE],
     uint8_t reset_key[TROPIC_MAC_AND_DESTROY_SIZE]);
 
+void tropic_pin_set_time(uint32_t* time_ms);
+
 bool tropic_pin_set_kek_masks(
     tropic_ui_progress_t ui_progress,
     const uint8_t kek[TROPIC_MAC_AND_DESTROY_SIZE],
     const uint8_t stretched_pins[PIN_MAX_TRIES][TROPIC_MAC_AND_DESTROY_SIZE]);
+
+void tropic_pin_set_kek_masks_time(uint32_t* time_ms);
 
 bool tropic_pin_unmask_kek(
     tropic_ui_progress_t ui_progress, uint16_t pin_index,
     const uint8_t stretched_pin[TROPIC_MAC_AND_DESTROY_SIZE],
     uint8_t kek[TROPIC_MAC_AND_DESTROY_SIZE]);
 
-uint32_t tropic_estimate_time_ms(storage_pin_op_t op, uint16_t pin_index);
+void tropic_pin_unmask_kek_time(uint32_t* time_ms);
 #endif

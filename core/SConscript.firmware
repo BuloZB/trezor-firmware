@@ -271,6 +271,9 @@ CPPDEFINES_MOD += [
     'FANCY_FATAL_ERROR',
     ]
 
+if TREZOR_MODEL in ["T3W1", "T3T1"]:
+    CPPDEFINES_MOD += ('THREAD_LOCAL', '__attribute__((section(".tls")))'),
+
 # modtrezorutils
 SOURCE_MOD += [
     'embed/upymod/modtrezorutils/modtrezorutils.c',
@@ -732,6 +735,8 @@ if FROZEN:
         ])
     )
 
+    SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/evolu/*.py'))
+
     if BENCHMARK:
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/benchmark/*.py'))
 
@@ -770,6 +775,8 @@ if FROZEN:
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nostr/*.py'))
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nostr/*/*.py'))
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Nostr*.py'))
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/tron/*.py'))
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Tron*.py'))
 
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/ripple/*.py'))
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Ripple*.py'))
@@ -994,7 +1001,7 @@ BINARY_NAME += ".bin"
 
 if 'STM32F427xx' in CPPDEFINES_HAL or 'STM32F429xx' in CPPDEFINES_HAL:
     action_bin=[
-        '$OBJCOPY -O binary -j .vendorheader -j .header -j .flash -j .data -j .confidential --pad-to 0x08100000 $SOURCE ${TARGET}.p1',
+        '$OBJCOPY -O binary -j .vendorheader -j .header -j .flash -j .data --pad-to 0x08100000 $SOURCE ${TARGET}.p1',
         '$OBJCOPY -O binary -j .flash2 $SOURCE ${TARGET}.p2',
         '$CAT ${TARGET}.p1 ${TARGET}.p2 > $TARGET',
         '$HEADERTOOL -h $TARGET ' + ('-D' if not PRODUCTION else ''),
@@ -1003,7 +1010,7 @@ if 'STM32F427xx' in CPPDEFINES_HAL or 'STM32F429xx' in CPPDEFINES_HAL:
     ]
 elif 'STM32U5G9xx' in CPPDEFINES_HAL or 'STM32U585xx' in CPPDEFINES_HAL:
     action_bin=[
-        '$OBJCOPY -O binary -j .vendorheader -j .header -j .flash -j .data -j .confidential $SOURCE ${TARGET}',
+        '$OBJCOPY -O binary -j .vendorheader -j .header -j .flash -j .data $SOURCE ${TARGET}',
         '$HEADERTOOL -h $TARGET ' + ('-D' if not PRODUCTION else ''),
         '$CP $TARGET ' + BINARY_NAME,
         ]

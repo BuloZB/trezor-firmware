@@ -471,7 +471,7 @@ impl FirmwareUI for UIEckhart {
             } else if is_data {
                 &theme::TEXT_MONO_ADDRESS
             } else {
-                &theme::TEXT_MEDIUM
+                &theme::TEXT_MONO_MEDIUM_LIGHT
             },
             description_font: &theme::TEXT_SMALL,
             extra_font: &theme::TEXT_SMALL,
@@ -516,7 +516,7 @@ impl FirmwareUI for UIEckhart {
             .with_subtitle(subtitle.unwrap_or(TString::empty()))
             .with_action_bar(action_bar);
         if page_counter {
-            screen = screen.with_pagination_hint();
+            screen = screen.with_hint(Hint::new_page_counter())
         } else if let Some(warning_footer) = warning_footer {
             screen = screen.with_hint(Hint::new_warning_caution(warning_footer));
         }
@@ -1297,7 +1297,7 @@ impl FirmwareUI for UIEckhart {
     fn wait_ble_host_confirmation() -> Result<impl LayoutMaybeTrace, Error> {
         let screen = BLEHandler::new(
             TextScreen::new(
-                Paragraph::new(&theme::TEXT_REGULAR, TR::words__waiting_for_host)
+                Paragraph::new(&theme::TEXT_REGULAR, TR::ble__waiting_for_host)
                     .into_paragraphs()
                     .with_placement(LinearPlacement::vertical()),
             )
@@ -1616,7 +1616,9 @@ impl FirmwareUI for UIEckhart {
     }
 
     fn show_wait_text(text: TString<'static>) -> Result<impl LayoutMaybeTrace, Error> {
-        let paragraphs = Paragraph::new(&theme::TEXT_REGULAR, text).into_paragraphs();
+        let paragraphs = Paragraph::new(&theme::TEXT_REGULAR, text)
+            .into_paragraphs()
+            .with_placement(LinearPlacement::vertical());
         let screen = TextScreen::new(paragraphs);
         let layout = RootComponent::new(screen);
         Ok(layout)
@@ -1649,7 +1651,7 @@ impl FirmwareUI for UIEckhart {
         let action_bar = if allow_cancel {
             ActionBar::new_double(
                 Button::with_icon(theme::ICON_CROSS),
-                Button::with_single_line_text(button),
+                Button::with_text(button),
             )
         } else {
             ActionBar::new_single(Button::with_text(button))

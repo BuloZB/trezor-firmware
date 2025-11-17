@@ -2089,6 +2089,8 @@ if TYPE_CHECKING:
         firmware_corrupted: "bool | None"
         auto_lock_delay_battery_ms: "int | None"
         led: "bool | None"
+        usb_connected: "bool | None"
+        wireless_connected: "bool | None"
 
         def __init__(
             self,
@@ -2148,6 +2150,8 @@ if TYPE_CHECKING:
             firmware_corrupted: "bool | None" = None,
             auto_lock_delay_battery_ms: "int | None" = None,
             led: "bool | None" = None,
+            usb_connected: "bool | None" = None,
+            wireless_connected: "bool | None" = None,
         ) -> None:
             pass
 
@@ -4100,6 +4104,14 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class EvoluGetNode(protobuf.MessageType):
+        proof_of_delegated_identity: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            proof_of_delegated_identity: "AnyBytes",
+        ) -> None:
+            pass
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["EvoluGetNode"]:
@@ -4117,6 +4129,70 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["EvoluNode"]:
+            return isinstance(msg, cls)
+
+    class EvoluSignRegistrationRequest(protobuf.MessageType):
+        challenge_from_server: "AnyBytes"
+        size_to_acquire: "int"
+        proof_of_delegated_identity: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            challenge_from_server: "AnyBytes",
+            size_to_acquire: "int",
+            proof_of_delegated_identity: "AnyBytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EvoluSignRegistrationRequest"]:
+            return isinstance(msg, cls)
+
+    class EvoluRegistrationRequest(protobuf.MessageType):
+        certificate_chain: "list[AnyBytes]"
+        signature: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            signature: "AnyBytes",
+            certificate_chain: "list[AnyBytes] | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EvoluRegistrationRequest"]:
+            return isinstance(msg, cls)
+
+    class EvoluGetDelegatedIdentityKey(protobuf.MessageType):
+        thp_credential: "AnyBytes | None"
+        host_static_public_key: "AnyBytes | None"
+
+        def __init__(
+            self,
+            *,
+            thp_credential: "AnyBytes | None" = None,
+            host_static_public_key: "AnyBytes | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EvoluGetDelegatedIdentityKey"]:
+            return isinstance(msg, cls)
+
+    class EvoluDelegatedIdentityKey(protobuf.MessageType):
+        private_key: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            private_key: "AnyBytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EvoluDelegatedIdentityKey"]:
             return isinstance(msg, cls)
 
     class MoneroTransactionSourceEntry(protobuf.MessageType):
@@ -6699,6 +6775,40 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["ThpPairedCacheEntry"]:
+            return isinstance(msg, cls)
+
+    class TronGetAddress(protobuf.MessageType):
+        address_n: "list[int]"
+        show_display: "bool | None"
+        chunkify: "bool | None"
+
+        def __init__(
+            self,
+            *,
+            address_n: "list[int] | None" = None,
+            show_display: "bool | None" = None,
+            chunkify: "bool | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronGetAddress"]:
+            return isinstance(msg, cls)
+
+    class TronAddress(protobuf.MessageType):
+        address: "str"
+        mac: "AnyBytes | None"
+
+        def __init__(
+            self,
+            *,
+            address: "str",
+            mac: "AnyBytes | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronAddress"]:
             return isinstance(msg, cls)
 
     class WebAuthnListResidentCredentials(protobuf.MessageType):

@@ -192,6 +192,10 @@ trezor_message_impl! {
 trezor_message_impl! {
     EvoluGetNode => MessageType_EvoluGetNode,
     EvoluNode => MessageType_EvoluNode,
+    EvoluSignRegistrationRequest => MessageType_EvoluSignRegistrationRequest,
+    EvoluRegistrationRequest => MessageType_EvoluRegistrationRequest,
+    EvoluGetDelegatedIdentityKey => MessageType_EvoluGetDelegatedIdentityKey,
+    EvoluDelegatedIdentityKey => MessageType_EvoluDelegatedIdentityKey,
 }
 
 #[cfg(feature = "monero")]
@@ -301,6 +305,12 @@ trezor_message_impl! {
     TezosSignedTx => MessageType_TezosSignedTx,
     TezosGetPublicKey => MessageType_TezosGetPublicKey,
     TezosPublicKey => MessageType_TezosPublicKey,
+}
+
+#[cfg(feature = "tron")]
+trezor_message_impl! {
+    TronGetAddress => MessageType_TronGetAddress,
+    TronAddress => MessageType_TronAddress,
 }
 
 #[cfg(feature = "webauthn")]

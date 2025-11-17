@@ -17,9 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <trezor_types.h>
-
 #ifndef KERNEL_MODE
+
+#pragma GCC optimize("no-stack-protector")
+
+#include <trezor_types.h>
 
 #include "syscall_internal.h"
 
@@ -428,6 +430,17 @@ void optiga_set_sec_max(void) { syscall_invoke0(SYSCALL_OPTIGA_SET_SEC_MAX); }
 #endif  // USE_OPTIGA
 
 // =============================================================================
+// secret_keys.h
+// =============================================================================
+
+#include <sec/secret_keys.h>
+
+secbool secret_key_delegated_identity(uint8_t dest[ECDSA_PRIVATE_KEY_SIZE]) {
+  return (secbool)syscall_invoke1(
+      (uint32_t)dest, SYSCALL_SECRET_KEYS_GET_DELEGATED_IDENTITY_KEY);
+}
+
+// =============================================================================
 // storage.h
 // =============================================================================
 
@@ -693,6 +706,8 @@ uint32_t nrf_get_version(void) {
 bool nrf_authenticate(void) {
   return (bool)syscall_invoke0(SYSCALL_NRF_AUTHENTICATE);
 }
+
+void nrf_reboot(void) { syscall_invoke0(SYSCALL_NRF_REBOOT); }
 
 #endif
 

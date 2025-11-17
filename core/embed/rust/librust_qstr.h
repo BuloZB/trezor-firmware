@@ -34,6 +34,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_LayoutObj;
   MP_QSTR_LayoutState;
   MP_QSTR_MAX;
+  MP_QSTR_MAX_BONDS;
   MP_QSTR_MESSAGE_NAME;
   MP_QSTR_MESSAGE_WIRE_TYPE;
   MP_QSTR_MessageType;
@@ -205,6 +206,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ble__unpair_current;
   MP_QSTR_ble__unpair_title;
   MP_QSTR_ble__version;
+  MP_QSTR_ble__waiting_for_host;
   MP_QSTR_ble_enabled;
   MP_QSTR_ble_event;
   MP_QSTR_bootscreen;
@@ -630,7 +632,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_recovery__x_of_y_entered_template;
   MP_QSTR_recovery__you_have_entered;
   MP_QSTR_recovery_type;
-  MP_QSTR_regulatory_certification__title;
+  MP_QSTR_regulatory__title;
   MP_QSTR_reject_pairing;
   MP_QSTR_remaining_shares;
   MP_QSTR_request_bip39;
@@ -770,6 +772,9 @@ static void _librust_qstrs(void) {
   MP_QSTR_sd_card__use_different_card;
   MP_QSTR_sd_card__wanna_format;
   MP_QSTR_sd_card__wrong_sd_card;
+  MP_QSTR_secure_sync__delegated_identity_key_no_thp;
+  MP_QSTR_secure_sync__delegated_identity_key_thp;
+  MP_QSTR_secure_sync__header;
   MP_QSTR_select_menu;
   MP_QSTR_select_word;
   MP_QSTR_select_word_count;
@@ -982,6 +987,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__cancel_and_exit;
   MP_QSTR_words__cancel_question;
   MP_QSTR_words__chain;
+  MP_QSTR_words__comm_trouble;
   MP_QSTR_words__confirm;
   MP_QSTR_words__confirm_fee;
   MP_QSTR_words__connect;
@@ -1047,7 +1053,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__unknown;
   MP_QSTR_words__unlimited;
   MP_QSTR_words__unlocked;
-  MP_QSTR_words__waiting_for_host;
   MP_QSTR_words__wallet;
   MP_QSTR_words__warning;
   MP_QSTR_words__wipe;

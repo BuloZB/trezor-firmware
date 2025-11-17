@@ -121,17 +121,12 @@ class TropicModel:
         LOG.info("Waiting for Tropic model to come up...")
         start = time.monotonic()
         while True:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(1.0)
-                # simply check whether we can connect to the TCP port
-                # where we told the model to listen
-                result = s.connect_ex(("127.0.0.1", self.port))
-                if result == 0:
-                    # seems that even if the model is listening for connections
-                    # it sometimes needs up to 2 seconds more
-                    # before it actually correctly processes requests
-                    time.sleep(2)
-                    break
+            try:
+                with socket.create_connection(("127.0.0.1", self.port), timeout=1):
+                    break  # if we can connect to the model, it means it is ready
+            except OSError:
+                pass
+
             if self.process.poll() is not None:
                 raise RuntimeError("Tropic model process died")
 

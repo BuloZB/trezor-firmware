@@ -71,6 +71,14 @@ def firmware_vendor() -> str:
 
 
 # upymod/modtrezorutils/modtrezorutils.c
+def delegated_identity() -> bytes:
+    """
+    Returns the delegated identity key used for registration and space
+    management at Evolu.
+    """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
 def unit_color() -> int | None:
     """
     Returns the color of the unit.
@@ -157,12 +165,25 @@ if __debug__:
 
 
 # upymod/modtrezorutils/modtrezorutils.c
-def reboot_to_bootloader(
-    boot_command : int = 0,
-    boot_args : AnyBytes | None = None,
+def reboot_and_upgrade(
+    hash : AnyBytes,
 ) -> None:
     """
-    Reboots to bootloader.
+    Reboots to perform upgrade to FW with specified hash.
+    """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
+def reboot_to_bootloader() -> None:
+    """
+    Reboots the device and stay in bootloader.
+    """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
+def reboot() -> None:
+    """
+    Reboots the device.
     """
 VersionTuple = Tuple[int, int, int, int]
 
@@ -183,7 +204,7 @@ def check_firmware_header(header : AnyBytes) -> FirmwareHeaderInfo:
 # upymod/modtrezorutils/modtrezorutils.c
 def bootloader_locked() -> bool | None:
     """
-    Returns True/False if the the bootloader is locked/unlocked and None if
+    Returns True/False if the bootloader is locked/unlocked and None if
     the feature is not supported.
     """
 

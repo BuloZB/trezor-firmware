@@ -20,6 +20,7 @@
 
 #include <sys/backup_ram.h>
 #include <sys/irq.h>
+#include <sys/notify.h>
 #include <sys/pmic.h>
 #include <sys/systick.h>
 #include <trezor_rtl.h>
@@ -89,6 +90,8 @@ void pm_pmic_data_ready(void* context, pmic_report_t* report) {
 
   } else {
     if (drv->woke_up_from_suspend) {
+#ifdef USE_RTC
+
       // Use known battery self-discharge rate to compensate the fuel gauge
       // estimation during the suspend period. Since this period may be very
       // long and the battery temperature may vary, use the average ambient
@@ -97,14 +100,16 @@ void pm_pmic_data_ready(void* context, pmic_report_t* report) {
                                PM_SELF_DISG_RATE_SUSPEND_MA, 25.0f);
 
       // TODO: Currently in suspend mode we use single self-discharge rate
-      // but in practive the discharge rate may change in case the BLE chip
+      // but in practive the discharge rate may change in case some components
       // remains active. Since the device is very likely to stay in suspend
       // mode for limited time, for now we decided to neglect this. but in
-      // the future we may want to distinguish between suspend mode
-      // with/without BLE and use different self-discharge rates.
+      // the future we may want to distinguish between different suspend modes
+      // and use different self-discharge rates.
 
       fuel_gauge_set_soc(&drv->fuel_gauge, drv->fuel_gauge.soc,
                          drv->fuel_gauge.P);
+
+#endif  // USE_RTC
 
       // clear the flag
       drv->woke_up_from_suspend = false;
@@ -141,7 +146,10 @@ void pm_pmic_data_ready(void* context, pmic_report_t* report) {
     pm_store_data_to_backup_ram();
 
     if (drv->suspending) {
+#ifdef USE_RTC
+      // Schedule auto-hibernation rtc event
       pm_schedule_rtc_wakeup();
+#endif
       drv->suspending = false;
       drv->suspended = true;
     }
@@ -185,10 +193,12 @@ void pm_charging_controller(pm_driver_t* drv) {
              20.0f) {
     // Translate SoC target to charging voltage via battery model
     float target_ocv_voltage_v =
-        battery_ocv(drv->soc_target / 100.0f, drv->pmic_data.ntc_temp, false);
+        battery_ocv(&drv->fuel_gauge.model, drv->soc_target / 100.0f,
+                    drv->pmic_data.ntc_temp, false);
 
-    float battery_ocv_v = battery_meas_to_ocv(
-        drv->pmic_data.vbat, drv->pmic_data.ibat, drv->pmic_data.ntc_temp);
+    float battery_ocv_v =
+        battery_meas_to_ocv(&drv->fuel_gauge.model, drv->pmic_data.vbat,
+                            drv->pmic_data.ibat, drv->pmic_data.ntc_temp);
 
     drv->target_battery_ocv_v_tau =
         (drv->target_battery_ocv_v_tau * 0.95f) +
@@ -291,10 +301,12 @@ static void pm_parse_power_source_state(pm_driver_t* drv) {
   if (drv->pmic_data.usb_status != 0x0) {
     if (!drv->usb_connected) {
       drv->usb_connected = true;
+      notify_send(NOTIFY_POWER_STATUS_CHANGE);
     }
   } else {
     if (drv->usb_connected) {
       drv->usb_connected = false;
+      notify_send(NOTIFY_POWER_STATUS_CHANGE);
     }
   }
 
@@ -302,10 +314,12 @@ static void pm_parse_power_source_state(pm_driver_t* drv) {
   if (drv->wireless_data.vout_ready) {
     if (!drv->wireless_connected) {
       drv->wireless_connected = true;
+      notify_send(NOTIFY_POWER_STATUS_CHANGE);
     }
   } else {
     if (drv->wireless_connected) {
       drv->wireless_connected = false;
+      notify_send(NOTIFY_POWER_STATUS_CHANGE);
     }
   }
 

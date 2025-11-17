@@ -678,6 +678,12 @@ class MessageType(IntEnum):
     NostrEventSignature = 2004
     EvoluGetNode = 2100
     EvoluNode = 2101
+    EvoluSignRegistrationRequest = 2102
+    EvoluRegistrationRequest = 2103
+    EvoluGetDelegatedIdentityKey = 2104
+    EvoluDelegatedIdentityKey = 2105
+    TronGetAddress = 2200
+    TronAddress = 2201
     BenchmarkListNames = 9100
     BenchmarkNames = 9101
     BenchmarkRun = 9102
@@ -3244,6 +3250,8 @@ class Features(protobuf.MessageType):
         56: protobuf.Field("firmware_corrupted", "bool", repeated=False, required=False, default=None),
         57: protobuf.Field("auto_lock_delay_battery_ms", "uint32", repeated=False, required=False, default=None),
         58: protobuf.Field("led", "bool", repeated=False, required=False, default=None),
+        59: protobuf.Field("usb_connected", "bool", repeated=False, required=False, default=None),
+        60: protobuf.Field("wireless_connected", "bool", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -3305,6 +3313,8 @@ class Features(protobuf.MessageType):
         firmware_corrupted: Optional["bool"] = None,
         auto_lock_delay_battery_ms: Optional["int"] = None,
         led: Optional["bool"] = None,
+        usb_connected: Optional["bool"] = None,
+        wireless_connected: Optional["bool"] = None,
     ) -> None:
         self.capabilities: Sequence["Capability"] = capabilities if capabilities is not None else []
         self.major_version = major_version
@@ -3362,6 +3372,8 @@ class Features(protobuf.MessageType):
         self.firmware_corrupted = firmware_corrupted
         self.auto_lock_delay_battery_ms = auto_lock_delay_battery_ms
         self.led = led
+        self.usb_connected = usb_connected
+        self.wireless_connected = wireless_connected
 
 
 class LockDevice(protobuf.MessageType):
@@ -5547,6 +5559,16 @@ class EthereumFieldType(protobuf.MessageType):
 
 class EvoluGetNode(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 2100
+    FIELDS = {
+        1: protobuf.Field("proof_of_delegated_identity", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        proof_of_delegated_identity: "bytes",
+    ) -> None:
+        self.proof_of_delegated_identity = proof_of_delegated_identity
 
 
 class EvoluNode(protobuf.MessageType):
@@ -5561,6 +5583,74 @@ class EvoluNode(protobuf.MessageType):
         data: "bytes",
     ) -> None:
         self.data = data
+
+
+class EvoluSignRegistrationRequest(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2102
+    FIELDS = {
+        1: protobuf.Field("challenge_from_server", "bytes", repeated=False, required=True),
+        2: protobuf.Field("size_to_acquire", "uint32", repeated=False, required=True),
+        3: protobuf.Field("proof_of_delegated_identity", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        challenge_from_server: "bytes",
+        size_to_acquire: "int",
+        proof_of_delegated_identity: "bytes",
+    ) -> None:
+        self.challenge_from_server = challenge_from_server
+        self.size_to_acquire = size_to_acquire
+        self.proof_of_delegated_identity = proof_of_delegated_identity
+
+
+class EvoluRegistrationRequest(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2103
+    FIELDS = {
+        1: protobuf.Field("certificate_chain", "bytes", repeated=True, required=False, default=None),
+        2: protobuf.Field("signature", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        signature: "bytes",
+        certificate_chain: Optional[Sequence["bytes"]] = None,
+    ) -> None:
+        self.certificate_chain: Sequence["bytes"] = certificate_chain if certificate_chain is not None else []
+        self.signature = signature
+
+
+class EvoluGetDelegatedIdentityKey(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2104
+    FIELDS = {
+        1: protobuf.Field("thp_credential", "bytes", repeated=False, required=False, default=None),
+        2: protobuf.Field("host_static_public_key", "bytes", repeated=False, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        thp_credential: Optional["bytes"] = None,
+        host_static_public_key: Optional["bytes"] = None,
+    ) -> None:
+        self.thp_credential = thp_credential
+        self.host_static_public_key = host_static_public_key
+
+
+class EvoluDelegatedIdentityKey(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2105
+    FIELDS = {
+        1: protobuf.Field("private_key", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        private_key: "bytes",
+    ) -> None:
+        self.private_key = private_key
 
 
 class MoneroTransactionSourceEntry(protobuf.MessageType):
@@ -8466,6 +8556,43 @@ class ThpPairedCacheEntry(protobuf.MessageType):
         self.mac_addr = mac_addr
         self.host_name = host_name
         self.app_name = app_name
+
+
+class TronGetAddress(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2200
+    FIELDS = {
+        1: protobuf.Field("address_n", "uint32", repeated=True, required=False, default=None),
+        2: protobuf.Field("show_display", "bool", repeated=False, required=False, default=None),
+        3: protobuf.Field("chunkify", "bool", repeated=False, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        address_n: Optional[Sequence["int"]] = None,
+        show_display: Optional["bool"] = None,
+        chunkify: Optional["bool"] = None,
+    ) -> None:
+        self.address_n: Sequence["int"] = address_n if address_n is not None else []
+        self.show_display = show_display
+        self.chunkify = chunkify
+
+
+class TronAddress(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2201
+    FIELDS = {
+        1: protobuf.Field("address", "string", repeated=False, required=True),
+        2: protobuf.Field("mac", "bytes", repeated=False, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        address: "str",
+        mac: Optional["bytes"] = None,
+    ) -> None:
+        self.address = address
+        self.mac = mac
 
 
 class WebAuthnListResidentCredentials(protobuf.MessageType):

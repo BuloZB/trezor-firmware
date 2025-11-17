@@ -111,6 +111,7 @@ def configure(
 
     if "rtc" in features_wanted:
         sources += ["embed/sys/time/stm32u5/rtc.c"]
+        sources += ["embed/sys/time/stm32u5/rtc_scheduler.c"]
         defines += [("USE_RTC", "1")]
 
     if "haptic" in features_wanted:
@@ -179,7 +180,7 @@ def configure(
         sources += ["embed/sec/optiga/stm32/optiga_hal.c"]
         sources += ["embed/sec/optiga/optiga.c"]
         sources += ["embed/sec/optiga/optiga_commands.c"]
-        sources += ["embed/sec/optiga/optiga_config.c"]
+        sources += ["embed/sec/optiga/optiga_init.c"]
         sources += ["embed/sec/optiga/optiga_transport.c"]
         sources += ["vendor/trezor-crypto/hash_to_curve.c"]
         paths += ["embed/sec/optiga/inc"]
@@ -315,6 +316,7 @@ def configure(
 
     if "serial_number" in features_wanted:
         defines += [("USE_SERIAL_NUMBER", "1")]
+        features_available.append("serial_number")
 
     env.get("ENV")["LINKER_SCRIPT"] = linker_script
     env.get("ENV")["MEMORY_LAYOUT"] = memory_layout

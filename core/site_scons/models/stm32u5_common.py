@@ -8,7 +8,6 @@ def stm32u5_common_files(env, features_wanted, defines, sources, paths):
         ("STM32_HAL_H", "<stm32u5xx.h>"),
         ("FLASH_BLOCK_WORDS", "4"),
         ("USE_TRUSTZONE", "1"),
-        ("CONFIDENTIAL", '__attribute__((section(".confidential")))'),
     ]
 
     paths += [
@@ -90,6 +89,7 @@ def stm32u5_common_files(env, features_wanted, defines, sources, paths):
         "embed/sec/rng/rng_common.c",
         "embed/sec/secret/stm32u5/secret.c",
         "embed/sec/secret/stm32u5/secret_keys.c",
+        "embed/sec/secret/secret_keys_common.c",
         "embed/sec/secure_aes/stm32u5/secure_aes.c",
         "embed/sec/secure_aes/stm32u5/secure_aes_unpriv.c",
         "embed/sec/storage/stm32u5/storage_salt.c",
@@ -152,6 +152,7 @@ def stm32u5_common_files(env, features_wanted, defines, sources, paths):
 
     if "applet" in features_wanted:
         sources += ["embed/sys/task/stm32/applet.c"]
+        sources += ["embed/sys/task/stm32/coreapp.c"]
 
     if "usb" in features_wanted:
         sources += [

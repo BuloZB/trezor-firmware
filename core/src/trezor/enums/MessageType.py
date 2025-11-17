@@ -88,6 +88,10 @@ ECDHSessionKey = 62
 PaymentNotification = 52
 EvoluGetNode = 2100
 EvoluNode = 2101
+EvoluSignRegistrationRequest = 2102
+EvoluRegistrationRequest = 2103
+EvoluGetDelegatedIdentityKey = 2104
+EvoluDelegatedIdentityKey = 2105
 BenchmarkListNames = 9100
 BenchmarkNames = 9101
 BenchmarkRun = 9102
@@ -263,3 +267,5 @@ if not utils.BITCOIN_ONLY:
     NostrPubkey = 2002
     NostrSignEvent = 2003
     NostrEventSignature = 2004
+    TronGetAddress = 2200
+    TronAddress = 2201

@@ -8,7 +8,6 @@ def stm32f4_common_files(env, features_wanted, defines, sources, paths):
         ("STM32_HAL_H", "<stm32f4xx.h>"),
         ("FLASH_BLOCK_WORDS", "1"),
         ("FLASH_BIT_ACCESS", "1"),
-        ("CONFIDENTIAL", ""),
     ]
 
     paths += [
@@ -71,6 +70,7 @@ def stm32f4_common_files(env, features_wanted, defines, sources, paths):
         "embed/sec/rng/rng_common.c",
         "embed/sec/secret/stm32f4/secret.c",
         "embed/sec/secret/stm32f4/secret_keys.c",
+        "embed/sec/secret/secret_keys_common.c",
         "embed/sec/storage/stm32f4/storage_salt.c",
         "embed/sec/time_estimate/stm32/time_estimate.c",
         "embed/sys/irq/stm32/irq.c",
@@ -91,6 +91,7 @@ def stm32f4_common_files(env, features_wanted, defines, sources, paths):
         "embed/sys/syscall/stm32/syscall_stubs.c",
         "embed/sys/syscall/stm32/syscall_verifiers.c",
         "embed/sys/task/stm32/applet.c",
+        "embed/sys/task/stm32/coreapp.c",
         "embed/sys/task/stm32/systask.c",
         "embed/sys/task/stm32/system.c",
         "embed/sys/time/stm32/systick.c",

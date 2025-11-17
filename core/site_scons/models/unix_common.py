@@ -7,7 +7,6 @@ def unix_common_files(env, features_wanted, defines, sources, paths):
     defines += [
         ("FLASH_BLOCK_WORDS", "1"),
         ("FLASH_BIT_ACCESS", "1"),
-        ("CONFIDENTIAL", ""),
     ]
 
     paths += [
@@ -34,9 +33,11 @@ def unix_common_files(env, features_wanted, defines, sources, paths):
 
     sources += [
         "embed/io/display/unix/display_driver.c",
+        "embed/io/usb/unix/sock.c",
         "embed/sec/random_delays/unix/random_delays.c",
         "embed/sec/secret/unix/secret.c",
         "embed/sec/secret/unix/secret_keys.c",
+        "embed/sec/secret/secret_keys_common.c",
         "embed/sec/storage/unix/storage_salt.c",
         "embed/sec/monoctr/unix/monoctr.c",
         "embed/sec/rng/unix/rng.c",

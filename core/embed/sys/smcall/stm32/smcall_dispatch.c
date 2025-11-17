@@ -24,6 +24,7 @@
 #include <sec/random_delays.h>
 #include <sec/rng.h>
 #include <sec/secret.h>
+#include <sec/secret_keys.h>
 #include <sys/bootargs.h>
 #include <sys/bootutils.h>
 #include <sys/irq.h>
@@ -38,6 +39,7 @@
 
 #ifdef USE_OPTIGA
 #include <sec/optiga.h>
+#include <sec/optiga_init.h>
 #endif
 
 #ifdef USE_SUSPEND
@@ -191,12 +193,29 @@ __attribute((no_stack_protector)) void smcall_handler(uint32_t *args,
       args[0] = optiga_read_sec__verified(sec);
     } break;
 
+    case SMCALL_OPTIGA_CLOSE_CHANNEL: {
+      optiga_close_channel();
+    } break;
+
+    case SMCALL_OPTIGA_POWER_DOWN: {
+      optiga_power_down();
+    } break;
+
+    case SMCALL_OPTIGA_INIT_AND_CONFIGURE: {
+      optiga_init_and_configure();
+    } break;
+
 #if PYOPT == 0
     case SMCALL_OPTIGA_SET_SEC_MAX: {
       optiga_set_sec_max();
     } break;
 #endif
-#endif
+#endif  // USE_OPTIGA
+
+    case SMCALL_SECRET_KEYS_GET_DELEGATED_IDENTITY_KEY: {
+      uint8_t *dest = (uint8_t *)args[0];
+      args[0] = secret_key_delegated_identity__verified(dest);
+    } break;
 
     case SMCALL_STORAGE_SETUP: {
       PIN_UI_WAIT_CALLBACK callback = (PIN_UI_WAIT_CALLBACK)args[0];
@@ -382,7 +401,7 @@ __attribute((no_stack_protector)) void smcall_handler(uint32_t *args,
       size_t data_size = (size_t)args[3];
       args[0] = backup_ram_write__verified(key, type, data, data_size);
     } break;
-#endif
+#endif  // USE_BACKUP_RAM
 
     default:
       system_exit_fatal("Invalid smcall", __FILE__, __LINE__);

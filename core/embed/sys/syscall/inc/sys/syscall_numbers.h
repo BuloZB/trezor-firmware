@@ -144,6 +144,7 @@ typedef enum {
   SYSCALL_NRF_UPDATE,
   SYSCALL_NRF_GET_VERSION,
   SYSCALL_NRF_AUTHENTICATE,
+  SYSCALL_NRF_REBOOT,
 
   SYSCALL_POWER_MANAGER_SUSPEND,
   SYSCALL_POWER_MANAGER_HIBERNATE,
@@ -176,6 +177,8 @@ typedef enum {
   SYSCALL_TROPIC_DATA_READ,
 
   SYSCALL_STORAGE_GET,
+
+  SYSCALL_SECRET_KEYS_GET_DELEGATED_IDENTITY_KEY,
 
   // ------------------------------------------------------
   // Following syscalls are executed in kernel thread mode

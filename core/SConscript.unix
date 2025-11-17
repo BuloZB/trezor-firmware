@@ -726,13 +726,14 @@ if FROZEN:
         ] if TREZOR_MODEL != "T3W1" else [])
     )
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/management/*.py',
-        exclude=[
-            SOURCE_PY_DIR + 'apps/management/sd_protect.py',
-        ] if "sd_card" not in FEATURES_AVAILABLE else [] + [
-            SOURCE_PY_DIR + 'apps/management/authenticate_device.py',
-        ] if "optiga" not in FEATURES_AVAILABLE else [] + [
-            SOURCE_PY_DIR + 'apps/management/get_serial_number.py',
-        ] if "serial_number" not in FEATURES_AVAILABLE else [])
+        exclude=(
+            [SOURCE_PY_DIR + 'apps/management/sd_protect.py'] if "sd_card" not in FEATURES_AVAILABLE else []
+        ) + (
+            [SOURCE_PY_DIR + 'apps/management/authenticate_device.py'] if "optiga" not in FEATURES_AVAILABLE else []
+        ) + (
+            [SOURCE_PY_DIR + 'apps/management/get_serial_number.py'] if "serial_number" not in FEATURES_AVAILABLE else []
+        )
+    )
     )
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/management/*/*.py',
         exclude=(
@@ -748,6 +749,9 @@ if FROZEN:
             SOURCE_PY_DIR + 'apps/bitcoin/sign_tx/zcash_v4.py',
         ])
     )
+
+    SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/evolu/*.py'))
+
     if BENCHMARK:
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/benchmark/*.py'))
 
@@ -786,6 +790,8 @@ if FROZEN:
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nostr/*.py'))
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/nostr/*/*.py'))
             SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Nostr*.py'))
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/tron/*.py'))
+            SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Tron*.py'))
 
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/ripple/*.py'))
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Ripple*.py'))
@@ -800,7 +806,6 @@ if FROZEN:
 
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/tezos/*.py'))
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'trezor/enums/Tezos*.py'))
-
 
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/zcash/*.py'))
 

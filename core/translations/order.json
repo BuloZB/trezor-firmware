@@ -1077,7 +1077,7 @@
   "1075": "stellar__transaction_source_diff_warning",
   "1076": "device_name__continue_with_empty_label",
   "1077": "device_name__enter",
-  "1078": "regulatory_certification__title",
+  "1078": "regulatory__title",
   "1079": "words__name",
   "1080": "device_name__changed",
   "1081": "cardano__confirm_message",
@@ -1162,10 +1162,15 @@
   "1160": "homescreen__backup_needed_info",
   "1161": "ble__host_info",
   "1162": "ble__mac_address",
-  "1163": "words__waiting_for_host",
+  "1163": "ble__waiting_for_host",
   "1164": "ble__apps_connected",
   "1165": "sn__action",
   "1166": "sn__title",
   "1167": "ble__must_be_enabled",
-  "1168": "ripple__destination_tag_missing"
+  "1168": "ripple__destination_tag_missing",
+  "1169": "words__comm_trouble",
+  "1170": "secure_sync__delegated_identity_key_no_thp",
+  "1171": "secure_sync__delegated_identity_key_thp",
+  "1172": "secure_sync__evolu_node_no_optiga",
+  "1173": "secure_sync__header"
 }

@@ -35,6 +35,7 @@
 #include "embed/upymod/trezorobj.h"
 
 #include <io/usb.h>
+#include <sec/secret_keys.h>
 #include <sys/bootutils.h>
 #include <sys/notify.h>
 #include <util/fwutils.h>
@@ -43,6 +44,9 @@
 #include "blake2s.h"
 #include "memzero.h"
 
+#ifdef USE_BLE
+#include <io/ble.h>
+#endif
 #ifdef USE_NRF
 #include <io/nrf.h>
 #endif
@@ -230,6 +234,22 @@ STATIC mp_obj_t mod_trezorutils_firmware_vendor(void) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_firmware_vendor_obj,
                                  mod_trezorutils_firmware_vendor);
+
+/// def delegated_identity() -> bytes:
+///     """
+///     Returns the delegated identity key used for registration and space
+///     management at Evolu.
+///     """
+STATIC mp_obj_t mod_trezorutils_delegated_identity(void) {
+  uint8_t private_key[ECDSA_PRIVATE_KEY_SIZE] = {0};
+  if (secret_key_delegated_identity(private_key) != sectrue) {
+    mp_raise_msg(&mp_type_RuntimeError,
+                 MP_ERROR_TEXT("Failed to read delegated identity."));
+  }
+  return mp_obj_new_bytes(private_key, sizeof(private_key));
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_delegated_identity_obj,
+                                 mod_trezorutils_delegated_identity);
 
 /// def unit_color() -> int | None:
 ///     """
@@ -481,54 +501,63 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_check_heap_fragmentation_obj,
                                  mod_trezorutils_check_heap_fragmentation);
 #endif  // !PYOPT
 
-/// def reboot_to_bootloader(
-///     boot_command : int = 0,
-///     boot_args : AnyBytes | None = None,
+/// def reboot_and_upgrade(
+///     hash : AnyBytes,
 /// ) -> None:
 ///     """
-///     Reboots to bootloader.
+///     Reboots to perform upgrade to FW with specified hash.
 ///     """
-STATIC mp_obj_t mod_trezorutils_reboot_to_bootloader(size_t n_args,
-                                                     const mp_obj_t *args) {
-#ifndef TREZOR_EMULATOR
-  if (n_args > 0 && args[0] != mp_const_none) {
-    mp_int_t value = mp_obj_get_int(args[0]);
+STATIC mp_obj_t mod_trezorutils_reboot_and_upgrade(mp_obj_t hash_obj) {
+  // Reboot and continue with the firmware upgrade
+  mp_buffer_info_t hash = {0};
 
-    switch (value) {
-      case 0:
-        // Reboot and stay in bootloader
-        reboot_to_bootloader();
-        break;
-      case 1:
-        // Reboot and continue with the firmware upgrade
-        mp_buffer_info_t hash = {0};
+  mp_get_buffer_raise(hash_obj, &hash, MP_BUFFER_READ);
 
-        if (n_args > 1 && args[1] != mp_const_none) {
-          mp_get_buffer_raise(args[1], &hash, MP_BUFFER_READ);
-        }
-
-        if (hash.len != 32) {
-          mp_raise_ValueError(MP_ERROR_TEXT("Invalid value."));
-        }
-
-        reboot_and_upgrade((uint8_t *)hash.buf);
-        break;
-      default:
-        mp_raise_ValueError(MP_ERROR_TEXT("Invalid value."));
-        break;
-    }
-  } else {
-    // Just reboot and go through the normal boot sequence
-    reboot_device();
+  if (hash.len != 32) {
+    mp_raise_ValueError(MP_ERROR_TEXT("Invalid value."));
   }
 
-#endif
+  reboot_and_upgrade((uint8_t *)hash.buf);
   return mp_const_none;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(
-    mod_trezorutils_reboot_to_bootloader_obj, 0, 2,
-    mod_trezorutils_reboot_to_bootloader);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_trezorutils_reboot_and_upgrade_obj,
+                                 mod_trezorutils_reboot_and_upgrade);
+
+/// def reboot_to_bootloader() -> None:
+///     """
+///     Reboots the device and stay in bootloader.
+///     """
+STATIC mp_obj_t mod_trezorutils_reboot_to_bootloader(void) {
+  // Reboot and stay in bootloader
+  reboot_to_bootloader();
+
+  return mp_const_none;
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_reboot_to_bootloader_obj,
+                                 mod_trezorutils_reboot_to_bootloader);
+
+/// def reboot() -> None:
+///     """
+///     Reboots the device.
+///     """
+STATIC mp_obj_t mod_trezorutils_reboot(void) {
+#ifdef USE_BLE
+  ble_switch_off();
+#endif
+#ifdef USE_NRF
+  nrf_reboot();
+#endif
+
+  // Just reboot and go through the normal boot sequence
+  reboot_device();
+
+  return mp_const_none;
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_reboot_obj,
+                                 mod_trezorutils_reboot);
 
 /// VersionTuple = Tuple[int, int, int, int]
 
@@ -571,7 +600,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_trezorutils_check_firmware_header_obj,
 
 /// def bootloader_locked() -> bool | None:
 ///     """
-///     Returns True/False if the the bootloader is locked/unlocked and None if
+///     Returns True/False if the bootloader is locked/unlocked and None if
 ///     the feature is not supported.
 ///     """
 STATIC mp_obj_t mod_trezorutils_bootloader_locked() {
@@ -626,31 +655,31 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_trezorutils_nrf_get_version_obj,
                                  mod_trezorutils_nrf_get_version);
 #endif
 
-STATIC mp_obj_str_t mod_trezorutils_revision_obj = {
+STATIC const mp_obj_str_t mod_trezorutils_revision_obj = {
     {&mp_type_bytes}, 0, sizeof(SCM_REVISION), (const byte *)SCM_REVISION};
 
-STATIC mp_obj_str_t mod_trezorutils_model_name_obj = {
+STATIC const mp_obj_str_t mod_trezorutils_model_name_obj = {
     {&mp_type_str}, 0, sizeof(MODEL_NAME) - 1, (const byte *)MODEL_NAME};
 
-STATIC mp_obj_str_t mod_trezorutils_full_name_obj = {
+STATIC const mp_obj_str_t mod_trezorutils_full_name_obj = {
     {&mp_type_str},
     0,
     sizeof(MODEL_FULL_NAME) - 1,
     (const byte *)MODEL_FULL_NAME};
 
-STATIC mp_obj_str_t mod_trezorutils_model_usb_manufacturer_obj = {
+STATIC const mp_obj_str_t mod_trezorutils_model_usb_manufacturer_obj = {
     {&mp_type_str},
     0,
     sizeof(MODEL_USB_MANUFACTURER) - 1,
     (const byte *)MODEL_USB_MANUFACTURER};
 
-STATIC mp_obj_str_t mod_trezorutils_model_usb_product_obj = {
+STATIC const mp_obj_str_t mod_trezorutils_model_usb_product_obj = {
     {&mp_type_str},
     0,
     sizeof(MODEL_USB_PRODUCT) - 1,
     (const byte *)MODEL_USB_PRODUCT};
 
-STATIC mp_obj_tuple_t mod_trezorutils_version_obj = {
+STATIC const mp_obj_tuple_t mod_trezorutils_version_obj = {
     {&mp_type_tuple},
     4,
     {MP_OBJ_NEW_SMALL_INT(VERSION_MAJOR), MP_OBJ_NEW_SMALL_INT(VERSION_MINOR),
@@ -741,8 +770,11 @@ STATIC const mp_rom_map_elem_t mp_module_trezorutils_globals_table[] = {
      MP_ROM_PTR(&mod_trezorutils_firmware_hash_obj)},
     {MP_ROM_QSTR(MP_QSTR_firmware_vendor),
      MP_ROM_PTR(&mod_trezorutils_firmware_vendor_obj)},
+    {MP_ROM_QSTR(MP_QSTR_reboot_and_upgrade),
+     MP_ROM_PTR(&mod_trezorutils_reboot_and_upgrade_obj)},
     {MP_ROM_QSTR(MP_QSTR_reboot_to_bootloader),
      MP_ROM_PTR(&mod_trezorutils_reboot_to_bootloader_obj)},
+    {MP_ROM_QSTR(MP_QSTR_reboot), MP_ROM_PTR(&mod_trezorutils_reboot_obj)},
     {MP_ROM_QSTR(MP_QSTR_check_firmware_header),
      MP_ROM_PTR(&mod_trezorutils_check_firmware_header_obj)},
     {MP_ROM_QSTR(MP_QSTR_bootloader_locked),
@@ -764,7 +796,8 @@ STATIC const mp_rom_map_elem_t mp_module_trezorutils_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_nrf_get_version),
      MP_ROM_PTR(&mod_trezorutils_nrf_get_version_obj)},
 #endif
-
+    {MP_ROM_QSTR(MP_QSTR_delegated_identity),
+     MP_ROM_PTR(&mod_trezorutils_delegated_identity_obj)},
     {MP_ROM_QSTR(MP_QSTR_unit_color),
      MP_ROM_PTR(&mod_trezorutils_unit_color_obj)},
     {MP_ROM_QSTR(MP_QSTR_unit_packaging),
