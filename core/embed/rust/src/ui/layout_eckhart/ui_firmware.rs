@@ -402,7 +402,7 @@ impl FirmwareUI for UIEckhart {
     fn confirm_trade(
         title: TString<'static>,
         subtitle: TString<'static>,
-        sell_amount: TString<'static>,
+        sell_amount: Option<TString<'static>>,
         buy_amount: TString<'static>,
         back_button: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
@@ -410,7 +410,7 @@ impl FirmwareUI for UIEckhart {
         let mut ops = OpTextLayout::new(theme::firmware::TEXT_REGULAR);
         ops.add_offset(Offset::y(16))
             .add_color(theme::RED)
-            .add_text_with_font(sell_amount, font)
+            .add_text_with_font(sell_amount.unwrap_or(TString::empty()), font)
             .add_offset(Offset::y(44))
             .add_newline()
             .add_color(theme::GREEN_LIME)
@@ -456,7 +456,9 @@ impl FirmwareUI for UIEckhart {
         warning_footer: Option<TString<'static>>,
         external_menu: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
-        debug_assert!(!(info && external_menu));
+        if info && external_menu {
+            return Err(Error::NotImplementedError);
+        }
 
         let paragraphs = ConfirmValueParams {
             description: description.unwrap_or("".into()),
@@ -514,7 +516,8 @@ impl FirmwareUI for UIEckhart {
         let mut screen = TextScreen::new(paragraphs)
             .with_header(header)
             .with_subtitle(subtitle.unwrap_or(TString::empty()))
-            .with_action_bar(action_bar);
+            .with_action_bar(action_bar)
+            .with_external_menu(external_menu);
         if page_counter {
             screen = screen.with_hint(Hint::new_page_counter())
         } else if let Some(warning_footer) = warning_footer {
@@ -995,7 +998,7 @@ impl FirmwareUI for UIEckhart {
             menu.item(Button::new_menu_item(*text, theme::menu_item_title()));
         }
         if let Some(text) = cancel {
-            menu.item(Button::new_menu_item(text, theme::menu_item_title_red()));
+            menu.item(Button::new_cancel_menu_item(text));
         }
         let screen = VerticalMenuScreen::new(menu)
             .with_header(Header::new(TString::empty()).with_close_button())

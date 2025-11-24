@@ -142,7 +142,7 @@ def confirm_trade(
     *,
     title: str,
     subtitle: str,
-    sell_amount: str,
+    sell_amount: str | None,
     buy_amount: str,
     back_button: bool = False,
 ) -> LayoutObj[UiResult]:
@@ -161,7 +161,7 @@ def confirm_value(
     subtitle: str | None = None,
     verb: str | None = None,
     verb_cancel: str | None = None,
-    info: bool = True,
+    info: bool = False,
     hold: bool = False,
     chunkify: bool = False,
     page_counter: bool = False,

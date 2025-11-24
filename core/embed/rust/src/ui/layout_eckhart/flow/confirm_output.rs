@@ -234,10 +234,7 @@ fn content_main_menu(
         ));
         unwrap!(main_menu_items.push(MENU_ITEM_ACCOUNT_INFO));
     }
-    main_menu.item(Button::new_menu_item(
-        cancel_menu_label,
-        theme::menu_item_title_orange(),
-    ));
+    main_menu.item(Button::new_cancel_menu_item(cancel_menu_label));
     unwrap!(main_menu_items.push(MENU_ITEM_CANCEL));
 
     VerticalMenuScreen::<ShortMenuVec>::new(main_menu)
@@ -286,6 +283,7 @@ pub fn new_confirm_output(
         TextScreen::new(main_paragraphs.into_paragraphs().with_placement(
             LinearPlacement::vertical().with_spacing(theme::TEXT_VERTICAL_SPACING),
         ))
+        .with_flow_menu()
         .with_header(Header::new(title.unwrap_or(TString::empty())).with_menu_button())
         .with_subtitle(subtitle.unwrap_or(TString::empty()))
         .with_hint(Hint::new_page_counter())
@@ -323,6 +321,7 @@ pub fn new_confirm_output(
                 .into_paragraphs()
                 .with_placement(LinearPlacement::vertical()),
         )
+        .with_flow_menu()
         .with_header(Header::new(TR::words__send.into()).with_menu_button())
         .with_action_bar(ActionBar::new_double(
             Button::with_icon(theme::ICON_CHEVRON_UP),
@@ -388,6 +387,7 @@ pub fn new_confirm_output(
                 .into_paragraphs()
                 .with_placement(LinearPlacement::vertical()),
         )
+        .with_flow_menu()
         .with_header(
             Header::new(summary_title.unwrap_or(TR::words__title_summary.into()))
                 .with_menu_button(),
@@ -427,10 +427,7 @@ pub fn new_confirm_output(
             ));
             unwrap!(summary_menu_items.push(MENU_ITEM_FEE_INFO));
         }
-        summary_menu.item(Button::new_menu_item(
-            cancel_menu_label,
-            theme::menu_item_title_orange(),
-        ));
+        summary_menu.item(Button::new_cancel_menu_item(cancel_menu_label));
         unwrap!(summary_menu_items.push(MENU_ITEM_CANCEL));
         let content_summary_menu = VerticalMenuScreen::new(summary_menu)
             .with_header(Header::new(TString::empty()).with_close_button())

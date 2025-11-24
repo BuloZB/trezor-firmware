@@ -93,7 +93,7 @@ impl FirmwareUI for UIDelizia {
     fn confirm_trade(
         title: TString<'static>,
         subtitle: TString<'static>,
-        sell_amount: TString<'static>,
+        sell_amount: Option<TString<'static>>,
         buy_amount: TString<'static>,
         _back_button: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
@@ -126,6 +126,10 @@ impl FirmwareUI for UIDelizia {
         _warning_footer: Option<TString<'static>>,
         external_menu: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
+        if info && external_menu {
+            return Err(Error::NotImplementedError);
+        }
+
         ConfirmValue::new(title, value.try_into()?, description)
             .with_description_font(&theme::TEXT_SUB_GREY)
             .with_text_mono(is_data)

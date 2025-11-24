@@ -1,10 +1,17 @@
 {
   "current": {
-    "merkle_root": "f97f463a8ef596a548171af516e0d2ae02667c3d9ee1042b1127964e66b6fb6b",
-    "datetime": "2025-11-07T20:50:59.842854+00:00",
-    "commit": "69056d572559c551422de368c621c76cd03ccc6b"
+    "merkle_root": "db1079fbbb9d95eb9549aedd79604f0f7d9dbc68aa3aa4d8db5d82cfbfafc2b3",
+    "datetime": "2025-11-20T14:04:25.418547+00:00",
+    "commit": "ee0df06285151f29bb1ea6532c9ea66b399a36c4"
   },
   "history": [
+    {
+      "signature": "03bdb5f1adee3d2e35f805422fb17bc237c626831cf1ce463b75ae78120b40d53d44652176aceec7fdaed5291147e11aecfb782cf962c8f08c0358cf17929f8f00",
+      "version": "2.9.4.0",
+      "merkle_root": "5d92167a3b0923534be8c08fac5dd40a9560e9a957538e6b07830b5c6faf7ee0",
+      "datetime": "2025-11-06T16:55:50.753257+00:00",
+      "commit": "ccf73fd0e9450b2407cd65f91cb06161454fc72b"
+    },
     {
       "signature": "034b4dd4ac62ee0c513a704a2188eae2974e35ebabbf79c64a44c99030f52aa3314548102c03e15d7bd3078e3fb4c3973b7757f46394ce6bce6c5449ed8d7e0102",
       "version": "2.9.3.0",

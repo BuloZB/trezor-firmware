@@ -213,6 +213,7 @@ pub fn new_confirm_output(
 ) -> Result<SwipeFlow, error::Error> {
     // Main
     let main_content = confirm_main
+        .with_flow_menu(true)
         .into_layout()?
         .one_button_request(ButtonRequest::from_num(br_code, br_name));
 
@@ -230,10 +231,7 @@ pub fn new_confirm_output(
         );
         unwrap!(main_menu_items.push(MENU_ITEM_ACCOUNT_INFO));
     }
-    main_menu = main_menu.danger(
-        theme::ICON_CANCEL,
-        cancel_text.unwrap_or(TR::send__cancel_sign.into()),
-    );
+    main_menu = main_menu.cancel_item(cancel_text.unwrap_or(TR::send__cancel_sign.into()));
     unwrap!(main_menu_items.push(MENU_ITEM_CANCEL));
     let content_main_menu = Frame::left_aligned(TString::empty(), main_menu)
         .with_cancel_button()
@@ -298,10 +296,8 @@ pub fn new_confirm_output(
             );
             unwrap!(summary_menu_items.push(MENU_ITEM_FEE_INFO));
         }
-        summary_menu = summary_menu.danger(
-            theme::ICON_CANCEL,
-            cancel_text.unwrap_or(TR::send__cancel_sign.into()),
-        );
+        summary_menu =
+            summary_menu.cancel_item(cancel_text.unwrap_or(TR::send__cancel_sign.into()));
         unwrap!(summary_menu_items.push(MENU_ITEM_CANCEL));
         let content_summary_menu = Frame::left_aligned(TString::empty(), summary_menu)
             .with_cancel_button()
@@ -313,10 +309,8 @@ pub fn new_confirm_output(
             });
 
         // HoldMenu
-        let hold_menu = VerticalMenu::empty().danger(
-            theme::ICON_CANCEL,
-            cancel_text.unwrap_or(TR::send__cancel_sign.into()),
-        );
+        let hold_menu =
+            VerticalMenu::empty().cancel_item(cancel_text.unwrap_or(TR::send__cancel_sign.into()));
         let content_hold_menu = Frame::left_aligned(TString::empty(), hold_menu)
             .with_cancel_button()
             .map(super::util::map_to_choice);
