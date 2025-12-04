@@ -471,7 +471,7 @@ class InputFlowSignMessageInfo(InputFlowBase):
     def input_flow_delizia(self) -> BRGeneratorType:
         yield
         # show address/message info
-        self.client.ui._visit_menu_items()
+        self.client.ui.visit_menu_items()
         # cancel signature
         self.debug.click(self.debug.screen_buttons.menu())
         self.debug.button_actions.navigate_to_menu_item(0)
@@ -1095,6 +1095,7 @@ def sign_tx_go_to_info_delizia(
 ) -> Generator[None, messages.ButtonRequest, str]:
     yield  # confirm output
     client.debug.read_layout()
+    client.ui.visit_menu_items()
     client.debug.swipe_up()
     yield  # confirm output
     client.debug.read_layout()
@@ -1134,10 +1135,12 @@ def sign_tx_go_to_info_eckhart(
 ) -> Generator[None, messages.ButtonRequest, str]:
     yield  # confirm output
     client.debug.read_layout()
+    client.ui.visit_menu_items()
     client.debug.click(client.debug.screen_buttons.ok())
 
     yield  # confirm output
     client.debug.read_layout()
+    client.ui.visit_menu_items()
     client.debug.click(client.debug.screen_buttons.ok())
 
     if multi_account:
@@ -1199,6 +1202,30 @@ def sign_tx_go_to_info_caesar(
     client.debug.press_left()
 
     return "\n".join(screen_texts)
+
+
+class InputFlowSignTxBackFromAmount(InputFlowBase):
+    def __init__(self, client: Client):
+        super().__init__(client)
+
+    def input_flow_eckhart(self) -> BRGeneratorType:
+        yield  # confirm address
+        self.debug.read_layout()
+        self.debug.click(self.debug.screen_buttons.ok())
+
+        yield  # confirm amount
+        self.debug.read_layout()
+        self.debug.click(self.debug.screen_buttons.cancel())
+
+        self.debug.read_layout()
+        self.debug.click(self.debug.screen_buttons.ok())
+
+        self.debug.read_layout()
+        self.debug.click(self.debug.screen_buttons.ok())
+
+        yield
+        self.debug.read_layout()
+        self.debug.press_yes()
 
 
 class InputFlowSignTxInformation(InputFlowBase):
@@ -2945,7 +2972,7 @@ class InputFlowConfirmAllWarnings(InputFlowBase):
                     self.debug.swipe_up()
 
             # Visit info menus (if exist)
-            layout = self.client.ui._visit_menu_items()
+            layout = self.client.ui.visit_menu_items()
 
             text = layout.footer().lower()
             # hi priority warning
