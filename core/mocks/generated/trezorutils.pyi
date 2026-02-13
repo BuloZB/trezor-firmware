@@ -4,10 +4,20 @@ from buffer_types import *
 
 # upymod/modtrezorutils/modtrezorutils-meminfo.h
 def meminfo(filename: str | None) -> None:
-    """Dumps map of micropython GC arena to a file.
+    """
+    Dumps map of micropython GC arena to a file.
     The JSON file can be decoded by analyze-memory-dump.py
-     """
+    """
 from trezor import utils
+
+
+# upymod/modtrezorutils/modtrezorutils.c
+def telemetry_get() -> tuple[int, int, int, int] | None:
+    """
+    Retrieves the stored telemetry data. Returns a tuple
+    (min_temp_milli_c, max_temp_milli_c, battery_errors, battery_cycles)
+    or None if telemetry is not available.
+    """
 
 
 # upymod/modtrezorutils/modtrezorutils.c
@@ -96,6 +106,14 @@ def unit_btconly() -> bool | None:
 def unit_packaging() -> int | None:
     """
     Returns the packaging version of the unit.
+    """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
+def unit_production_date() -> tuple[int, int, int] | None:
+    """
+    Returns the unit production date as (year, month, day), or None if
+    unavailable.
     """
 if utils.USE_SERIAL_NUMBER:
     def serial_number() -> str:
@@ -221,6 +239,13 @@ def nrf_get_version() -> VersionTuple:
     """
     Reads version of nRF firmware
     """
+
+
+# upymod/modtrezorutils/modtrezorutils.c
+def set_log_filter(filter: str) -> None:
+    """
+    Sets filter string for syslog
+    """
 SCM_REVISION: bytes
 """Git commit hash of the firmware."""
 VERSION: VersionTuple
@@ -249,6 +274,12 @@ USE_POWER_MANAGER: bool
 """Whether the hardware has a battery."""
 USE_NRF: bool
 """Whether the hardware has a nRF chip."""
+USE_DBG_CONSOLE: bool
+"""Whether a debug console is enabled."""
+USE_APP_LOADING: bool
+"""Whether the firmware supports loading 3rd-party applications."""
+USE_TELEMETRY: bool
+"""Whether a telemetry is supported."""
 MODEL: str
 """Model name."""
 MODEL_FULL_NAME: str

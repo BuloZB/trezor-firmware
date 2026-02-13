@@ -69,6 +69,7 @@ if TYPE_CHECKING:
     from trezor.enums import TezosContractType  # noqa: F401
     from trezor.enums import ThpMessageType  # noqa: F401
     from trezor.enums import ThpPairingMethod  # noqa: F401
+    from trezor.enums import TronRawContractType  # noqa: F401
     from trezor.enums import WordRequestType  # noqa: F401
 
     class BenchmarkListNames(protobuf.MessageType):
@@ -2038,6 +2039,7 @@ if TYPE_CHECKING:
         major_version: "int"
         minor_version: "int"
         patch_version: "int"
+        build_version: "int | None"
         bootloader_mode: "bool | None"
         device_id: "str | None"
         pin_protection: "bool | None"
@@ -2056,6 +2058,7 @@ if TYPE_CHECKING:
         fw_major: "int | None"
         fw_minor: "int | None"
         fw_patch: "int | None"
+        fw_build: "int | None"
         fw_vendor: "str | None"
         unfinished_backup: "bool | None"
         no_backup: "bool | None"
@@ -2100,6 +2103,7 @@ if TYPE_CHECKING:
             patch_version: "int",
             capabilities: "list[Capability] | None" = None,
             vendor: "str | None" = None,
+            build_version: "int | None" = None,
             bootloader_mode: "bool | None" = None,
             device_id: "str | None" = None,
             pin_protection: "bool | None" = None,
@@ -2118,6 +2122,7 @@ if TYPE_CHECKING:
             fw_major: "int | None" = None,
             fw_minor: "int | None" = None,
             fw_patch: "int | None" = None,
+            fw_build: "int | None" = None,
             fw_vendor: "str | None" = None,
             unfinished_backup: "bool | None" = None,
             no_backup: "bool | None" = None,
@@ -2676,14 +2681,12 @@ if TYPE_CHECKING:
     class RebootToBootloader(protobuf.MessageType):
         boot_command: "BootCommand"
         firmware_header: "AnyBytes | None"
-        language_data_length: "int"
 
         def __init__(
             self,
             *,
             boot_command: "BootCommand | None" = None,
             firmware_header: "AnyBytes | None" = None,
-            language_data_length: "int | None" = None,
         ) -> None:
             pass
 
@@ -3079,6 +3082,20 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkGcInfo"]:
+            return isinstance(msg, cls)
+
+    class DebugLinkSetLogFilter(protobuf.MessageType):
+        filter: "str | None"
+
+        def __init__(
+            self,
+            *,
+            filter: "str | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkSetLogFilter"]:
             return isinstance(msg, cls)
 
     class DebugLinkGcInfoItem(protobuf.MessageType):
@@ -4167,13 +4184,11 @@ if TYPE_CHECKING:
 
     class EvoluGetDelegatedIdentityKey(protobuf.MessageType):
         thp_credential: "AnyBytes | None"
-        host_static_public_key: "AnyBytes | None"
 
         def __init__(
             self,
             *,
             thp_credential: "AnyBytes | None" = None,
-            host_static_public_key: "AnyBytes | None" = None,
         ) -> None:
             pass
 
@@ -6111,6 +6126,32 @@ if TYPE_CHECKING:
         def is_type_of(cls, msg: Any) -> TypeGuard["StellarSignedTx"]:
             return isinstance(msg, cls)
 
+    class TelemetryGet(protobuf.MessageType):
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TelemetryGet"]:
+            return isinstance(msg, cls)
+
+    class Telemetry(protobuf.MessageType):
+        min_temp_c: "int | None"
+        max_temp_c: "int | None"
+        battery_errors: "int | None"
+        battery_cycles: "int | None"
+
+        def __init__(
+            self,
+            *,
+            min_temp_c: "int | None" = None,
+            max_temp_c: "int | None" = None,
+            battery_errors: "int | None" = None,
+            battery_cycles: "int | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["Telemetry"]:
+            return isinstance(msg, cls)
+
     class TezosGetAddress(protobuf.MessageType):
         address_n: "list[int]"
         show_display: "bool | None"
@@ -6809,6 +6850,146 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["TronAddress"]:
+            return isinstance(msg, cls)
+
+    class TronSignTx(protobuf.MessageType):
+        address_n: "list[int]"
+        ref_block_bytes: "AnyBytes"
+        ref_block_hash: "AnyBytes"
+        expiration: "int"
+        data: "AnyBytes | None"
+        timestamp: "int"
+        fee_limit: "int | None"
+
+        def __init__(
+            self,
+            *,
+            ref_block_bytes: "AnyBytes",
+            ref_block_hash: "AnyBytes",
+            expiration: "int",
+            timestamp: "int",
+            address_n: "list[int] | None" = None,
+            data: "AnyBytes | None" = None,
+            fee_limit: "int | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronSignTx"]:
+            return isinstance(msg, cls)
+
+    class TronContractRequest(protobuf.MessageType):
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronContractRequest"]:
+            return isinstance(msg, cls)
+
+    class TronTransferContract(protobuf.MessageType):
+        owner_address: "AnyBytes"
+        to_address: "AnyBytes"
+        amount: "int"
+
+        def __init__(
+            self,
+            *,
+            owner_address: "AnyBytes",
+            to_address: "AnyBytes",
+            amount: "int",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronTransferContract"]:
+            return isinstance(msg, cls)
+
+    class TronTriggerSmartContract(protobuf.MessageType):
+        owner_address: "AnyBytes"
+        contract_address: "AnyBytes"
+        data: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            owner_address: "AnyBytes",
+            contract_address: "AnyBytes",
+            data: "AnyBytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronTriggerSmartContract"]:
+            return isinstance(msg, cls)
+
+    class TronSignature(protobuf.MessageType):
+        signature: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            signature: "AnyBytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronSignature"]:
+            return isinstance(msg, cls)
+
+    class TronRawTransaction(protobuf.MessageType):
+        ref_block_bytes: "AnyBytes"
+        ref_block_hash: "AnyBytes"
+        expiration: "int"
+        data: "AnyBytes | None"
+        contract: "list[TronRawContract]"
+        timestamp: "int"
+        fee_limit: "int | None"
+
+        def __init__(
+            self,
+            *,
+            ref_block_bytes: "AnyBytes",
+            ref_block_hash: "AnyBytes",
+            expiration: "int",
+            timestamp: "int",
+            contract: "list[TronRawContract] | None" = None,
+            data: "AnyBytes | None" = None,
+            fee_limit: "int | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronRawTransaction"]:
+            return isinstance(msg, cls)
+
+    class TronRawContract(protobuf.MessageType):
+        type: "TronRawContractType"
+        parameter: "TronRawParameter"
+
+        def __init__(
+            self,
+            *,
+            type: "TronRawContractType",
+            parameter: "TronRawParameter",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronRawContract"]:
+            return isinstance(msg, cls)
+
+    class TronRawParameter(protobuf.MessageType):
+        type_url: "str"
+        value: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            type_url: "str",
+            value: "AnyBytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronRawParameter"]:
             return isinstance(msg, cls)
 
     class WebAuthnListResidentCredentials(protobuf.MessageType):

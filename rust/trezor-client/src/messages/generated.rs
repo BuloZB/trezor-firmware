@@ -91,6 +91,7 @@ trezor_message_impl! {
     DebugLinkGcInfo => MessageType_DebugLinkGcInfo,
     DebugLinkGetPairingInfo => MessageType_DebugLinkGetPairingInfo,
     DebugLinkPairingInfo => MessageType_DebugLinkPairingInfo,
+    DebugLinkSetLogFilter => MessageType_DebugLinkSetLogFilter,
     ThpCreateNewSession => MessageType_ThpCreateNewSession,
     ThpCredentialRequest => MessageType_ThpCredentialRequest,
     ThpCredentialResponse => MessageType_ThpCredentialResponse,
@@ -98,6 +99,8 @@ trezor_message_impl! {
     BenchmarkNames => MessageType_BenchmarkNames,
     BenchmarkRun => MessageType_BenchmarkRun,
     BenchmarkResult => MessageType_BenchmarkResult,
+    TelemetryGet => MessageType_TelemetryGet,
+    Telemetry => MessageType_Telemetry,
 }
 
 #[cfg(feature = "bitcoin")]
@@ -311,6 +314,11 @@ trezor_message_impl! {
 trezor_message_impl! {
     TronGetAddress => MessageType_TronGetAddress,
     TronAddress => MessageType_TronAddress,
+    TronSignTx => MessageType_TronSignTx,
+    TronSignature => MessageType_TronSignature,
+    TronContractRequest => MessageType_TronContractRequest,
+    TronTransferContract => MessageType_TronTransferContract,
+    TronTriggerSmartContract => MessageType_TronTriggerSmartContract,
 }
 
 #[cfg(feature = "webauthn")]

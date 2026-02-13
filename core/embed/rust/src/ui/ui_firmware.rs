@@ -3,6 +3,7 @@ use crate::{
     io::BinaryData,
     micropython::{buffer::StrBuffer, gc::Gc, list::List, obj::Obj},
     strutil::TString,
+    ui::notification::Notification,
 };
 use heapless::Vec;
 
@@ -68,9 +69,10 @@ pub trait FirmwareUI {
         page_counter: bool,
         prompt_screen: bool,
         cancel: bool,
+        back_button: bool,
         warning_footer: Option<TString<'static>>,
         external_menu: bool,
-    ) -> Result<Gc<LayoutObj>, Error>; // TODO: return LayoutMaybeTrace
+    ) -> Result<impl LayoutMaybeTrace, Error>;
 
     fn confirm_value_intro(
         title: TString<'static>,
@@ -187,7 +189,6 @@ pub trait FirmwareUI {
         description: Option<TString<'static>>,
         extra: Option<TString<'static>>,
         message: TString<'static>,
-        amount: Option<TString<'static>>,
         chunkify: bool,
         text_mono: bool,
         account_title: TString<'static>,
@@ -351,8 +352,7 @@ pub trait FirmwareUI {
 
     fn show_homescreen(
         label: TString<'static>,
-        notification: Option<TString<'static>>,
-        notification_level: u8,
+        notification: Option<Notification>,
         lockable: bool,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
@@ -376,6 +376,7 @@ pub trait FirmwareUI {
         haptics_enabled: Option<bool>,
         led_enabled: Option<bool>,
         about_items: Obj,
+        production_year: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
     fn show_pairing_device_name(
@@ -442,6 +443,7 @@ pub trait FirmwareUI {
 
     fn show_properties(
         _title: TString<'static>,
+        _subtitle: Option<TString<'static>>,
         _value: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
@@ -490,6 +492,8 @@ pub trait FirmwareUI {
         allow_cancel: bool,
         danger: bool,
     ) -> Result<Gc<LayoutObj>, Error>; // TODO: return LayoutMaybeTrace
+
+    fn confirm_cancel() -> Result<impl LayoutMaybeTrace, Error>;
 
     fn tutorial() -> Result<impl LayoutMaybeTrace, Error>;
 }

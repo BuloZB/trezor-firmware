@@ -8,7 +8,7 @@ from trezor.wire import ActionCancelled
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Coroutine, Literal, TypeVar, overload
 
-    from trezorui_api import PropertyType  # noqa: F401
+    from trezorui_api import PropertyType, StrPropertyType  # noqa: F401
 
     ExceptionType = BaseException | type[BaseException]
 
@@ -132,6 +132,21 @@ async def with_info(
                 continue
         else:
             raise RuntimeError  # unexpected result
+
+
+async def confirm_linear_flow(
+    *confirm_factories: Callable[[], Awaitable[ui.UiResult]],
+) -> None:
+    i = 0
+    while i < len(confirm_factories):
+        layout = confirm_factories[i]()
+        res = await layout
+        if res is trezorui_api.CONFIRMED:
+            i += 1
+        elif res is trezorui_api.BACK and i > 0:
+            i -= 1
+        else:
+            raise ActionCancelled
 
 
 def draw_simple(layout: trezorui_api.LayoutObj[Any]) -> None:

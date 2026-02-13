@@ -8,8 +8,9 @@
 #include <io/display.h>
 #include <sys/bootargs.h>
 #include <sys/bootutils.h>
-#include <util/flash.h>
-#include <util/flash_otp.h>
+#include <sys/flash.h>
+#include <sys/flash_otp.h>
+#include <sys/logging.h>
 #include "bootui.h"
 
 #ifdef LOCKABLE_BOOTLOADER
@@ -18,6 +19,8 @@
 
 #include "emulator.h"
 #include "rust_ui_common.h"
+
+LOG_DECLARE(emulator)
 
 #undef FIRMWARE_START
 
@@ -234,11 +237,11 @@ void jump_to_next_stage(uint32_t address) {
       storage_empty(&STORAGE_AREAS[0]) && storage_empty(&STORAGE_AREAS[1]);
 
   if (storage_is_erased) {
-    printf("STORAGE WAS ERASED\n");
+    LOG_WARN("Storage was erased");
     error_shutdown_ex("BOOTLOADER EXIT", "Jumped to firmware",
                       "STORAGE WAS ERASED");
   } else {
-    printf("storage was retained\n");
+    LOG_WARN("Storage was retained");
     error_shutdown_ex("BOOTLOADER EXIT", "Jumped to firmware",
                       "STORAGE WAS RETAINED");
   }

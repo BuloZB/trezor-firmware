@@ -24,6 +24,7 @@ use crate::{
             obj::{LayoutMaybeTrace, LayoutObj, RootComponent},
             util::{ConfirmValueParams, RecoveryType},
         },
+        notification::Notification,
         ui_firmware::{
             FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS,
             MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
@@ -159,9 +160,10 @@ impl FirmwareUI for UICaesar {
         _page_counter: bool,
         _prompt_screen: bool,
         _cancel: bool,
+        _back_button: bool,
         _warning_footer: Option<TString<'static>>,
         _external_menu: bool,
-    ) -> Result<Gc<LayoutObj>, Error> {
+    ) -> Result<impl LayoutMaybeTrace, Error> {
         let paragraphs = ConfirmValueParams {
             description: description.unwrap_or("".into()),
             extra: extra.unwrap_or("".into()),
@@ -179,15 +181,14 @@ impl FirmwareUI for UICaesar {
         }
         .into_paragraphs();
 
-        let layout = content_in_button_page(
+        content_in_button_page(
             title,
             paragraphs,
             verb.unwrap_or(TR::buttons__confirm.into()),
             verb_cancel,
             hold,
             false,
-        )?;
-        LayoutObj::new_root(layout)
+        )
     }
 
     fn confirm_value_intro(
@@ -514,11 +515,7 @@ impl FirmwareUI for UICaesar {
             // if there are no info pages, the right button is not needed
             // if verb_cancel is "^", the left button is an arrow pointing up
             let left_btn = Some(ButtonDetails::from_text_possible_icon(verb_cancel));
-            let right_btn = (has_pages_after || external_menu).then(|| {
-                ButtonDetails::text("i".into())
-                    .with_fixed_width(theme::BUTTON_ICON_WIDTH)
-                    .with_font(fonts::FONT_NORMAL)
-            });
+            let right_btn = (has_pages_after || external_menu).then(ButtonDetails::info_icon);
             let middle_btn = Some(ButtonDetails::armed_text(TR::buttons__confirm.into()));
 
             (
@@ -626,7 +623,7 @@ impl FirmwareUI for UICaesar {
         _subtitle: Option<TString<'static>>,
         items: Obj,
         verb: TString<'static>,
-        _verb_info: TString<'static>,
+        verb_info: TString<'static>,
         verb_cancel: Option<TString<'static>>,
         external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
@@ -653,6 +650,7 @@ impl FirmwareUI for UICaesar {
                 paragraphs.into_paragraphs(),
                 verb_cancel,
                 verb,
+                verb_info,
             )
             .with_menu(external_menu),
         ));
@@ -709,7 +707,6 @@ impl FirmwareUI for UICaesar {
         _description: Option<TString<'static>>,
         _extra: Option<TString<'static>>,
         _message: TString<'static>,
-        _amount: Option<TString<'static>>,
         _chunkify: bool,
         _text_mono: bool,
         _account_title: TString<'static>,
@@ -1116,11 +1113,9 @@ impl FirmwareUI for UICaesar {
 
     fn show_homescreen(
         label: TString<'static>,
-        notification: Option<TString<'static>>,
-        notification_level: u8,
+        notification: Option<Notification>,
         lockable: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let notification = notification.map(|w| (w, notification_level));
         let loader_description = lockable.then_some("Locking the device...".into());
         let layout = RootComponent::new(Homescreen::new(label, notification, loader_description));
         Ok(layout)
@@ -1145,6 +1140,7 @@ impl FirmwareUI for UICaesar {
         _haptics_enabled: Option<bool>,
         _led_enabled: Option<bool>,
         _about_items: Obj,
+        _production_year: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
@@ -1296,6 +1292,7 @@ impl FirmwareUI for UICaesar {
 
     fn show_properties(
         title: TString<'static>,
+        _subtitle: Option<TString<'static>>,
         value: Obj,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut paragraphs = ParagraphVecLong::new();
@@ -1417,6 +1414,10 @@ impl FirmwareUI for UICaesar {
         let pages = FlowPages::new(get_page, 1);
         let obj = LayoutObj::new(Flow::new(pages))?;
         Ok(obj)
+    }
+
+    fn confirm_cancel() -> Result<impl LayoutMaybeTrace, Error> {
+        Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
     }
 
     fn tutorial() -> Result<impl LayoutMaybeTrace, Error> {
