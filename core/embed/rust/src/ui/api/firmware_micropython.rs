@@ -64,6 +64,7 @@ extern "C" fn new_confirm_action(n_args: usize, args: *const Obj, kwargs: *mut M
             .get(Qstr::MP_QSTR_verb)
             .unwrap_or_else(|_| Obj::const_none())
             .try_into_option()?;
+        let cancel: bool = kwargs.get_or(Qstr::MP_QSTR_cancel, true)?;
         let verb_cancel: Option<TString> = kwargs
             .get(Qstr::MP_QSTR_verb_cancel)
             .unwrap_or_else(|_| Obj::const_none())
@@ -84,6 +85,7 @@ extern "C" fn new_confirm_action(n_args: usize, args: *const Obj, kwargs: *mut M
             description,
             subtitle,
             verb,
+            cancel,
             verb_cancel,
             hold,
             hold_danger,
@@ -476,7 +478,7 @@ extern "C" fn new_confirm_with_info(n_args: usize, args: *const Obj, kwargs: *mu
             .try_into_option()?;
         let external_menu: bool = kwargs.get_or(Qstr::MP_QSTR_external_menu, false)?;
 
-        let layout = ModelUI::confirm_with_info(
+        let obj = ModelUI::confirm_with_info(
             title,
             subtitle,
             items,
@@ -485,7 +487,7 @@ extern "C" fn new_confirm_with_info(n_args: usize, args: *const Obj, kwargs: *mu
             verb_cancel,
             external_menu,
         )?;
-        Ok(LayoutObj::new_root(layout)?.into())
+        Ok(obj.into())
     };
     unsafe { util::try_with_args_and_kwargs(n_args, args, kwargs, block) }
 }
@@ -540,18 +542,6 @@ extern "C" fn new_flow_confirm_output(n_args: usize, args: *const Obj, kwargs: *
 
         let address_item: Option<Obj> =
             kwargs.get(Qstr::MP_QSTR_address_item)?.try_into_option()?;
-        let extra_item: Option<Obj> = kwargs.get(Qstr::MP_QSTR_extra_item)?.try_into_option()?;
-        let summary_items: Option<Obj> =
-            kwargs.get(Qstr::MP_QSTR_summary_items)?.try_into_option()?;
-        let fee_items: Option<Obj> = kwargs.get(Qstr::MP_QSTR_fee_items)?.try_into_option()?;
-        let summary_title: Option<TString> =
-            kwargs.get(Qstr::MP_QSTR_summary_title)?.try_into_option()?;
-        let summary_br_code: Option<u16> = kwargs
-            .get(Qstr::MP_QSTR_summary_br_code)?
-            .try_into_option()?;
-        let summary_br_name: Option<TString> = kwargs
-            .get(Qstr::MP_QSTR_summary_br_name)?
-            .try_into_option()?;
         let cancel_text: Option<TString> =
             kwargs.get(Qstr::MP_QSTR_cancel_text)?.try_into_option()?;
 
@@ -569,12 +559,6 @@ extern "C" fn new_flow_confirm_output(n_args: usize, args: *const Obj, kwargs: *
             br_code,
             br_name,
             address_item,
-            extra_item,
-            summary_items,
-            fee_items,
-            summary_title,
-            summary_br_code,
-            summary_br_name,
             cancel_text,
         )?;
         Ok(LayoutObj::new_root(layout)?.into())
@@ -1386,8 +1370,21 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     /// from trezor import utils
     /// from trezor.enums import ButtonRequestType, RecoveryType
     ///
+    /// # Note: `PropertyType` / `StrPropertyType` are very much WIP.
+    /// # Historical context: Initially all we had was
+    /// # `tuple[str, str]`, `tuple[str | None, str | bytes | None, bool | None]`, etc.
+    /// # which we unified under `PropertyType`.
+    /// # We then later introduced `StrPropertyType` for cases where the value
+    /// # cannot be `bytes` and started getting rid of `PropertyType` uses.
+    /// # There are still a few instances where properties use `bytes`,
+    /// # but we should probably get rid of all and drop `PropertyType` completely.
+    /// # The next goal would be to replace the `bool` with something
+    /// # that can encode actual types / rendering strategies.
+    /// # See more details here: https://github.com/trezor/trezor-firmware/issues/5411
     /// PropertyType = tuple[str | None, StrOrBytes | None, bool | None]
     /// StrPropertyType = tuple[str | None, str | None, bool | None]
+    ///
+    ///
     /// T = TypeVar("T")
     ///
     /// class LayoutObj(Generic[T]):
@@ -1520,6 +1517,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     description: str | None,
     ///     subtitle: str | None = None,
     ///     verb: str | None = None,
+    ///     cancel: bool = True,
     ///     verb_cancel: str | None = None,
     ///     hold: bool = False,
     ///     hold_danger: bool = False,
@@ -1762,12 +1760,6 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     br_code: ButtonRequestType,
     ///     br_name: str,
     ///     address_item: PropertyType | None,
-    ///     extra_item: PropertyType | None,
-    ///     summary_items: Sequence[PropertyType] | None = None,
-    ///     fee_items: Sequence[PropertyType] | None = None,
-    ///     summary_title: str | None = None,
-    ///     summary_br_code: ButtonRequestType | None = None,
-    ///     summary_br_name: str | None = None,
     ///     cancel_text: str | None = None,
     /// ) -> LayoutObj[UiResult]:
     ///     """Confirm the recipient, (optionally) confirm the amount and (optionally) confirm the summary and present a Hold to Sign page."""

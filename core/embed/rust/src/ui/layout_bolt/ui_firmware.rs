@@ -52,6 +52,7 @@ impl FirmwareUI for UIBolt {
         description: Option<TString<'static>>,
         _subtitle: Option<TString<'static>>,
         verb: Option<TString<'static>>,
+        _cancel: bool,
         verb_cancel: Option<TString<'static>>,
         hold: bool,
         hold_danger: bool,
@@ -495,7 +496,7 @@ impl FirmwareUI for UIBolt {
         verb_info: TString<'static>,
         _verb_cancel: Option<TString<'static>>,
         _external_menu: bool,
-    ) -> Result<impl LayoutMaybeTrace, Error> {
+    ) -> Result<Gc<LayoutObj>, Error> {
         let mut paragraphs = ParagraphVecShort::new();
 
         for para in IterBuf::new().try_iterate(items)? {
@@ -520,14 +521,22 @@ impl FirmwareUI for UIBolt {
         }
         .styled(theme::button_confirm());
 
-        let buttons = Button::cancel_info_confirm(confirm_button, verb_info);
-
-        let layout = RootComponent::new(Frame::left_aligned(
-            theme::label_title(),
-            title,
-            Dialog::new(paragraphs.into_paragraphs(), buttons),
-        ));
-        Ok(layout)
+        if verb_info.is_empty() {
+            // hide the info button if its verb is empty
+            let buttons = Button::cancel_confirm_text(None, Some(verb));
+            LayoutObj::new(Frame::left_aligned(
+                theme::label_title(),
+                title,
+                Dialog::new(paragraphs.into_paragraphs(), buttons),
+            ))
+        } else {
+            let buttons = Button::cancel_info_confirm(confirm_button, verb_info);
+            LayoutObj::new(Frame::left_aligned(
+                theme::label_title(),
+                title,
+                Dialog::new(paragraphs.into_paragraphs(), buttons),
+            ))
+        }
     }
 
     fn check_homescreen_format(image: BinaryData, _accept_toif: bool) -> bool {
@@ -592,12 +601,6 @@ impl FirmwareUI for UIBolt {
         _br_code: u16,
         _br_name: TString<'static>,
         _address_item: Option<Obj>,
-        _extra_item: Option<Obj>,
-        _summary_items: Option<Obj>,
-        _fee_items: Option<Obj>,
-        _summary_title: Option<TString<'static>>,
-        _summary_br_code: Option<u16>,
-        _summary_br_name: Option<TString<'static>>,
         _cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
@@ -986,6 +989,7 @@ impl FirmwareUI for UIBolt {
             Some(description),
             None,
             None,
+            true,
             None,
             false,
             false,

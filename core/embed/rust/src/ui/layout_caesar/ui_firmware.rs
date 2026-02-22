@@ -52,6 +52,7 @@ impl FirmwareUI for UICaesar {
         description: Option<TString<'static>>,
         _subtitle: Option<TString<'static>>,
         verb: Option<TString<'static>>,
+        _cancel: bool,
         verb_cancel: Option<TString<'static>>,
         hold: bool,
         _hold_danger: bool,
@@ -626,7 +627,7 @@ impl FirmwareUI for UICaesar {
         verb_info: TString<'static>,
         verb_cancel: Option<TString<'static>>,
         external_menu: bool,
-    ) -> Result<impl LayoutMaybeTrace, Error> {
+    ) -> Result<Gc<LayoutObj>, Error> {
         let mut paragraphs = ParagraphVecShort::new();
 
         for para in IterBuf::new().try_iterate(items)? {
@@ -644,7 +645,7 @@ impl FirmwareUI for UICaesar {
             }
         }
 
-        let layout = RootComponent::new(Frame::new(
+        LayoutObj::new(Frame::new(
             title,
             ShowMore::<Paragraphs<ParagraphVecShort>>::new(
                 paragraphs.into_paragraphs(),
@@ -653,8 +654,7 @@ impl FirmwareUI for UICaesar {
                 verb_info,
             )
             .with_menu(external_menu),
-        ));
-        Ok(layout)
+        ))
     }
 
     fn check_homescreen_format(image: BinaryData, _accept_toif: bool) -> bool {
@@ -715,12 +715,6 @@ impl FirmwareUI for UICaesar {
         _br_code: u16,
         _br_name: TString<'static>,
         _address_item: Option<Obj>,
-        _extra_item: Option<Obj>,
-        _summary_items: Option<Obj>,
-        _fee_items: Option<Obj>,
-        _summary_title: Option<TString<'static>>,
-        _summary_br_code: Option<u16>,
-        _summary_br_name: Option<TString<'static>>,
         _cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         Err::<RootComponent<Empty, ModelUI>, Error>(Error::NotImplementedError)
@@ -1177,6 +1171,7 @@ impl FirmwareUI for UICaesar {
             Some(description),
             None,
             None,
+            true,
             None,
             false,
             false,

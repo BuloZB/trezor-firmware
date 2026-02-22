@@ -424,9 +424,17 @@ class ThpPairingMethod(IntEnum):
     NFC = 4
 
 
+class TronResourceCode(IntEnum):
+    BANDWIDTH = 0
+    ENERGY = 1
+
+
 class TronRawContractType(IntEnum):
     TransferContract = 1
     TriggerSmartContract = 31
+    FreezeBalanceV2Contract = 54
+    UnfreezeBalanceV2Contract = 55
+    WithdrawExpireUnfreezeContract = 56
 
 
 class MessageType(IntEnum):
@@ -696,6 +704,9 @@ class MessageType(IntEnum):
     TronContractRequest = 2204
     TronTransferContract = 2205
     TronTriggerSmartContract = 2206
+    TronFreezeBalanceV2Contract = 2207
+    TronUnfreezeBalanceV2Contract = 2208
+    TronWithdrawUnfreeze = 2209
     BenchmarkListNames = 9100
     BenchmarkNames = 9101
     BenchmarkRun = 9102
@@ -3705,6 +3716,7 @@ class LoadDevice(protobuf.MessageType):
         8: protobuf.Field("u2f_counter", "uint32", repeated=False, required=False, default=None),
         9: protobuf.Field("needs_backup", "bool", repeated=False, required=False, default=None),
         10: protobuf.Field("no_backup", "bool", repeated=False, required=False, default=None),
+        11: protobuf.Field("unfinished_backup", "bool", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -3719,6 +3731,7 @@ class LoadDevice(protobuf.MessageType):
         u2f_counter: Optional["int"] = None,
         needs_backup: Optional["bool"] = None,
         no_backup: Optional["bool"] = None,
+        unfinished_backup: Optional["bool"] = None,
     ) -> None:
         self.mnemonics: Sequence["str"] = mnemonics if mnemonics is not None else []
         self.pin = pin
@@ -3729,6 +3742,7 @@ class LoadDevice(protobuf.MessageType):
         self.u2f_counter = u2f_counter
         self.needs_backup = needs_backup
         self.no_backup = no_backup
+        self.unfinished_backup = unfinished_backup
 
 
 class ResetDevice(protobuf.MessageType):
@@ -8724,6 +8738,60 @@ class TronTriggerSmartContract(protobuf.MessageType):
         self.owner_address = owner_address
         self.contract_address = contract_address
         self.data = data
+
+
+class TronFreezeBalanceV2Contract(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2207
+    FIELDS = {
+        1: protobuf.Field("owner_address", "bytes", repeated=False, required=True),
+        2: protobuf.Field("balance", "uint64", repeated=False, required=True),
+        3: protobuf.Field("resource", "TronResourceCode", repeated=False, required=False, default=TronResourceCode.BANDWIDTH),
+    }
+
+    def __init__(
+        self,
+        *,
+        owner_address: "bytes",
+        balance: "int",
+        resource: Optional["TronResourceCode"] = TronResourceCode.BANDWIDTH,
+    ) -> None:
+        self.owner_address = owner_address
+        self.balance = balance
+        self.resource = resource
+
+
+class TronUnfreezeBalanceV2Contract(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2208
+    FIELDS = {
+        1: protobuf.Field("owner_address", "bytes", repeated=False, required=True),
+        2: protobuf.Field("balance", "uint64", repeated=False, required=True),
+        3: protobuf.Field("resource", "TronResourceCode", repeated=False, required=False, default=TronResourceCode.BANDWIDTH),
+    }
+
+    def __init__(
+        self,
+        *,
+        owner_address: "bytes",
+        balance: "int",
+        resource: Optional["TronResourceCode"] = TronResourceCode.BANDWIDTH,
+    ) -> None:
+        self.owner_address = owner_address
+        self.balance = balance
+        self.resource = resource
+
+
+class TronWithdrawUnfreeze(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2209
+    FIELDS = {
+        1: protobuf.Field("owner_address", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        owner_address: "bytes",
+    ) -> None:
+        self.owner_address = owner_address
 
 
 class TronSignature(protobuf.MessageType):

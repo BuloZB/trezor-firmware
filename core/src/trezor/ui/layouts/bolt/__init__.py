@@ -1,3 +1,4 @@
+from micropython import const
 from typing import TYPE_CHECKING
 
 import trezorui_api
@@ -649,7 +650,7 @@ async def should_show_more(
             title=title,
             items=items,
             verb=confirm or TR.buttons__confirm,
-            verb_info=button_text or TR.buttons__show_all,
+            verb_info=TR.buttons__show_all if button_text is None else button_text,
         ),
         br_name,
         br_code,
@@ -713,6 +714,45 @@ async def _confirm_ask_pagination(
             return
 
     assert False
+
+
+_INFO_DATA_ROWS = const(3)
+_INFO_DATA_WIDTH_BYTES = const(9)
+
+
+async def confirm_blob_prefix(
+    title: str,
+    data: memoryview,
+    *,
+    total_len: int,
+    confirmed_len: int,
+    br_name: str,
+    br_code: ButtonRequestType = BR_CODE_OTHER,
+) -> int | None:
+    """
+    Returns the number of bytes confirmed, or `None` if confirmation should be skipped.
+    """
+    # 3 rows x 18 hex digits (the maximal width is 19 digits)
+    prefix = data[: _INFO_DATA_ROWS * _INFO_DATA_WIDTH_BYTES]
+    prefix_parts = (
+        prefix[i * _INFO_DATA_WIDTH_BYTES : (i + 1) * _INFO_DATA_WIDTH_BYTES]
+        for i in range(_INFO_DATA_ROWS)
+    )
+    confirmed_len += len(prefix)
+
+    button_text = TR.words__show_next if confirmed_len < total_len else ""
+
+    show_more = await should_show_more(
+        title=f"{title}:\n{confirmed_len} / {total_len} bytes",
+        items=[(utils.hexlify_if_bytes(part), True) for part in prefix_parts],
+        button_text=button_text,  # will return True
+        confirm=TR.words__confirm_all,  # will return False
+        br_name=br_name,
+        br_code=br_code,
+    )
+    if show_more:
+        return len(prefix)
+    return None
 
 
 def confirm_blob(
@@ -1462,41 +1502,52 @@ if not utils.BITCOIN_ONLY:
         # TODO: #6359 Reword the TR strings to be ETH agnostic.
         async def confirm_tron_approve(
             recipient_addr: str,
-            total_amount: str,
+            amount_str: str,
+            is_revoke: bool,
             maximum_fee: str,
             chunkify: bool = False,
         ) -> None:
             br_name = "confirm_tron_approve"
+            if is_revoke:
+                title = TR.ethereum__approve_intro_title_revoke
+                action_subtitle = TR.ethereum__approve_intro_revoke
+                value_subtitle = TR.ethereum__approve_revoke_from
+                summary_view = (TR.words__token, amount_str[2:], True)
+            else:
+                title = TR.ethereum__approve_intro_title
+                action_subtitle = TR.ethereum__approve_intro
+                value_subtitle = TR.ethereum__approve_to
+                summary_view = (
+                    TR.ethereum__approve_amount_allowance,
+                    amount_str,
+                    False,
+                )
 
             await confirm_action(
                 br_name,
-                TR.ethereum__approve_intro_title,
-                TR.ethereum__approve_intro,
+                title,
+                action_subtitle,
                 verb=TR.buttons__continue,
             )
             await confirm_value(
-                TR.ethereum__approve_to,
+                title,
                 recipient_addr,
                 "",
-                subtitle=None,
+                subtitle=value_subtitle,
                 chunkify=chunkify,
                 br_name=br_name,
                 verb=TR.buttons__continue,
                 cancel=True,
             )
 
-            properties: Iterable[PropertyType] = (
-                (
-                    TR.ethereum__approve_amount_allowance,
-                    total_amount,
-                    False,
-                ),
+            properties: list[StrPropertyType] = [
+                summary_view,
                 (TR.words__chain, "Tron", True),
-            )
+            ]
 
             await confirm_properties(
                 br_name,
-                TR.ethereum__approve,
+                title,
                 properties,
                 None,
                 False,
@@ -1508,14 +1559,14 @@ if not utils.BITCOIN_ONLY:
                 None,
                 maximum_fee,
                 TR.send__maximum_fee,
-                TR.words__title_summary,
+                title,
                 None,
             )
 
         # TODO: #6364 Consider simplifying with confirm_tron_send like ETH flows.
         async def confirm_tron_transfer(
             recipient_addr: str,
-            total_amount: str,
+            amount_str: str,
             maximum_fee: str,
             chunkify: bool = True,
         ) -> None:
@@ -1533,10 +1584,10 @@ if not utils.BITCOIN_ONLY:
                 cancel=True,
             )
 
-            properties: Iterable[PropertyType] = (
+            properties: Iterable[StrPropertyType] = (
                 (
                     TR.words__amount,
-                    total_amount,
+                    amount_str,
                     False,
                 ),
                 (TR.words__chain, "Tron", True),

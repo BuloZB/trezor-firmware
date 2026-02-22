@@ -63,13 +63,14 @@ impl FirmwareUI for UIEckhart {
         description: Option<TString<'static>>,
         subtitle: Option<TString<'static>>,
         verb: Option<TString<'static>>,
+        cancel: bool,
         _verb_cancel: Option<TString<'static>>,
         hold: bool,
         hold_danger: bool,
         reverse: bool,
         _prompt_screen: bool,
         _prompt_title: Option<TString<'static>>,
-        _external_menu: bool, // TODO: will eventually replace the internal menu
+        external_menu: bool, // TODO: will eventually replace the internal menu
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let paragraphs = {
             let action = action.unwrap_or("".into());
@@ -109,12 +110,19 @@ impl FirmwareUI for UIEckhart {
             }
         };
 
+        let mut header = Header::new(title);
+        if external_menu {
+            header = header.with_right_button(Button::with_icon(theme::ICON_MENU), HeaderMsg::Menu);
+        }
+
         let mut screen = TextScreen::new(paragraphs)
-            .with_header(Header::new(title))
-            .with_action_bar(ActionBar::new_double(
-                Button::with_icon(theme::ICON_CROSS),
-                right_button,
-            ));
+            .with_header(header)
+            .with_external_menu(external_menu)
+            .with_action_bar(if cancel {
+                ActionBar::new_double(Button::with_icon(theme::ICON_CROSS), right_button)
+            } else {
+                ActionBar::new_single(right_button)
+            });
         if let Some(subtitle) = subtitle {
             screen = screen.with_hint(Hint::new_instruction(subtitle, None));
         }
@@ -346,7 +354,7 @@ impl FirmwareUI for UIEckhart {
         extra_title: Option<TString<'static>>,
         verb_cancel: Option<TString<'static>>,
         back_button: bool,
-        _external_menu: bool, // TODO: will eventually replace the internal menu
+        external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         // collect available info
         let account_paragraphs = if let Some(items) = account_items {
@@ -372,6 +380,7 @@ impl FirmwareUI for UIEckhart {
             extra_paragraphs,
             verb_cancel,
             back_button,
+            external_menu,
         )?;
         Ok(flow)
     }
@@ -580,7 +589,7 @@ impl FirmwareUI for UIEckhart {
         verb_info: TString<'static>,
         _verb_cancel: Option<TString<'static>>,
         _external_menu: bool,
-    ) -> Result<impl LayoutMaybeTrace, Error> {
+    ) -> Result<Gc<LayoutObj>, Error> {
         let mut paragraphs = ParagraphVecShort::new();
 
         for para in IterBuf::new().try_iterate(items)? {
@@ -611,7 +620,7 @@ impl FirmwareUI for UIEckhart {
             Some(verb_info),
             None,
         )?;
-        Ok(flow)
+        LayoutObj::new_root(flow)
     }
 
     fn check_homescreen_format(image: BinaryData, _accept_toif: bool) -> bool {
@@ -676,12 +685,6 @@ impl FirmwareUI for UIEckhart {
         br_code: u16,
         br_name: TString<'static>,
         address_item: Option<Obj>,
-        extra_item: Option<Obj>,
-        summary_items: Option<Obj>,
-        fee_items: Option<Obj>,
-        summary_title: Option<TString<'static>>,
-        summary_br_code: Option<u16>,
-        summary_br_name: Option<TString<'static>>,
         cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let mut main_paragraphs = ParagraphVecShort::new();
@@ -754,46 +757,6 @@ impl FirmwareUI for UIEckhart {
             }
         };
 
-        let summary_paragraphs = if let Some(items) = summary_items {
-            Some(PropsList::new_styled(
-                items,
-                &theme::TEXT_SMALL_LIGHT,
-                &theme::TEXT_MONO_MEDIUM_LIGHT,
-                &theme::TEXT_MONO_MEDIUM_LIGHT,
-                theme::PROP_INNER_SPACING,
-                theme::PROPS_SPACING,
-            )?)
-        } else {
-            None
-        };
-
-        let fee_paragraphs = if let Some(items) = fee_items {
-            Some(PropsList::new_styled(
-                items,
-                &theme::TEXT_SMALL_LIGHT,
-                &theme::TEXT_MONO_MEDIUM_LIGHT,
-                &theme::TEXT_MONO_MEDIUM_LIGHT_DATA,
-                theme::PROP_INNER_SPACING,
-                theme::PROPS_SPACING,
-            )?)
-        } else {
-            None
-        };
-
-        let (extra_title, extra_paragraph) = if let Some(extra_item) = extra_item {
-            let [key, value, _is_data]: [Obj; 3] = util::iter_into_array(extra_item)?;
-            let paragraph = Paragraph::new(
-                &theme::TEXT_MONO_ADDRESS,
-                value.try_into().unwrap_or(TString::empty()),
-            );
-            (
-                Some(key.try_into().unwrap_or(TString::empty())),
-                Some(paragraph),
-            )
-        } else {
-            (None, None)
-        };
-
         let flow = flow::confirm_output::new_confirm_output(
             title,
             subtitle,
@@ -804,13 +767,6 @@ impl FirmwareUI for UIEckhart {
             account_paragraphs,
             address_title,
             address_paragraph,
-            summary_title,
-            summary_paragraphs,
-            summary_br_code,
-            summary_br_name,
-            extra_title,
-            extra_paragraph,
-            fee_paragraphs,
             cancel_text,
         )?;
         Ok(flow)
@@ -1528,7 +1484,11 @@ impl FirmwareUI for UIEckhart {
                         // subtitle is already quite prominent
                         &theme::TEXT_SMALL_LIGHT
                     },
-                    header,
+                    if header != title {
+                        header
+                    } else {
+                        TString::empty()
+                    },
                 )
                 .no_break();
                 if !first_item_is_address.unwrap_or(false) {

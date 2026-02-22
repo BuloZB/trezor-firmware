@@ -40,7 +40,7 @@ async def sign_tx(msg: TronSignTx, keychain: Keychain) -> TronSignature:
     await paths.validate_path(keychain, msg.address_n)
     node = keychain.derive(msg.address_n)
 
-    # It is also not necessary for it to be UTF-8 encoded but all applications using it use it as a Note to be attached with the transaction.
+    # It is not necessary for it to be UTF-8 encoded but all applications using it use it as a Note to be attached with the transaction.
     if msg.data and msg.data != b"":
         if len(msg.data) > _MAX_DATA_LENGTH:
             raise DataError("Tron: data field too long")
@@ -84,6 +84,10 @@ async def process_contract(
     contract: MessageType,
     fee_limit: int,
 ) -> TronRawContract:
+
+    # Importing individual enums would de-clutter the code a bit.
+    # But it causes type error in messages.TronRawContract.type.
+    from trezor import TR
     from trezor.enums import TronRawContractType
     from trezor.ui.layouts import confirm_tron_send
 
@@ -95,9 +99,55 @@ async def process_contract(
         if contract.amount > _INT64_MAX:
             raise DataError("Tron: invalid transfer amount")
         await confirm_tron_send(layout.format_trx_amount(contract.amount), None)
+
     elif messages.TronTriggerSmartContract.is_type_of(contract):
         contract_type = TronRawContractType.TriggerSmartContract
         await process_smart_contract(contract, fee_limit)
+
+    elif messages.TronFreezeBalanceV2Contract.is_type_of(contract):
+        from trezor.enums import TronResourceCode
+
+        contract_type = TronRawContractType.FreezeBalanceV2Contract
+
+        await layout.confirm_freeze_operations(
+            owner_address=contract.owner_address,
+            balance=contract.balance,
+            resource=contract.resource,
+            title=TR.ethereum__staking_stake,
+        )
+
+        # TRON protocol uses proto3, which omits fields with default values from
+        # serialization. Since BANDWIDTH=0 is the default, we must set resource=None
+        # to match proto3 encoding and produce the correct transaction hash.
+        if contract.resource == TronResourceCode.BANDWIDTH:
+            contract = messages.TronFreezeBalanceV2Contract(
+                owner_address=contract.owner_address,
+                balance=contract.balance,
+                resource=None,
+            )
+    elif messages.TronUnfreezeBalanceV2Contract.is_type_of(contract):
+        from trezor.enums import TronResourceCode
+
+        contract_type = TronRawContractType.UnfreezeBalanceV2Contract
+
+        await layout.confirm_freeze_operations(
+            owner_address=contract.owner_address,
+            balance=contract.balance,
+            resource=contract.resource,
+            title=TR.ethereum__staking_unstake,
+        )
+
+        if contract.resource == TronResourceCode.BANDWIDTH:
+            contract = messages.TronUnfreezeBalanceV2Contract(
+                owner_address=contract.owner_address,
+                balance=contract.balance,
+                resource=None,
+            )
+
+    elif messages.TronWithdrawUnfreeze.is_type_of(contract):
+        contract_type = TronRawContractType.WithdrawExpireUnfreezeContract
+        await layout.confirm_withdraw_unfreeze(contract.owner_address)
+
     else:
         raise DataError("Tron: contract type unknown")
 
@@ -132,6 +182,7 @@ async def process_known_trc20_contract(
     from .sc_constants import (
         SC_ARGUMENT_ADDRESS_BYTES,
         SC_ARGUMENT_BYTES,
+        SC_FUNC_SIG_APPROVE,
         SC_FUNC_SIG_BYTES,
         SC_FUNC_SIG_TRANSFER,
     )
@@ -144,25 +195,31 @@ async def process_known_trc20_contract(
 
     data_reader = BufferReader(contract.data)
     func_sig = data_reader.read_memoryview(SC_FUNC_SIG_BYTES)
-    if func_sig != SC_FUNC_SIG_TRANSFER:
+    if func_sig not in (SC_FUNC_SIG_APPROVE, SC_FUNC_SIG_TRANSFER):
         return False
 
     if data_reader.remaining_count() < SC_ARGUMENT_BYTES * 2:
         return False
 
-    arg0 = data_reader.read_memoryview(SC_ARGUMENT_BYTES)
-    assert all(
-        byte == 0 for byte in arg0[: SC_ARGUMENT_BYTES - SC_ARGUMENT_ADDRESS_BYTES]
-    )
-    # TRON truncates the mandatory prefix \x41 from addresses in data
-    recipient = b"\x41" + bytes(arg0[SC_ARGUMENT_BYTES - SC_ARGUMENT_ADDRESS_BYTES :])
+    address_arg = data_reader.read_memoryview(SC_ARGUMENT_BYTES)
+    if not all(
+        byte == 0
+        for byte in address_arg[: SC_ARGUMENT_BYTES - SC_ARGUMENT_ADDRESS_BYTES]
+    ):
+        # invalid address padding in contract data
+        return False
 
-    arg1 = data_reader.read_memoryview(SC_ARGUMENT_BYTES)
-    value = int.from_bytes(arg1, "big")
+    # TRON truncates the mandatory prefix \x41 from addresses in data
+    recipient = b"\x41" + bytes(
+        address_arg[SC_ARGUMENT_BYTES - SC_ARGUMENT_ADDRESS_BYTES :]
+    )
+
+    amount_arg = data_reader.read_memoryview(SC_ARGUMENT_BYTES)
 
     await layout.confirm_known_trc20_smart_contract(
+        func_sig == SC_FUNC_SIG_APPROVE,
         recipient,
-        value,
+        amount_arg,
         fee_limit,
         token_decimals,
         token_symbol,

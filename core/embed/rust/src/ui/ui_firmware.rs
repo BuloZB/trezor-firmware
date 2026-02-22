@@ -27,6 +27,7 @@ pub trait FirmwareUI {
         description: Option<TString<'static>>,
         subtitle: Option<TString<'static>>,
         verb: Option<TString<'static>>,
+        cancel: bool,
         verb_cancel: Option<TString<'static>>,
         hold: bool,
         hold_danger: bool,
@@ -169,7 +170,7 @@ pub trait FirmwareUI {
         verb_info: TString<'static>,
         verb_cancel: Option<TString<'static>>,
         external_menu: bool,
-    ) -> Result<impl LayoutMaybeTrace, Error>;
+    ) -> Result<Gc<LayoutObj>, Error>;
 
     fn continue_recovery_homepage(
         text: TString<'static>,
@@ -197,12 +198,6 @@ pub trait FirmwareUI {
         br_code: u16,
         br_name: TString<'static>,
         address_item: Option<Obj>,
-        extra_item: Option<Obj>,
-        summary_items: Option<Obj>, // TODO: replace Obj
-        fee_items: Option<Obj>,     // TODO: replace Obj
-        summary_title: Option<TString<'static>>,
-        summary_br_code: Option<u16>,
-        summary_br_name: Option<TString<'static>>,
         cancel_text: Option<TString<'static>>,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 

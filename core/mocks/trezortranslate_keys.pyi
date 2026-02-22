@@ -1107,6 +1107,7 @@ class TR:
     words__receive: str = "Receive"
     words__recipient: str = "Recipient"
     words__recovery_share: str = "Recovery share"
+    words__resource: str = "Resource"
     words__review: str = "Review"
     words__security: str = "Security"
     words__send: str = "Send"

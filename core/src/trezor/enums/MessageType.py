@@ -277,3 +277,6 @@ if not utils.BITCOIN_ONLY:
     TronContractRequest = 2204
     TronTransferContract = 2205
     TronTriggerSmartContract = 2206
+    TronFreezeBalanceV2Contract = 2207
+    TronUnfreezeBalanceV2Contract = 2208
+    TronWithdrawUnfreeze = 2209

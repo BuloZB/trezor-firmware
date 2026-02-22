@@ -2,6 +2,17 @@ from typing import *
 from buffer_types import *
 from trezor import utils
 from trezor.enums import ButtonRequestType, RecoveryType
+# Note: `PropertyType` / `StrPropertyType` are very much WIP.
+# Historical context: Initially all we had was
+# `tuple[str, str]`, `tuple[str | None, str | bytes | None, bool | None]`, etc.
+# which we unified under `PropertyType`.
+# We then later introduced `StrPropertyType` for cases where the value
+# cannot be `bytes` and started getting rid of `PropertyType` uses.
+# There are still a few instances where properties use `bytes`,
+# but we should probably get rid of all and drop `PropertyType` completely.
+# The next goal would be to replace the `bool` with something
+# that can encode actual types / rendering strategies.
+# See more details here: https://github.com/trezor/trezor-firmware/issues/5411
 PropertyType = tuple[str | None, StrOrBytes | None, bool | None]
 StrPropertyType = tuple[str | None, str | None, bool | None]
 T = TypeVar("T")
@@ -114,6 +125,7 @@ def confirm_action(
     description: str | None,
     subtitle: str | None = None,
     verb: str | None = None,
+    cancel: bool = True,
     verb_cancel: str | None = None,
     hold: bool = False,
     hold_danger: bool = False,
@@ -371,12 +383,6 @@ def flow_confirm_output(
     br_code: ButtonRequestType,
     br_name: str,
     address_item: PropertyType | None,
-    extra_item: PropertyType | None,
-    summary_items: Sequence[PropertyType] | None = None,
-    fee_items: Sequence[PropertyType] | None = None,
-    summary_title: str | None = None,
-    summary_br_code: ButtonRequestType | None = None,
-    summary_br_name: str | None = None,
     cancel_text: str | None = None,
 ) -> LayoutObj[UiResult]:
     """Confirm the recipient, (optionally) confirm the amount and (optionally) confirm the summary and present a Hold to Sign page."""

@@ -319,6 +319,9 @@ trezor_message_impl! {
     TronContractRequest => MessageType_TronContractRequest,
     TronTransferContract => MessageType_TronTransferContract,
     TronTriggerSmartContract => MessageType_TronTriggerSmartContract,
+    TronFreezeBalanceV2Contract => MessageType_TronFreezeBalanceV2Contract,
+    TronUnfreezeBalanceV2Contract => MessageType_TronUnfreezeBalanceV2Contract,
+    TronWithdrawUnfreeze => MessageType_TronWithdrawUnfreeze,
 }
 
 #[cfg(feature = "webauthn")]
