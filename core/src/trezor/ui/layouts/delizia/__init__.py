@@ -578,7 +578,7 @@ async def confirm_payment_request(
 
 async def confirm_output(
     address: str,
-    amount: str | None = None,
+    amount: str,
     title: str | None = None,
     hold: bool = False,
     br_code: ButtonRequestType = ButtonRequestType.ConfirmOutput,
@@ -599,74 +599,53 @@ async def confirm_output(
     else:
         title = TR.send__title_sending_to
 
-    if amount is not None:
-        account_properties: list[StrPropertyType] = []
-        if source_account:
-            account_properties.append((TR.words__account, source_account, None))
-        if source_account_path and source_account_path != source_account:
-            # the reason for this check is account_label in bitcoin/sign_tx/layout.py
-            # which can return the derivation path instead of the account
-            account_properties.append(
-                (
-                    TR.address_details__derivation_path,
-                    source_account_path,
-                    None,
-                )
+    account_properties: list[StrPropertyType] = []
+    if source_account:
+        account_properties.append((TR.words__account, source_account, None))
+    if source_account_path and source_account_path != source_account:
+        # the reason for this check is account_label in bitcoin/sign_tx/layout.py
+        # which can return the derivation path instead of the account
+        account_properties.append(
+            (
+                TR.address_details__derivation_path,
+                source_account_path,
+                None,
             )
-        if account_properties:
-            info_items = [
-                (
-                    TR.address_details__account_info,
-                    account_properties,
-                    TR.send__send_from,
-                )
-            ]
-        else:
-            info_items = []
-        await confirm_linear_flow(
-            lambda: confirm_value(
-                TR.words__address,
-                address,
-                description or "",
-                "confirm_output",
-                br_code,
-                subtitle=title,
-                chunkify=chunkify,
-                cancel_text=TR.send__cancel_sign,
-                info_items=info_items,
-            ),
-            lambda: confirm_value(
-                TR.words__amount,
-                amount,
-                description="",
-                br_name="confirm_output",
-                br_code=br_code,
-                subtitle=title,
-                cancel_text=TR.send__cancel_sign,
-                info_items=info_items,
-                can_go_back=True,
-            ),
         )
+    if account_properties:
+        info_items = [
+            (
+                TR.address_details__account_info,
+                account_properties,
+                TR.send__send_from,
+            )
+        ]
     else:
-        await raise_if_not_confirmed(
-            trezorui_api.flow_confirm_output(
-                title=TR.words__address,
-                subtitle=title,
-                message=address,
-                extra=None,
-                chunkify=chunkify,
-                text_mono=True,
-                account_title=TR.send__send_from,
-                account=source_account,
-                account_path=source_account_path,
-                address_item=None,
-                br_code=br_code,
-                br_name="confirm_output",
-                cancel_text=cancel_text,
-                description=description,
-            ),
-            br_name=None,
-        )
+        info_items = []
+    await confirm_linear_flow(
+        lambda: confirm_value(
+            TR.words__address,
+            address,
+            description or "",
+            "confirm_output",
+            br_code,
+            subtitle=title,
+            chunkify=chunkify,
+            cancel_text=TR.send__cancel_sign,
+            info_items=info_items,
+        ),
+        lambda: confirm_value(
+            TR.words__amount,
+            amount,
+            description="",
+            br_name="confirm_output",
+            br_code=br_code,
+            subtitle=title,
+            cancel_text=TR.send__cancel_sign,
+            info_items=info_items,
+            can_go_back=True,
+        ),
+    )
 
 
 async def should_show_more(
@@ -1461,132 +1440,130 @@ if not utils.BITCOIN_ONLY:
             chunkify=False,
         )
 
-    if __debug__:
+    async def confirm_tron_send(amount: str | None, fee: str | None) -> None:
+        await _confirm_summary(
+            amount or "",
+            amount_label=TR.send__total_amount if amount else "",
+            fee=fee or "",
+            fee_label=TR.words__fee_limit if fee else "",
+            extra_items=None,
+            br_name="tron/send",
+            br_code=ButtonRequestType.SignTx,
+        )
 
-        async def confirm_tron_send(amount: str | None, fee: str | None) -> None:
-            await _confirm_summary(
-                amount or "",
-                amount_label=TR.send__total_amount if amount else "",
-                fee=fee or "",
-                fee_label=TR.words__fee_limit if fee else "",
-                extra_items=None,
-                br_name="confirm_tron_send",
-                br_code=ButtonRequestType.SignTx,
-            )
+    # TODO: #6364 Consider simplifying with confirm_tron_send like ETH flows.
+    async def confirm_tron_transfer(
+        recipient_addr: str,
+        amount_str: str,
+        maximum_fee: str,
+        chunkify: bool = True,
+    ) -> None:
 
-        # TODO: #6364 Consider simplifying with confirm_tron_send like ETH flows.
-        async def confirm_tron_transfer(
-            recipient_addr: str,
-            amount_str: str,
-            maximum_fee: str,
-            chunkify: bool = True,
-        ) -> None:
+        br_name = "tron/transfer"
+        title = TR.words__send
 
-            br_name = "confirm_tron_transfer"
-            title = TR.words__send
+        await confirm_value(
+            title,
+            recipient_addr,
+            "",
+            subtitle=TR.words__recipient,
+            chunkify=chunkify,
+            br_name=br_name,
+            verb=TR.buttons__continue,
+            cancel=True,
+        )
 
-            await confirm_value(
-                title,
-                recipient_addr,
-                "",
-                subtitle=TR.words__recipient,
-                chunkify=chunkify,
-                br_name=br_name,
-                verb=TR.buttons__continue,
-                cancel=True,
-            )
-
-            properties: Iterable[StrPropertyType] = (
-                (
-                    TR.words__amount,
-                    amount_str,
-                    False,
-                ),
-                (TR.words__chain, "Tron", True),
-            )
-
-            await confirm_properties(
-                br_name,
-                title,
-                properties,
-                None,
+        properties: Iterable[StrPropertyType] = (
+            (
+                TR.words__amount,
+                amount_str,
                 False,
-                verb=TR.buttons__continue,
-            )
+            ),
+            (TR.words__chain, "Tron", True),
+        )
 
-            await _confirm_summary(
-                None,
-                None,
-                maximum_fee,
-                TR.send__maximum_fee,
-                title,
-                None,
-            )
+        await confirm_properties(
+            br_name,
+            title,
+            properties,
+            None,
+            False,
+            verb=TR.buttons__continue,
+        )
 
-        # TODO: #6359 Reword the TR strings to be ETH agnostic.
-        async def confirm_tron_approve(
-            recipient_addr: str,
-            amount_str: str,
-            is_revoke: bool,
-            maximum_fee: str,
-            chunkify: bool = False,
-        ) -> None:
+        await _confirm_summary(
+            None,
+            None,
+            maximum_fee,
+            TR.words__fee_limit,
+            title,
+            None,
+        )
 
-            br_name = "confirm_tron_approve"
-            if is_revoke:
-                title = TR.ethereum__approve_intro_title_revoke
-                action_subtitle = TR.ethereum__approve_intro_revoke
-                value_subtitle = TR.ethereum__approve_revoke_from
-                summary_view = (TR.words__token, amount_str[2:], True)
-            else:
-                title = TR.ethereum__approve_intro_title
-                action_subtitle = TR.ethereum__approve_intro
-                value_subtitle = TR.ethereum__approve_to
-                summary_view = (
-                    TR.ethereum__approve_amount_allowance,
-                    amount_str,
-                    False,
-                )
+    # TODO: #6359 Reword the TR strings to be ETH agnostic.
+    async def confirm_tron_approve(
+        recipient_addr: str,
+        amount_str: str,
+        is_revoke: bool,
+        maximum_fee: str,
+        chunkify: bool = False,
+    ) -> None:
 
-            await confirm_action(
-                br_name,
-                title,
-                action_subtitle,
-                verb=TR.buttons__continue,
-            )
-            await confirm_value(
-                title,
-                recipient_addr,
-                "",
-                subtitle=value_subtitle,
-                chunkify=chunkify,
-                br_name=br_name,
-                verb=TR.buttons__continue,
-                cancel=True,
-            )
-
-            properties: list[StrPropertyType] = [
-                summary_view,
-                (f"{TR.words__chain}:", "Tron", True),
-            ]
-
-            await confirm_properties(
-                br_name,
-                title,
-                properties,
-                None,
+        br_name = "tron/approve"
+        if is_revoke:
+            title = TR.ethereum__approve_intro_title_revoke
+            action_subtitle = TR.ethereum__approve_intro_revoke
+            value_subtitle = TR.ethereum__approve_revoke_from
+            summary_view = (TR.words__token, amount_str[2:], True)
+        else:
+            title = TR.ethereum__approve_intro_title
+            action_subtitle = TR.ethereum__approve_intro
+            value_subtitle = TR.ethereum__approve_to
+            summary_view = (
+                TR.ethereum__approve_amount_allowance,
+                amount_str,
                 False,
-                verb=TR.buttons__continue,
             )
 
-            await _confirm_summary(
-                None,
-                None,
-                maximum_fee,
-                TR.send__maximum_fee,
-                title,
-                None,
-            )
+        await confirm_action(
+            br_name,
+            title,
+            action_subtitle,
+            verb=TR.buttons__continue,
+        )
+        await confirm_value(
+            title,
+            recipient_addr,
+            "",
+            subtitle=value_subtitle,
+            chunkify=chunkify,
+            br_name=br_name,
+            verb=TR.buttons__continue,
+            cancel=True,
+        )
+
+        properties: list[StrPropertyType] = [
+            summary_view,
+            (f"{TR.words__chain}:", "Tron", True),
+        ]
+
+        await confirm_properties(
+            br_name,
+            title,
+            properties,
+            None,
+            False,
+            verb=TR.buttons__continue,
+        )
+
+        await _confirm_summary(
+            None,
+            None,
+            maximum_fee,
+            TR.words__fee_limit,
+            title,
+            None,
+        )
 
 
 def confirm_joint_total(spending_amount: str, total_amount: str) -> Awaitable[None]:
