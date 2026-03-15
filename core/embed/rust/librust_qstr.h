@@ -112,7 +112,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_address_details__derivation_path;
   MP_QSTR_address_details__derivation_path_colon;
   MP_QSTR_address_details__title_receive_address;
-  MP_QSTR_address_details__title_receiving_to;
   MP_QSTR_address_label;
   MP_QSTR_address_qr;
   MP_QSTR_allow_cancel;
@@ -1050,6 +1049,8 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__unknown;
   MP_QSTR_words__unlimited;
   MP_QSTR_words__unlocked;
+  MP_QSTR_words__votes;
+  MP_QSTR_words__voting;
   MP_QSTR_words__wallet;
   MP_QSTR_words__warning;
   MP_QSTR_words__wipe;
