@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from typing import TypeGuard
     from trezor.enums import AmountUnit  # noqa: F401
     from trezor.enums import BackupAvailability  # noqa: F401
+    from trezor.enums import BackupMethod  # noqa: F401
     from trezor.enums import BackupType  # noqa: F401
     from trezor.enums import BootCommand  # noqa: F401
     from trezor.enums import ButtonRequestType  # noqa: F401
@@ -2487,6 +2488,7 @@ if TYPE_CHECKING:
         no_backup: "bool | None"
         backup_type: "BackupType"
         entropy_check: "bool | None"
+        backup_method: "BackupMethod"
 
         def __init__(
             self,
@@ -2500,6 +2502,7 @@ if TYPE_CHECKING:
             no_backup: "bool | None" = None,
             backup_type: "BackupType | None" = None,
             entropy_check: "bool | None" = None,
+            backup_method: "BackupMethod | None" = None,
         ) -> None:
             pass
 
@@ -2510,12 +2513,14 @@ if TYPE_CHECKING:
     class BackupDevice(protobuf.MessageType):
         group_threshold: "int | None"
         groups: "list[Slip39Group]"
+        backup_method: "BackupMethod"
 
         def __init__(
             self,
             *,
             groups: "list[Slip39Group] | None" = None,
             group_threshold: "int | None" = None,
+            backup_method: "BackupMethod | None" = None,
         ) -> None:
             pass
 
@@ -2582,6 +2587,7 @@ if TYPE_CHECKING:
         input_method: "RecoveryDeviceInputMethod | None"
         u2f_counter: "int | None"
         type: "RecoveryType"
+        backup_method: "BackupMethod"
 
         def __init__(
             self,
@@ -2594,6 +2600,7 @@ if TYPE_CHECKING:
             input_method: "RecoveryDeviceInputMethod | None" = None,
             u2f_counter: "int | None" = None,
             type: "RecoveryType | None" = None,
+            backup_method: "BackupMethod | None" = None,
         ) -> None:
             pass
 
@@ -4175,11 +4182,13 @@ if TYPE_CHECKING:
 
     class EvoluGetNode(protobuf.MessageType):
         proof_of_delegated_identity: "AnyBytes"
+        node_rotation_index: "int"
 
         def __init__(
             self,
             *,
             proof_of_delegated_identity: "AnyBytes",
+            node_rotation_index: "int | None" = None,
         ) -> None:
             pass
 
@@ -4237,11 +4246,15 @@ if TYPE_CHECKING:
 
     class EvoluGetDelegatedIdentityKey(protobuf.MessageType):
         thp_credential: "AnyBytes | None"
+        rotation_index: "int | None"
+        rotate: "bool | None"
 
         def __init__(
             self,
             *,
             thp_credential: "AnyBytes | None" = None,
+            rotation_index: "int | None" = None,
+            rotate: "bool | None" = None,
         ) -> None:
             pass
 
@@ -4251,16 +4264,46 @@ if TYPE_CHECKING:
 
     class EvoluDelegatedIdentityKey(protobuf.MessageType):
         private_key: "AnyBytes"
+        rotation_index: "int | None"
 
         def __init__(
             self,
             *,
             private_key: "AnyBytes",
+            rotation_index: "int | None" = None,
         ) -> None:
             pass
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["EvoluDelegatedIdentityKey"]:
+            return isinstance(msg, cls)
+
+    class EvoluIndexManagement(protobuf.MessageType):
+        rotation_index: "int | None"
+
+        def __init__(
+            self,
+            *,
+            rotation_index: "int | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EvoluIndexManagement"]:
+            return isinstance(msg, cls)
+
+    class EvoluIndexManagementResponse(protobuf.MessageType):
+        rotation_index: "int | None"
+
+        def __init__(
+            self,
+            *,
+            rotation_index: "int | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EvoluIndexManagementResponse"]:
             return isinstance(msg, cls)
 
     class MoneroTransactionSourceEntry(protobuf.MessageType):
