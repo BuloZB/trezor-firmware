@@ -169,10 +169,15 @@ extern "C" fn new_confirm_value(n_args: usize, args: *const Obj, kwargs: *mut Ma
         let prompt_screen: bool = kwargs.get_or(Qstr::MP_QSTR_prompt_screen, false)?;
         let cancel: bool = kwargs.get_or(Qstr::MP_QSTR_cancel, false)?;
         let back_button: bool = kwargs.get_or(Qstr::MP_QSTR_back_button, false)?;
-        let warning_footer: Option<TString> = kwargs
-            .get(Qstr::MP_QSTR_warning_footer)
-            .unwrap_or_else(|_| Obj::const_none())
-            .try_into_option()?;
+        let footer_obj: Obj = kwargs
+            .get(Qstr::MP_QSTR_footer)
+            .unwrap_or_else(|_| Obj::const_none());
+        let footer: Option<(TString, bool)> = if footer_obj == Obj::const_none() {
+            None
+        } else {
+            let [text_obj, is_warning_obj]: [Obj; 2] = util::iter_into_array(footer_obj)?;
+            Some((text_obj.try_into()?, is_warning_obj.try_into()?))
+        };
         let external_menu: bool = kwargs.get_or(Qstr::MP_QSTR_external_menu, false)?;
 
         let layout = ModelUI::confirm_value(
@@ -191,7 +196,7 @@ extern "C" fn new_confirm_value(n_args: usize, args: *const Obj, kwargs: *mut Ma
             prompt_screen,
             cancel,
             back_button,
-            warning_footer,
+            footer,
             external_menu,
         )?;
 
@@ -471,7 +476,10 @@ extern "C" fn new_confirm_with_info(n_args: usize, args: *const Obj, kwargs: *mu
             .try_into_option()?;
         let items: Obj = kwargs.get(Qstr::MP_QSTR_items)?;
         let verb: TString = kwargs.get(Qstr::MP_QSTR_verb)?.try_into()?;
-        let verb_info: TString = kwargs.get(Qstr::MP_QSTR_verb_info)?.try_into()?;
+        let verb_info: Option<TString<'static>> = kwargs
+            .get(Qstr::MP_QSTR_verb_info)
+            .unwrap_or_else(|_| Obj::const_none())
+            .try_into_option()?;
         let verb_cancel: Option<TString<'static>> = kwargs
             .get(Qstr::MP_QSTR_verb_cancel)
             .unwrap_or_else(|_| Obj::const_none())
@@ -1532,7 +1540,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     prompt_screen: bool = False,
     ///     cancel: bool = False,
     ///     back_button: bool = False,
-    ///     warning_footer: str | None = None,
+    ///     footer: tuple[str, bool] | None = None,
     ///     external_menu: bool = False,
     /// ) -> LayoutObj[UiResult]:
     ///     """Confirm a generic piece of information on the screen.
@@ -1686,7 +1694,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     subtitle: str | None = None,
     ///     items: Iterable[tuple[StrOrBytes, bool]],
     ///     verb: str,
-    ///     verb_info: str,
+    ///     verb_info: str | None = None,
     ///     verb_cancel: str | None = None,
     ///     external_menu: bool = False,
     /// ) -> LayoutObj[UiResult]:
@@ -2011,7 +2019,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     horizontal: bool = False,
     ///     chunkify: bool = False,
     /// ) -> LayoutObj[UiResult]:
-    ///     """Show metadata for outgoing transaction."""
+    ///     """Show metadata for outgoing transaction with a 'close' button."""
     Qstr::MP_QSTR_show_info_with_cancel => obj_fn_kw!(0, new_show_info_with_cancel).as_obj(),
 
     /// def show_lockscreen(

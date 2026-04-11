@@ -464,7 +464,7 @@ impl FirmwareUI for UIEckhart {
         _prompt_screen: bool,
         cancel: bool,
         back_button: bool,
-        warning_footer: Option<TString<'static>>,
+        footer: Option<(TString<'static>, bool)>, // true implies warning style
         external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         if info && external_menu {
@@ -512,7 +512,7 @@ impl FirmwareUI for UIEckhart {
         } else {
             Button::with_text(TR::buttons__confirm.into()).styled(button_confirm())
         };
-        if warning_footer.is_some() {
+        if matches!(footer, Some((_, true))) {
             right_button = right_button
                 .styled(theme::button_actionbar_danger())
                 .with_gradient(Gradient::Alert);
@@ -542,8 +542,12 @@ impl FirmwareUI for UIEckhart {
             .with_external_menu(external_menu);
         if page_counter {
             screen = screen.with_hint(Hint::new_page_counter())
-        } else if let Some(warning_footer) = warning_footer {
-            screen = screen.with_hint(Hint::new_warning_caution(warning_footer));
+        } else if let Some((footer_text, is_warning)) = footer {
+            screen = screen.with_hint(if is_warning {
+                Hint::new_warning_caution(footer_text)
+            } else {
+                Hint::new_instruction(footer_text, Some(theme::ICON_INFO))
+            });
         }
         let screen = screen.map(move |msg| match msg {
             TextScreenMsg::Cancelled => Some(if back_button {
@@ -586,7 +590,7 @@ impl FirmwareUI for UIEckhart {
         subtitle: Option<TString<'static>>,
         items: Obj,
         verb: TString<'static>,
-        verb_info: TString<'static>,
+        verb_info: Option<TString<'static>>,
         _verb_cancel: Option<TString<'static>>,
         _external_menu: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
@@ -617,7 +621,7 @@ impl FirmwareUI for UIEckhart {
             None,
             Some(verb),
             false,
-            Some(verb_info),
+            verb_info,
             None,
         )?;
         LayoutObj::new_root(flow)
