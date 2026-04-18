@@ -717,6 +717,20 @@ async def _confirm_ask_pagination(
     assert False
 
 
+async def confirm_blob_intro(
+    title: str,
+    value: AnyBytes,
+    *,
+    subtitle: str,
+    verb: str,
+    verb_cancel: str,
+    br_name: str,
+    br_code: ButtonRequestType = BR_CODE_OTHER,
+) -> bool:
+    """Not needed for this layout - `confirm_blob_prefix` can skip confirmation."""
+    return False
+
+
 _INFO_DATA_ROWS = const(3)
 _INFO_DATA_WIDTH_BYTES = const(9)
 
@@ -1190,7 +1204,7 @@ if not utils.BITCOIN_ONLY:
                 token_address,
                 None,
                 verb=TR.buttons__continue,
-                subtitle=TR.ethereum__token_contract,
+                subtitle=TR.ethereum__title_token_contract,
                 br_name="confirm_ethereum_approve",
                 chunkify=chunkify,
             )

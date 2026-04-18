@@ -153,6 +153,8 @@ static void _librust_qstrs(void) {
   MP_QSTR_backup__title_backup_wallet;
   MP_QSTR_backup__title_create_wallet_backup;
   MP_QSTR_backup__title_skip;
+  MP_QSTR_backup__type_n4w1;
+  MP_QSTR_backup__type_wordlist;
   MP_QSTR_backup__want_to_skip;
   MP_QSTR_backup_check_allowed;
   MP_QSTR_backup_failed;
@@ -1272,6 +1274,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ethereum__title_confirm_typed_data;
   MP_QSTR_ethereum__title_input_data;
   MP_QSTR_ethereum__title_signing_address;
+  MP_QSTR_ethereum__title_token_contract;
   MP_QSTR_ethereum__token_contract;
   MP_QSTR_ethereum__units_template;
   MP_QSTR_ethereum__unknown_contract_address;

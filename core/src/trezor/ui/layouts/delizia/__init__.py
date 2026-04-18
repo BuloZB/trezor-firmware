@@ -685,6 +685,37 @@ async def should_show_more(
         raise ActionCancelled
 
 
+async def confirm_blob_intro(
+    title: str,
+    value: AnyBytes,
+    *,
+    subtitle: str,
+    verb: str,
+    verb_cancel: str,
+    br_name: str,
+    br_code: ButtonRequestType = BR_CODE_OTHER,
+) -> bool:
+    """
+    Introduce blob to be confirmed, allowing the user to:
+    - view (returns `False`)
+    - confirm (returns `True`)
+    - cancel (raises `ActionCancelled`)
+    """
+
+    res = await interact(
+        trezorui_api.confirm_value_intro(
+            title=title,
+            value=value,
+            subtitle=subtitle,
+            verb=verb,
+            verb_cancel=verb_cancel,
+        ),
+        br_name=br_name,
+        br_code=br_code,
+    )
+    return res is CONFIRMED
+
+
 async def confirm_blob_prefix(
     title: str,
     data: memoryview,
@@ -1041,7 +1072,7 @@ if not utils.BITCOIN_ONLY:
     ) -> Awaitable[None]:
         return show_danger(
             "unknown_contract_warning",
-            content=f"{TR.ethereum__unknown_contract_address}. {TR.words__know_what_your_doing}",
+            content=f"{TR.ethereum__unknown_contract_address} {TR.words__know_what_your_doing}",
             verb_cancel=TR.send__cancel_sign,
         )
 
@@ -1162,7 +1193,7 @@ if not utils.BITCOIN_ONLY:
                 TR.words__address,
                 token_address,
                 "",
-                subtitle=TR.ethereum__token_contract,
+                subtitle=TR.ethereum__title_token_contract,
                 chunkify=chunkify,
                 br_name=br_name,
             )
@@ -1375,7 +1406,7 @@ if not utils.BITCOIN_ONLY:
     def confirm_solana_unknown_token_warning() -> Awaitable[None]:
         return show_danger(
             "unknown_token_warning",
-            content=f"{TR.solana__unknown_token_address}. {TR.words__know_what_your_doing}",
+            content=f"{TR.solana__unknown_token_address} {TR.words__know_what_your_doing}",
             verb_cancel=TR.send__cancel_sign,
         )
 

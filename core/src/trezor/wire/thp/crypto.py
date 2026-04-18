@@ -54,22 +54,7 @@ def dec(
     aes_ctx.auth(auth_data)
     aes_ctx.decrypt_in_place(buffer)
     computed_tag = aes_ctx.finish()
-    return computed_tag == tag
-
-
-class BusyDecoder:
-
-    def __init__(self, key: bytes, nonce: int, auth_data: bytes = b"") -> None:
-        iv = _get_iv_from_nonce(nonce)
-        self.aes_ctx = aesgcm(key, iv)
-        self.aes_ctx.auth(auth_data)
-
-    def decrypt_part(self, part: AnyBuffer) -> None:
-        self.aes_ctx.decrypt_in_place(part)
-
-    def finish_and_check_tag(self, tag: bytes) -> bool:
-        computed_tag = self.aes_ctx.finish()
-        return computed_tag == tag
+    return utils.consteq(computed_tag, tag)
 
 
 PROTOCOL_NAME = b"Noise_XX_25519_AESGCM_SHA256\x00\x00\x00\x00"
@@ -173,7 +158,7 @@ class Handshake:
             :PUBKEY_LENGTH
         ]
         tag = aes_ctx.finish()
-        if tag != encrypted_host_static_public_key[-16:]:
+        if not utils.consteq(tag, encrypted_host_static_public_key[-16:]):
             raise ThpDecryptionError()
 
         self.ck, self.k = _hkdf(
@@ -191,7 +176,7 @@ class Handshake:
                 __name__, "th2 - dec (key: %s, nonce: %d)", hexlify_if_bytes(self.k), 0
             )
         tag = aes_ctx.finish()
-        if tag != encrypted_payload[-16:]:
+        if not utils.consteq(tag, encrypted_payload[-16:]):
             raise ThpDecryptionError()
 
         self.key_receive, self.key_send = _hkdf(self.ck, b"")

@@ -30,6 +30,7 @@ ui_color_32bit = []
 ui_overlay = []
 ui_empty_lock = []
 ui_jpeg = []
+ui_font_kerning = []
 hw_jpeg_decoder = []
 boot_ucb = []
 bootloader = []
@@ -56,6 +57,7 @@ tropic = []
 serial_number = []
 storage = []
 telemetry = []
+n4w1 = []
 translations = ["crypto"]
 secmon_layout = []
 dbg_console = []
@@ -78,6 +80,7 @@ test = [
     "translations",
     "ui",
     "ui_jpeg",
+    "ui_font_kerning",
     "ui_blurring",
     "ui_image_buffer",
     "ui_overlay",

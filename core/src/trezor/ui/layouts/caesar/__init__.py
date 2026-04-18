@@ -744,6 +744,20 @@ async def should_show_more(
         raise ActionCancelled
 
 
+async def confirm_blob_intro(
+    title: str,
+    value: AnyBytes,
+    *,
+    subtitle: str,
+    verb: str,
+    verb_cancel: str,
+    br_name: str,
+    br_code: ButtonRequestType = BR_CODE_OTHER,
+) -> bool:
+    """Not needed for this layout - `confirm_blob_prefix` can skip confirmation."""
+    return False
+
+
 async def confirm_blob_prefix(
     title: str,
     data: memoryview,
@@ -1161,7 +1175,7 @@ if not utils.BITCOIN_ONLY:
 
         if is_unknown_token:
             await confirm_value(
-                TR.ethereum__token_contract + " | " + TR.words__address,
+                TR.ethereum__title_token_contract,
                 token_address,
                 None,
                 verb=DOWN_ARROW,

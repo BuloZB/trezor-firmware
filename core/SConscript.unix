@@ -17,9 +17,10 @@ PYOPT = ARGUMENTS.get('PYOPT', '1')
 DEBUGLINK = ARGUMENTS.get('DEBUGLINK', '0') == '1'
 FROZEN = ARGUMENTS.get('TREZOR_EMULATOR_FROZEN', 0)
 RASPI = os.getenv('TREZOR_EMULATOR_RASPI') == '1'
-MICROPY_ENABLE_SOURCE_LINE = ARGUMENTS.get('MICROPY_ENABLE_SOURCE_LINE', '1')
+MICROPY_ENABLE_SOURCE_LINE = ARGUMENTS.get('MICROPY_ENABLE_SOURCE_LINE', '1') == '1'
 DBG_CONSOLE = ARGUMENTS.get('DBG_CONSOLE', '')
 EXTAPP_SUPPORT = ARGUMENTS.get('EXTAPP_SUPPORT', '0') == '1'
+N4W1 = ARGUMENTS.get('N4W1', '0') == '1'
 
 
 if DEBUGLINK or PYOPT == '0':
@@ -67,6 +68,10 @@ if not DISABLE_TROPIC:
 
 if TREZOR_MODEL in ['T3W1'] and EXTAPP_SUPPORT:
     FEATURES_WANTED += ["app_loading"]
+
+if N4W1:
+    assert PYOPT == "0", "N4W1 requires PYOPT=0"
+    FEATURES_WANTED += ["n4w1"]
 
 if not models.has_emulator(TREZOR_MODEL):
     # skip unix build
@@ -119,7 +124,7 @@ CPPDEFINES_MOD += [
     ('USE_CARDANO', '1' if EVERYTHING else '0'),
     ('USE_NEM', '1' if (EVERYTHING and TREZOR_MODEL == "T2T1") else '0'),
     ('USE_EOS', '1' if (EVERYTHING and TREZOR_MODEL == "T2T1") else '0'),
-    ('MICROPY_ENABLE_SOURCE_LINE', MICROPY_ENABLE_SOURCE_LINE),
+    ('MICROPY_ENABLE_SOURCE_LINE', '1' if MICROPY_ENABLE_SOURCE_LINE else '0'),
 ]
 SOURCE_MOD += [
     'embed/upymod/trezorobj.c',
@@ -469,6 +474,8 @@ SDCARD = ('sd_card' in FEATURES_AVAILABLE)
 OPTIGA = ('optiga' in FEATURES_AVAILABLE)
 SERIAL_NUMBER = ('serial_number' in FEATURES_AVAILABLE)
 BACKLIGHT = ('backlight' in FEATURES_AVAILABLE)
+TELEMETRY = ('telemetry' in FEATURES_AVAILABLE)
+N4W1 = ('n4w1' in FEATURES_AVAILABLE)
 
 env.Tool('micropython')
 
@@ -755,7 +762,7 @@ if FROZEN:
         )
     ))
     if PYOPT == '0':
-        exclude_n4w1 = [SOURCE_PY_DIR + 'apps/debug/n4w1_mock.py'] if TREZOR_MODEL != "T3W1" else []
+        exclude_n4w1 = [SOURCE_PY_DIR + 'apps/debug/n4w1_mock.py'] if not N4W1 else []
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/debug/*.py', exclude=exclude_n4w1))
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/homescreen/*.py',
         exclude=[
@@ -776,7 +783,7 @@ if FROZEN:
         ))
     )
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/misc/*.py'))
-    if 'telemetry' in FEATURES_AVAILABLE:
+    if TELEMETRY:
         SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/telemetry/*.py'))
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/bitcoin/*.py'))
     SOURCE_PY.extend(Glob(SOURCE_PY_DIR + 'apps/bitcoin/*/*.py',
@@ -876,7 +883,10 @@ if FROZEN:
         ui_layout=ui.get_ui_layout(TREZOR_MODEL),
         thp=THP,
         power_manager='power_manager' in FEATURES_AVAILABLE,
-        )
+        telemetry=TELEMETRY,
+        n4w1=N4W1,
+        include_source_lines=MICROPY_ENABLE_SOURCE_LINE,
+    )
 
     source_mpyc = env.FrozenCFile(
         target='frozen_mpy.c', source=source_mpy, qstr_header=qstr_preprocessed)
