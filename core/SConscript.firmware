@@ -284,7 +284,6 @@ SOURCE_MOD += [
     'embed/rtl/error_handling.c',
     'embed/rtl/scm_revision.c',
     'embed/rtl/strutils.c',
-    'embed/sec/image/boot_image_embdata.c',
     'embed/sec/image/image.c',
     'vendor/micropython/lib/uzlib/adler32.c',
     'vendor/micropython/lib/uzlib/crc32.c',
@@ -462,7 +461,7 @@ ui.init_ui(TREZOR_MODEL, "firmware", RUST_UI_FEATURES)
 SOURCE_QSTR = SOURCE_MOD + SOURCE_MICROPYTHON + SOURCE_MICROPYTHON_SPEED
 
 if PYOPT == '0':
-    DEBUG_FLAGS = "-DMICROPY_OOM_CALLBACK=1 -DSTATIC="
+    DEBUG_FLAGS = "-DMICROPY_OOM_CALLBACK=1 -DSTATIC= -DUSE_OPTIGA_TESTING=1"
 else:
     DEBUG_FLAGS = "-DMICROPY_OOM_CALLBACK=0"
 
@@ -481,8 +480,10 @@ env = Environment(
 FEATURES_AVAILABLE = models.configure_board(TREZOR_MODEL, HW_REVISION, FEATURES_WANTED, env, CPPDEFINES_HAL, SOURCE_HAL, PATH_HAL)
 
 SOURCE_FIRMWARE = [
+    'embed/projects/firmware/boot_image_embdata.c',
     'embed/projects/firmware/header.S',
     'embed/projects/firmware/main.c',
+    'embed/projects/firmware/stm32/coreapp_header.S',
     'embed/projects/firmware/mphalport.c',
     'embed/projects/firmware/nlrthumb.c',
 ]
@@ -860,6 +861,8 @@ if FROZEN:
         tropic='tropic' in FEATURES_AVAILABLE,
         use_ble='ble' in FEATURES_AVAILABLE,
         use_button='button' in FEATURES_AVAILABLE,
+        use_haptic='haptic' in FEATURES_AVAILABLE,
+        use_rgb_led='rgb_led' in FEATURES_AVAILABLE,
         use_touch='touch' in FEATURES_AVAILABLE,
         ui_layout=ui.get_ui_layout(TREZOR_MODEL),
         thp=THP,
@@ -867,6 +870,7 @@ if FROZEN:
         telemetry=TELEMETRY,
         n4w1=N4W1,
         include_source_lines=MICROPY_ENABLE_SOURCE_LINE,
+        emulator=False,
     )
 
     source_mpyc = env.FrozenCFile(

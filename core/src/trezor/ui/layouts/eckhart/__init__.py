@@ -298,24 +298,22 @@ async def show_address(
 
     if warning is None and multisig_index is not None:
         warning = TR.send__receiving_to_multisig
-    await raise_if_not_confirmed(
-        trezorui_api.flow_get_address(
-            address=address,
-            title=title or TR.words__receive,
-            subtitle=subtitle,
-            description=network or "",
-            hint=warning,
-            chunkify=chunkify,
-            address_qr=address if address_qr is None else address_qr,
-            case_sensitive=case_sensitive,
-            account=account,
-            path=path,
-            xpubs=[(xpub_title(i), xpub) for i, xpub in enumerate(xpubs)],
-            br_name=br_name,
-            br_code=br_code,
-        ),
-        None,
-    )
+    with trezorui_api.flow_get_address(
+        address=address,
+        title=title or TR.words__receive,
+        subtitle=subtitle,
+        description=network or "",
+        hint=warning,
+        chunkify=chunkify,
+        address_qr=address if address_qr is None else address_qr,
+        case_sensitive=case_sensitive,
+        account=account,
+        path=path,
+        xpubs=[(xpub_title(i), xpub) for i, xpub in enumerate(xpubs)],
+        br_name=br_name,
+        br_code=br_code,
+    ) as obj:
+        await raise_if_not_confirmed(obj, br_name=None)
 
     show_continue_in_app(TR.address__confirmed)
 
@@ -472,15 +470,13 @@ async def confirm_payment_request(
     )
 
     for t, text in texts:
-        await raise_if_not_confirmed(
-            trezorui_api.confirm_value(
-                title=t or title,
-                value=text,
-                description=None,
-                verb=TR.buttons__confirm,
-            ),
-            "confirm_payment_request",
-        )
+        with trezorui_api.confirm_value(
+            title=t or title,
+            value=text,
+            description=None,
+            verb=TR.buttons__confirm,
+        ) as obj:
+            await raise_if_not_confirmed(obj, "confirm_payment_request")
 
     main_layout = trezorui_api.confirm_value(
         title=title,
@@ -673,16 +669,13 @@ async def should_show_more(
     if confirm is None or not isinstance(confirm, str):
         confirm = TR.buttons__confirm
 
-    result = await interact(
-        trezorui_api.confirm_with_info(
-            title=title,
-            items=para,
-            verb=confirm,
-            verb_info=button_text,
-        ),
-        br_name,
-        br_code,
-    )
+    with trezorui_api.confirm_with_info(
+        title=title,
+        items=para,
+        verb=confirm,
+        verb_info=button_text,
+    ) as layout_obj:
+        result = await interact(layout_obj, br_name, br_code)
 
     if result is CONFIRMED:
         return False
@@ -1310,7 +1303,8 @@ if not utils.BITCOIN_ONLY:
         intro_question: str,
         verb: str,
         vault_str: str,
-        total_amount: str,
+        amount: str,
+        amount_label: str,
         account: str | None,
         account_path: str | None,
         maximum_fee: str,
@@ -1361,7 +1355,7 @@ if not utils.BITCOIN_ONLY:
                 trezorui_api.confirm_properties(
                     title=title,
                     items=[
-                        (TR.ethereum__deposit_amount, total_amount, False),
+                        (amount_label, amount, False),
                         (TR.words__chain, chain, False),
                     ],
                     hold=False,

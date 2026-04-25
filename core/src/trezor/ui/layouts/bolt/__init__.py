@@ -503,15 +503,13 @@ async def confirm_payment_request(
     title = TR.words__swap if is_swap(trades) else TR.words__confirm
 
     for t, text in texts:
-        await raise_if_not_confirmed(
-            trezorui_api.confirm_value(
-                title=t or title,
-                value=text,
-                is_data=False,
-                description=None,
-            ),
-            "confirm_payment_request",
-        )
+        with trezorui_api.confirm_value(
+            title=t or title,
+            value=text,
+            is_data=False,
+            description=None,
+        ) as obj:
+            await raise_if_not_confirmed(obj, "confirm_payment_request")
 
     menu_items: list[StrPropertyType] = []
     if recipient_address is not None:
@@ -645,16 +643,13 @@ async def should_show_more(
     Raises ActionCancelled if the user cancels.
     """
 
-    result = await interact(
-        trezorui_api.confirm_with_info(
-            title=title,
-            items=items,
-            verb=confirm or TR.buttons__confirm,
-            verb_info=button_text,
-        ),
-        br_name,
-        br_code,
-    )
+    with trezorui_api.confirm_with_info(
+        title=title,
+        items=items,
+        verb=confirm or TR.buttons__confirm,
+        verb_info=button_text,
+    ) as layout_obj:
+        result = await interact(layout_obj, br_name, br_code)
 
     if result is CONFIRMED:
         return False
@@ -1341,7 +1336,8 @@ if not utils.BITCOIN_ONLY:
         intro_question: str,
         verb: str,
         vault_str: str,
-        total_amount: str,
+        amount: str,
+        amount_label: str,
         account: str | None,
         account_path: str | None,
         maximum_fee: str,
@@ -1372,7 +1368,7 @@ if not utils.BITCOIN_ONLY:
         )
 
         await confirm_value(
-            title=verb,
+            title=title,
             value=vault_str,
             description="",
             br_name=br_name + "/vault",
@@ -1384,7 +1380,7 @@ if not utils.BITCOIN_ONLY:
             br_name=br_name + "/amount",
             title=title,
             props=[
-                (TR.ethereum__deposit_amount, total_amount, False),
+                (amount_label, amount, False),
                 (TR.words__chain, chain, False),
             ],
             br_code=br_code,

@@ -2427,6 +2427,8 @@ if TYPE_CHECKING:
         optiga_signature: "AnyBytes"
         tropic_certificates: "list[AnyBytes]"
         tropic_signature: "AnyBytes | None"
+        mcu_certificates: "list[AnyBytes]"
+        mcu_signature: "AnyBytes | None"
 
         def __init__(
             self,
@@ -2434,7 +2436,9 @@ if TYPE_CHECKING:
             optiga_signature: "AnyBytes",
             optiga_certificates: "list[AnyBytes] | None" = None,
             tropic_certificates: "list[AnyBytes] | None" = None,
+            mcu_certificates: "list[AnyBytes] | None" = None,
             tropic_signature: "AnyBytes | None" = None,
+            mcu_signature: "AnyBytes | None" = None,
         ) -> None:
             pass
 
@@ -3066,6 +3070,32 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkEraseSdCard"]:
+            return isinstance(msg, cls)
+
+    class DebugLinkSetBatteryState(protobuf.MessageType):
+        soc: "int | None"
+        usb_connected: "bool | None"
+        wireless_connected: "bool | None"
+        ntc_connected: "bool | None"
+        charging_limited: "bool | None"
+        temp_control_active: "bool | None"
+        battery_connected: "bool | None"
+
+        def __init__(
+            self,
+            *,
+            soc: "int | None" = None,
+            usb_connected: "bool | None" = None,
+            wireless_connected: "bool | None" = None,
+            ntc_connected: "bool | None" = None,
+            charging_limited: "bool | None" = None,
+            temp_control_active: "bool | None" = None,
+            battery_connected: "bool | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkSetBatteryState"]:
             return isinstance(msg, cls)
 
     class DebugLinkOptigaSetSecMax(protobuf.MessageType):

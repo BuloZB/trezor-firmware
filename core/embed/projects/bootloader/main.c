@@ -32,6 +32,7 @@
 #include <sys/bootargs.h>
 #include <sys/bootutils.h>
 #include <sys/flash_utils.h>
+#include <sys/startup_args.h>
 #include <sys/system.h>
 #include <sys/systick.h>
 #include <sys/types.h>
@@ -84,6 +85,12 @@
 #endif
 #ifdef USE_SECRET
 #include <sec/secret.h>
+#endif
+#ifdef USE_TRUSTZONE
+#include <sec/tz_init.h>
+#endif
+#ifdef USE_MCU_ATTESTATION
+#include <sec/mcu_attestation.h>
 #endif
 
 #ifdef USE_BLE
@@ -437,6 +444,19 @@ void real_jump_to_firmware(void) {
   ensure_secmon_min_version(secmon_hdr->monotonic);
 #endif
 
+#ifdef USE_MCU_ATTESTATION
+  {
+    uint8_t mcu_device_cert[MCU_ATTESTATION_MAX_CERT_SIZE];
+    size_t mcu_device_cert_size = 0;
+    if (sectrue == secret_mcu_device_cert_read(mcu_device_cert,
+                                               sizeof(mcu_device_cert),
+                                               &mcu_device_cert_size)) {
+      startup_args_add(STARTUP_ARGS_TYPE_MCU_DEVICE_CERT, mcu_device_cert,
+                       mcu_device_cert_size);
+    }
+  }
+#endif
+
 #ifdef USE_SECRET
   secbool provisioning_access =
       ((vhdr.vtrust & (VTRUST_ALLOW_PROVISIONING | VTRUST_SECRET_MASK)) ==
@@ -496,9 +516,11 @@ void real_jump_to_firmware(void) {
 
   system_deinit();
 
-  jump_to_next_stage(
+  uint32_t vectbl_addr =
       IMAGE_CODE_ALIGN(FIRMWARE_START + vhdr.hdrlen + IMAGE_HEADER_SIZE) +
-      secmon_code_offset);
+      secmon_code_offset;
+
+  jump_to_next_stage(vectbl_addr, startup_args_export());
 }
 
 __attribute__((noreturn)) void reboot_with_fade(void) {
@@ -512,6 +534,10 @@ int main(void) {
 int bootloader_main(void) {
 #endif
   secbool touch_initialized = secfalse;
+
+#ifdef USE_TRUSTZONE
+  tz_init();
+#endif
 
   system_init(&rsod_panic_handler);
 

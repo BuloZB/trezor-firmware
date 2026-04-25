@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <sys/startup_args.h>
 #include <sys/systask.h>
 
 #ifdef STM32F4
@@ -83,6 +84,22 @@ void __attribute__((noreturn)) reboot_or_halt_after_rsod(void);
 // Jumps to the next booting stage (e.g. bootloader to firmware).
 // `vectbl_address` points to the flash at the vector table of the next stage.
 //
+// Optionally, `args` can point to a structure with additional arguments for
+// the next stage of booting. `args` must point to a global or static variable
+// because the function will switch to a new stack before jumping and
+// smash the old stack contents.
+//
 // Before jumping, the function disables all interrupts and clears the
 // memory and registers that could contain sensitive information.
-void __attribute__((noreturn)) jump_to_next_stage(uint32_t vectbl_address);
+void __attribute__((noreturn)) jump_to_next_stage(uint32_t vectbl_address,
+                                                  const startup_args_t *args);
+
+// Ensures the device is in a compatible state before jumping to the next stage.
+// This function is used to ensure backward compatibility with older versions of
+// released bootloaders and firmware. Implementation is platform dependand.
+void ensure_compatible_display_settings_for_bootloader(void);
+
+// Ensures the device is in a compatible state before jumping to to kernel.
+// This function is used to ensure backward compatibility with older versions of
+// released bootloaders and firmware. Implementation is platform dependand.
+void ensure_compatible_display_settings(void);

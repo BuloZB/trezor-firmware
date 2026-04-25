@@ -1,7 +1,7 @@
 use heapless;
 
 use crate::{
-    Backend, Channel, ChannelIO, Error, Host,
+    Backend, ChannelIO, Error, Host,
     alternating_bit::SyncBits,
     channel::{ChannelState, Nonce, PacketInResult, PairingState, noise::NoiseHandshake},
     credential::CredentialStore,
@@ -21,6 +21,8 @@ use core::marker::PhantomData;
 // - DH key + credential + 2 AEAD tags + overhead
 const INTERNAL_BUFFER_LEN: usize = 192;
 const MAX_DEVICE_PROPERTIES_LEN: usize = 128;
+
+pub type Channel<B> = super::Channel<Host, B>;
 
 enum AllocationState {
     None,
@@ -56,29 +58,31 @@ enum PingState {
 /// Handles broadcast channel messages, notably channel allocation requests.
 /// Because host often only needs a single channel, you can throw away the Mux
 /// after allocating one, if you don't need the keep-alive functionality.
-pub struct Mux<C, B> {
-    cred_store: C,
+pub struct Mux<B> {
     internal_buffer: heapless::Vec<u8, MAX_DEVICE_PROPERTIES_LEN>,
     channel_allocation: AllocationState,
     ping: PingState,
     _phantom: PhantomData<B>,
 }
 
-impl<C, B> Mux<C, B>
+impl<B> Mux<B>
 where
-    C: CredentialStore,
     B: Backend,
 {
-    pub fn new(cred_store: C) -> Self {
+    pub fn new() -> Self {
         let mut internal_buffer = heapless::Vec::new();
         prepare_zeroed(&mut internal_buffer);
         Self {
-            cred_store,
             internal_buffer,
             channel_allocation: AllocationState::None,
             ping: PingState::None,
             _phantom: PhantomData,
         }
+    }
+
+    /// Reset everything to initial state - discard keep-alive and channel allocation.
+    pub fn reset(&mut self) {
+        *self = Self::new()
     }
 
     /// Enqueue a keep-alive message.
@@ -98,7 +102,10 @@ where
     }
 
     /// Create new [`ChannelOpen`] after channel allocation response was received.
-    pub fn channel_alloc(&mut self) -> Result<ChannelOpen<C, B>, Error> {
+    pub fn channel_alloc<C>(&mut self, cred_store: C) -> Result<ChannelOpen<C, B>, Error>
+    where
+        C: CredentialStore,
+    {
         let AllocationState::ReceivedId {
             try_to_unlock,
             channel_id,
@@ -106,12 +113,7 @@ where
         else {
             return Err(Error::not_ready());
         };
-        let ch = ChannelOpen::new(
-            channel_id,
-            self.cred_store.clone(),
-            &self.internal_buffer,
-            try_to_unlock,
-        )?;
+        let ch = ChannelOpen::new(channel_id, cred_store, &self.internal_buffer, try_to_unlock)?;
         self.channel_allocation = AllocationState::None;
         prepare_zeroed(&mut self.internal_buffer);
         Ok(ch)
@@ -124,8 +126,11 @@ where
 
     /// Same as [`Mux::channel_alloc`] but destroys the [`Mux`],
     /// like `complete()` does for other types.
-    pub fn complete(mut self) -> Result<ChannelOpen<C, B>, Error> {
-        self.channel_alloc()
+    pub fn complete<C>(mut self, cred_store: C) -> Result<ChannelOpen<C, B>, Error>
+    where
+        C: CredentialStore,
+    {
+        self.channel_alloc(cred_store)
     }
 
     fn handle_broadcast(&mut self, packet: &[u8]) -> Result<PacketInResult, Error> {
@@ -178,7 +183,7 @@ where
             // No Header::TransportError for broadcast channel.
             _ => {
                 log::debug!(
-                    "Broadcast channel: ignoring packet with control byte {}.",
+                    "Broadcast channel: ignoring packet with control byte 0x{:x}.",
                     packet[0]
                 );
                 Err(Error::malformed_data())
@@ -215,14 +220,22 @@ where
             try_to_unlock: *try_to_unlock,
             channel_id,
         };
-        log::debug!("Got channel id {}.", channel_id);
-        Ok(PacketInResult::channel_allocation(channel_id))
+        log::debug!("Got channel id {:04x}.", channel_id);
+        Ok(PacketInResult::channel_allocation())
     }
 }
 
-impl<C, B> ChannelIO for Mux<C, B>
+impl<B> Default for Mux<B>
 where
-    C: CredentialStore,
+    B: Backend,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<B> ChannelIO for Mux<B>
+where
     B: Backend,
 {
     fn packet_in(&mut self, packet_buffer: &[u8], _receive_buffer: &mut [u8]) -> PacketInResult {
@@ -231,7 +244,7 @@ where
             return PacketInResult::ignore(Error::malformed_data());
         };
         if !channel_id_valid(channel_id) {
-            log::warn!("Invalid channel id {}.", channel_id);
+            log::warn!("Invalid channel id {:04x}.", channel_id);
             return PacketInResult::ignore(Error::malformed_data());
         }
         if channel_id != BROADCAST_CHANNEL_ID && !cb.is_codec_v1() {
@@ -325,7 +338,7 @@ enum HandshakeState {
 /// - perform [`ChannelIO`] with empty messages until [`ChannelOpen::handshake_done`]
 /// - call [`ChannelOpen::complete`] to obtain [`Channel`]
 pub struct ChannelOpen<C: CredentialStore, B: Backend> {
-    channel: Channel<Host, B>,
+    channel: Channel<B>,
     state: HandshakeState,
     noise: NoiseHandshake<Host, B>,
     internal_buffer: heapless::Vec<u8, INTERNAL_BUFFER_LEN>,
@@ -427,23 +440,14 @@ impl<C: CredentialStore, B: Backend> ChannelOpen<C, B> {
         self.device_properties.as_slice()
     }
 
-    /// Returns pairing state if handshake finished, or None otherwise.
-    pub fn pairing_state(&self) -> Option<PairingState> {
-        match self.state {
-            HandshakeState::Finished { pairing_state } => Some(pairing_state),
-            _ => None,
-        }
-    }
-
     /// True if handshake finished and [`ChannelOpen::complete()`] can be called.
     pub fn handshake_done(&self) -> bool {
-        self.pairing_state().is_some()
+        matches!(self.state, HandshakeState::Finished { .. })
     }
 
     /// True if the handshake failed and the object should be discarded.
     pub fn handshake_failed(&self) -> bool {
-        matches!(self.state, HandshakeState::Failed)
-            || matches!(self.channel.state, ChannelState::Failed(_))
+        matches!(self.state, HandshakeState::Failed) || self.channel.is_failed()
     }
 
     /// Finish the handshake.
@@ -457,19 +461,26 @@ impl<C: CredentialStore, B: Backend> ChannelOpen<C, B> {
     ///
     /// [Pairing phase]: https://docs.trezor.io/trezor-firmware/common/thp/specification.html#pairing-phase
     /// [Credential phase]: https://docs.trezor.io/trezor-firmware/common/thp/specification.html#credential-phase
-    pub fn complete(self) -> Result<Channel<Host, B>, Error> {
+    pub fn complete(mut self) -> Result<Channel<B>, Error> {
         if self.channel.noise.is_none() {
             return Err(Error::unexpected_input());
         }
-        log::debug!("Handshake complete.");
+        log::debug!("[{:04x}] Handshake complete.", self.channel_id());
         Ok(match self.state {
-            HandshakeState::Finished { .. } => self.channel,
+            HandshakeState::Finished { pairing_state } => {
+                self.channel.pairing_state = pairing_state;
+                self.channel
+            }
             _ => return Err(Error::unexpected_input()),
         })
     }
 
     pub fn channel_id(&self) -> u16 {
         self.channel.channel_id
+    }
+
+    pub fn sending_retry(&self) -> Option<u8> {
+        self.channel.sending_retry()
     }
 }
 
@@ -484,7 +495,7 @@ where
             .packet_in(packet_buffer, &mut self.internal_buffer);
         if let PacketInResult::EnlargeBuffer { buffer_size, .. } = res {
             log::error!(
-                "[{}] Payload length {} exceeds handshake limit.",
+                "[{:04x}] Payload length {} exceeds handshake limit.",
                 self.channel_id(),
                 buffer_size
             );

@@ -6,8 +6,8 @@ use std::{env, net::SocketAddr, str::FromStr};
 use protobuf::Message;
 
 use trezor_thp::{
-    Backend, Channel, Host,
-    channel::host::{ChannelOpen, Mux},
+    Backend,
+    channel::host::{Channel, ChannelOpen, Mux},
     credential::{CredentialStore, NullCredentialStore},
 };
 
@@ -29,12 +29,9 @@ impl Backend for RustCrypto {
     }
 }
 
-type HostChannel = Channel<Host, RustCrypto>;
+type HostChannel = Channel<RustCrypto>;
 
-fn do_allocation<C>(client: &mut Client<Mux<C, RustCrypto>>)
-where
-    C: CredentialStore,
-{
+fn do_allocation(client: &mut Client<Mux<RustCrypto>>) {
     client.call(0, &[]);
 }
 
@@ -90,7 +87,7 @@ fn do_pairing_skip(client: &mut Client<HostChannel>) {
     );
 }
 
-fn do_ping(client: &mut Client<Channel<Host, RustCrypto>>) {
+fn do_ping(client: &mut Client<HostChannel>) {
     let mut ping = Ping::new();
     ping.set_message("trezor-thp/examples".into());
     ping.set_button_protection(true);
@@ -108,13 +105,13 @@ pub fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
 
     let cred_lookup = NullCredentialStore;
-    let mut channel = Mux::<_, RustCrypto>::new(cred_lookup);
+    let mut channel = Mux::<RustCrypto>::new();
     channel.request_channel(false);
     let mut client = Client::open(get_address(), channel);
 
     do_allocation(&mut client);
     assert!(client.channel.channel_alloc_ready());
-    let mut client = client.map(|c| c.complete().unwrap());
+    let mut client = client.map(|c| c.complete(cred_lookup).unwrap());
 
     do_handshake(&mut client);
     assert!(client.channel.handshake_done());
