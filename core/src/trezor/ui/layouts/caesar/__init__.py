@@ -753,36 +753,6 @@ async def confirm_blob_intro(
     return False
 
 
-async def confirm_blob_prefix(
-    title: str,
-    data: memoryview,
-    *,
-    total_len: int,
-    confirmed_len: int,
-    br_name: str,
-    br_code: ButtonRequestType = BR_CODE_OTHER,
-) -> int | None:
-    """
-    Returns the number of bytes confirmed, or `None` if confirmation should be skipped.
-    """
-    prefix = data[: 4 * 9]  # 4 rows x 18 hex digits
-    confirmed_len += len(prefix)
-
-    button_text = DOWN_ARROW if confirmed_len < total_len else ""
-
-    show_more = await should_show_more(
-        title=f"{title}: {confirmed_len} / {total_len} bytes",
-        para=[(utils.hexlify_if_bytes(prefix), True)],
-        button_text=button_text,  # will return True
-        confirm=TR.words__confirm_all,  # will return False
-        br_name=br_name,
-        br_code=br_code,
-    )
-    if show_more:
-        return len(prefix)
-    return None
-
-
 def confirm_blob(
     br_name: str,
     title: str,
@@ -1101,6 +1071,34 @@ async def confirm_trade(
 
 if not utils.BITCOIN_ONLY:
 
+    async def confirm_blob_prefix(
+        data: memoryview,
+        *,
+        total_len: int,
+        confirmed_len: int,
+        br_name: str,
+        br_code: ButtonRequestType = BR_CODE_OTHER,
+    ) -> int | None:
+        """
+        Returns the number of bytes confirmed, or `None` if confirmation should be skipped.
+        """
+        prefix = data[: 4 * 9]  # 4 rows x 18 hex digits
+        confirmed_len += len(prefix)
+
+        button_text = DOWN_ARROW if confirmed_len < total_len else ""
+
+        show_more = await should_show_more(
+            title=TR.ethereum__title_input_data_bytes.format(confirmed_len, total_len),
+            para=[(utils.hexlify_if_bytes(prefix), True)],
+            button_text=button_text,  # will return True
+            confirm=TR.words__confirm_all,  # will return False
+            br_name=br_name,
+            br_code=br_code,
+        )
+        if show_more:
+            return len(prefix)
+        return None
+
     def confirm_ethereum_unknown_contract_warning(
         _title: str | None,
     ) -> Awaitable[None]:
@@ -1319,6 +1317,7 @@ if not utils.BITCOIN_ONLY:
         chain: str,
         br_name: str = "ethereum/vault",
         br_code: ButtonRequestType = ButtonRequestType.SignTx,
+        extra_data: str | None = None,
     ) -> None:
         from ..properties import with_colon
 
@@ -1339,7 +1338,7 @@ if not utils.BITCOIN_ONLY:
             chunkify=False,
             info_items=account_properties if account_properties else None,
             cancel=True,
-            br_name=br_name + "/intro",
+            br_name=f"{br_name}/intro",
             br_code=br_code,
         )
 
@@ -1349,17 +1348,87 @@ if not utils.BITCOIN_ONLY:
             description=verb,
             verb=TR.buttons__continue,
             cancel=True,
-            br_name=br_name + "/vault",
+            br_name=f"{br_name}/vault",
             br_code=br_code,
         )
 
         await confirm_properties(
-            br_name + "/amount",
+            f"{br_name}/amount",
             title,
             [
                 (amount_label, amount, False),
                 (TR.words__chain, chain, False),
             ],
+        )
+
+        if extra_data is not None:
+            await confirm_value(
+                title=title,
+                value=extra_data,
+                description=TR.ethereum__calldata_suffix,
+                is_data=True,
+                verb=TR.buttons__continue,
+                cancel=True,
+                br_name=f"{br_name}/extra_data",
+                br_code=br_code,
+            )
+
+        await raise_if_not_confirmed(
+            trezorui_api.confirm_summary(
+                amount=None,
+                amount_label=None,
+                fee=maximum_fee,
+                fee_label=with_colon(TR.send__maximum_fee),
+                extra_title=TR.confirm_total__title_fee,
+                extra_items=with_colon(info_items),
+                title=title,
+            ),
+            br_name=f"{br_name}/summary",
+            br_code=br_code,
+        )
+
+    async def confirm_ethereum_vault_claim(
+        title: str,
+        intro_question: str,
+        account: str | None,
+        account_path: str | None,
+        maximum_fee: str,
+        info_items: Iterable[StrPropertyType],
+        token_list: str,
+        br_name: str,
+        br_code: ButtonRequestType = ButtonRequestType.SignTx,
+    ) -> None:
+
+        from ..properties import with_colon
+
+        account_properties: list[StrPropertyType] = []
+        if account:
+            account_properties.append((TR.words__account, account, None))
+        if account_path:
+            account_properties.append(
+                (TR.address_details__derivation_path, account_path, None)
+            )
+
+        await confirm_value(
+            title=title,
+            value=intro_question,
+            is_data=False,
+            description=None,
+            verb=TR.buttons__continue,
+            chunkify=False,
+            info_items=account_properties if account_properties else None,
+            cancel=True,
+            br_name=f"{br_name}/intro",
+            br_code=br_code,
+        )
+
+        await confirm_properties(
+            f"{br_name}/tokens",
+            title,
+            [
+                (TR.ethereum__reward_tokens, token_list, False),
+            ],
+            br_code=br_code,
         )
 
         await raise_if_not_confirmed(
@@ -1372,7 +1441,7 @@ if not utils.BITCOIN_ONLY:
                 extra_items=with_colon(info_items),
                 title=title,
             ),
-            br_name=br_name + "/summary",
+            br_name=f"{br_name}/summary",
             br_code=br_code,
         )
 
