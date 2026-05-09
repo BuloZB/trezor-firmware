@@ -8,6 +8,7 @@ BITCOIN_ONLY = ARGUMENTS.get('BITCOIN_ONLY', '0')
 EVERYTHING = BITCOIN_ONLY != '1'
 PRODUCTION = ARGUMENTS.get('PRODUCTION', '0') == '1'
 TREZOR_MODEL = ARGUMENTS.get('TREZOR_MODEL', 'T2T1')
+BOOTLOADER_DEVEL = ARGUMENTS.get('BOOTLOADER_DEVEL', '0') == '1'
 CMAKELISTS = int(ARGUMENTS.get('CMAKELISTS', 0))
 HW_REVISION ='emulator'
 THP = ARGUMENTS.get('THP', '0') == '1' # Trezor-Host Protocol
@@ -32,7 +33,7 @@ if BENCHMARK and PYOPT != '0':
   exit(1)
 
 FEATURES_WANTED = [
-    "applet",
+    "applets",
     "ble",
     "display",
     "dma2d",
@@ -431,7 +432,6 @@ SOURCE_MICROPYTHON = [
 SOURCE_UNIX = [
     'embed/projects/unix/main_main.c',
     'embed/projects/unix/main.c',
-    'embed/projects/unix/profile.c',
     'embed/projects/unix/rust_c_setup.c',
     'vendor/micropython/ports/unix/alloc.c',
     'vendor/micropython/ports/unix/gccollect.c',
@@ -463,7 +463,7 @@ else:
 
 env = Environment(
     ENV=os.environ,
-    CFLAGS=ARGUMENTS.get("CFLAGS", "") + f" -DCONFIDENTIAL= -DPYOPT={PYOPT} -DBITCOIN_ONLY={BITCOIN_ONLY} {DEBUG_FLAGS}",
+    CFLAGS=ARGUMENTS.get("CFLAGS", "") + f" -DCONFIDENTIAL= -DPYOPT={PYOPT} -DBITCOIN_ONLY={BITCOIN_ONLY} {DEBUG_FLAGS} -DBOOTLOADER_DEVEL={int(BOOTLOADER_DEVEL)}",
     CPPDEFPREFIX="-D'",
     CPPDEFSUFFIX="'",
 )
@@ -562,9 +562,9 @@ except OSError:
     print("libjpeg not installed, Emulator build is not possible")
 
 try:
-    env.ParseConfig('pkg-config --cflags --libs sdl2 SDL2_image')
+    env.ParseConfig('pkg-config --cflags --libs sdl3 sdl3-image')
 except OSError:
-    print("SDL2 not installed, Emulator build is not possible")
+    print("SDL3 not installed, Emulator build is not possible")
 
 BYTECODE_OPTIMIZATION = {'0': '0', '1': '3'}[PYOPT]
 
@@ -980,7 +980,8 @@ env.Depends(obj_program, qstr_generated)
 program = env.Command(
     target='trezor-emu-core',
     source=obj_program,
-    action='$CC -o $TARGET $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $LINKFLAGS', )
+    action='$CC -o $TARGET $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $LINKFLAGS',
+)
 
 if CMAKELISTS != 0:
     env.Depends(program, cmake_gen)

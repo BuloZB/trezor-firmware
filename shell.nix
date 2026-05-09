@@ -55,7 +55,8 @@ let
   rustProfiles = nixpkgs.rust-bin.nightly."2026-03-16";
   rustNightly = rustProfiles.minimal.override {
     targets = [
-      "thumbv7em-none-eabihf" # TT
+      "thumbv8m.main-none-eabihf" # T3
+      "thumbv7em-none-eabihf" # T2
       "thumbv7m-none-eabi"    # T1
     ];
     # we use rustfmt from nixpkgs because it's built with the nighly flag needed for wrap_comments
@@ -76,6 +77,7 @@ in
 with nixpkgs;
 stdenvNoCC.mkDerivation ({
   name = "trezor-firmware-env";
+  nativeBuildInputs = lib.optionals (!stdenv.isDarwin) [ autoPatchelfHook ];
   buildInputs = lib.optionals fullDeps [
     bitcoind
   ] ++ [
@@ -83,6 +85,8 @@ stdenvNoCC.mkDerivation ({
     # crash with SDL_CreateRenderer error.
     oldNixpkgs.SDL2
     oldNixpkgs.SDL2_image
+    sdl3
+    sdl3-image
     bash
     bloaty  # for binsize
     cargo-audit
@@ -114,7 +118,6 @@ stdenvNoCC.mkDerivation ({
     zlib
     moreutils
   ] ++ lib.optionals (!stdenv.isDarwin) [
-    autoPatchelfHook
     procps
     valgrind
   ] ++ lib.optionals (stdenv.isDarwin) [
@@ -137,7 +140,12 @@ stdenvNoCC.mkDerivation ({
     nrfutil
     nrfconnect
   ];
-  LD_LIBRARY_PATH = "${libffi}/lib:${libjpeg.out}/lib:${libusb1}/lib:${libressl.out}/lib";
+  LD_LIBRARY_PATH = lib.makeLibraryPath [
+    libffi
+    libjpeg
+    libusb1
+    libressl
+  ];
   DYLD_LIBRARY_PATH = "${libffi}/lib:${libjpeg.out}/lib:${libusb1}/lib:${libressl.out}/lib";
   NIX_ENFORCE_PURITY = 0;
 

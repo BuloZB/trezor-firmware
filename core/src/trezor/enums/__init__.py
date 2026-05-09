@@ -321,6 +321,7 @@ if TYPE_CHECKING:
     class EthereumERC7730ContainerPath(IntEnum):
         FROM = 1
         VALUE = 2
+        TO = 3
 
     class EthereumDataType(IntEnum):
         UINT = 1
@@ -552,6 +553,8 @@ if TYPE_CHECKING:
         EthereumTypedDataValueAck = 468
         EthereumTypedDataSignature = 469
         EthereumSignTypedHash = 470
+        EthereumDefinitionRequest = 471
+        EthereumDefinitionAck = 472
         NEMGetAddress = 67
         NEMAddress = 68
         NEMSignTx = 69
