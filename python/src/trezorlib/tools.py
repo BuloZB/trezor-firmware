@@ -23,9 +23,7 @@ import struct
 import typing as t
 import unicodedata
 from contextlib import AbstractContextManager
-from enum import Enum
 
-import construct
 import typing_extensions as tx
 
 from . import messages
@@ -324,34 +322,6 @@ def descriptor_checksum(desc: str) -> str:
     return "".join(ret)
 
 
-class EnumAdapter(construct.Adapter):
-    def __init__(self, subcon: construct.Adapter, enum: type[Enum]) -> None:
-        self.enum = enum
-        super().__init__(subcon)
-
-    def _encode(self, obj: t.Any, context: t.Any, path: t.Any) -> t.Any:
-        if isinstance(obj, self.enum):
-            return obj.value
-        return obj
-
-    def _decode(self, obj: t.Any, context: t.Any, path: t.Any) -> t.Any:
-        try:
-            return self.enum(obj)
-        except ValueError:
-            return obj
-
-
-class TupleAdapter(construct.Adapter):
-    def __init__(self, *subcons: construct.Adapter) -> None:
-        super().__init__(construct.Sequence(*subcons))
-
-    def _encode(self, obj: t.Any, context: t.Any, path: t.Any) -> t.Any:
-        return obj
-
-    def _decode(self, obj: t.Any, context: t.Any, path: t.Any) -> t.Any:
-        return tuple(obj)
-
-
 def enter_context(context_func: ContextFunc[CM, P, R]) -> ContextFunc[CM, P, R]:
     """Generic wrapper around any function or method that accepts a context manager
     as its first argument.
@@ -417,3 +387,23 @@ class workflow(t.Generic[P, R]):
             session.refresh_features()
 
         return result
+
+
+def __getattr__(name: str) -> t.Any:
+    import warnings
+
+    if name not in ("EnumAdapter", "TupleAdapter"):
+        raise AttributeError(f"module 'trezorlib.tools' has no attribute '{name}'")
+    warnings.warn(
+        f"trezorlib.tools.{name} is deprecated and will be removed in 0.21. Use trezorlib.construct_helpers.{name} instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    from . import construct_helpers
+
+    if name == "EnumAdapter":
+        return construct_helpers.EnumAdapter
+    if name == "TupleAdapter":
+        return construct_helpers.TupleAdapter
+    raise AttributeError(f"module 'trezorlib.tools' has no attribute '{name}'")
