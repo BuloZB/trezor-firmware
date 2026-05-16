@@ -1,8 +1,10 @@
 from trezorcrypto import (  # noqa: F401
+    AuthenticationError,
     aes,
     bip32,
     bip39,
-    chacha20poly1305,
+    chacha20poly1305_decrypt,
+    chacha20poly1305_encrypt,
     crc,
     hmac,
     pbkdf2,
@@ -10,7 +12,7 @@ from trezorcrypto import (  # noqa: F401
 )
 
 try:
-    from trezorcrypto import aesgcm  # noqa: F401
+    from trezorcrypto import aesgcm_decrypt, aesgcm_encrypt  # noqa: F401
 except Exception:
     pass
 
