@@ -70,6 +70,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ToggleBluetooth;
   MP_QSTR_ToggleHaptics;
   MP_QSTR_ToggleLed;
+  MP_QSTR_ToggleTapToWake;
   MP_QSTR_TranslationsHeader;
   MP_QSTR_TurnOff;
   MP_QSTR_UnpairAllDevices;
@@ -136,7 +137,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_auto_lock__on_battery;
   MP_QSTR_auto_lock__on_usb;
   MP_QSTR_auto_lock__title;
-  MP_QSTR_auto_lock__turned_on;
   MP_QSTR_back_button;
   MP_QSTR_backlight_fade;
   MP_QSTR_backlight_get;
@@ -298,7 +298,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_confirm_summary;
   MP_QSTR_confirm_thp_pairing;
   MP_QSTR_confirm_total__fee_rate;
-  MP_QSTR_confirm_total__fee_rate_colon;
   MP_QSTR_confirm_total__title_fee;
   MP_QSTR_confirm_total__title_sending_from;
   MP_QSTR_confirm_trade;
@@ -585,7 +584,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_pubkey_qr;
   MP_QSTR_qr_title;
   MP_QSTR_read;
-  MP_QSTR_reboot_to_bootloader__just_a_moment;
   MP_QSTR_reboot_to_bootloader__restart;
   MP_QSTR_reboot_to_bootloader__title;
   MP_QSTR_reboot_to_bootloader__version_by_template;
@@ -864,6 +862,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_suite_sync__header;
   MP_QSTR_suite_sync__rotate_key;
   MP_QSTR_switch_off;
+  MP_QSTR_tap_to_wake_enabled;
   MP_QSTR_text;
   MP_QSTR_text_check;
   MP_QSTR_text_confirm;
@@ -976,6 +975,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__about;
   MP_QSTR_words__account;
   MP_QSTR_words__account_colon;
+  MP_QSTR_words__account_deletion;
   MP_QSTR_words__address;
   MP_QSTR_words__amount;
   MP_QSTR_words__are_you_sure;
@@ -1045,6 +1045,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__sign;
   MP_QSTR_words__signer;
   MP_QSTR_words__swap;
+  MP_QSTR_words__tap_to_wake;
   MP_QSTR_words__title_check;
   MP_QSTR_words__title_done;
   MP_QSTR_words__title_group;
@@ -1230,7 +1231,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_eos__vote_for_producers;
   MP_QSTR_eos__vote_for_proxy;
   MP_QSTR_eos__voter;
-  MP_QSTR_ethereum__amount_sent;
   MP_QSTR_ethereum__approve;
   MP_QSTR_ethereum__approve_amount_allowance;
   MP_QSTR_ethereum__approve_chain_id;
@@ -1398,6 +1398,8 @@ static void _librust_qstrs(void) {
   MP_QSTR_nem__unencrypted;
   MP_QSTR_nem__unknown_mosaic;
   MP_QSTR_nostr__event_kind_template;
+  MP_QSTR_ripple__account_deletion_warning;
+  MP_QSTR_ripple__account_to_be_deleted;
   MP_QSTR_ripple__confirm_tag;
   MP_QSTR_ripple__destination_tag_missing;
   MP_QSTR_ripple__destination_tag_template;

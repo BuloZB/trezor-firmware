@@ -853,6 +853,8 @@ def confirm_address(
     chunkify: bool = True,
     br_name: str | None = None,
     br_code: ButtonRequestType = BR_CODE_OTHER,
+    info_items: Iterable[StrPropertyType] | None = None,
+    info_title: str | None = None,
 ) -> Awaitable[None]:
     return confirm_blob(
         br_name or "confirm_address",
@@ -990,7 +992,7 @@ def confirm_value(
         return lambda: trezorui_api.confirm_value(
             title=info_title,
             value=info_value,
-            description=description,
+            description=None,
             verb="",
             verb_cancel="",
             is_data=is_data,
@@ -1682,21 +1684,14 @@ if not utils.BITCOIN_ONLY:
             br_code=ButtonRequestType.SignTx,
         )
 
-    async def confirm_stellar_output(
-        address: str,
+    async def confirm_stellar_output_amount(
+        title: str,
+        subtitle: str,
         amount: str,
-        output_index: int,
         asset: StellarAsset,
+        description: str | None = None,
     ) -> None:
         from trezor.enums import StellarAssetType
-
-        await confirm_address(
-            f"{TR.words__recipient} #{output_index + 1}",
-            address,
-            None,
-            br_name="confirm_output_address",
-            br_code=ButtonRequestType.ConfirmOutput,
-        )
 
         info_items = []
         if asset.type != StellarAssetType.NATIVE:
@@ -1709,29 +1704,114 @@ if not utils.BITCOIN_ONLY:
             ]
 
         await confirm_value(
-            f"{TR.words__amount} #{output_index + 1}",
+            title,
             amount,
-            None,
+            description,
             br_name="confirm_output_amount",
             br_code=ButtonRequestType.ConfirmOutput,
             info_items=info_items,
             chunkify_info=True,
             chunkify=False,
+            verb=TR.buttons__continue,
         )
 
-    async def confirm_tron_send(amount: str | None, fee: str | None) -> None:
+    async def confirm_stellar_output(
+        address: str,
+        amount: str | None,
+        output_index: int,
+        asset: StellarAsset | None,
+        address_description: str | None = None,
+        amount_description: str | None = None,
+    ) -> None:
+        await confirm_address(
+            f"{TR.words__recipient} #{output_index + 1}",
+            address,
+            description=address_description,
+            br_name="confirm_output_address",
+            br_code=ButtonRequestType.ConfirmOutput,
+            verb=TR.buttons__continue,
+        )
+
+        if amount is not None and asset is not None:
+            await confirm_stellar_output_amount(
+                title=f"{TR.words__send} #{output_index + 1}",
+                subtitle="",
+                amount=amount,
+                asset=asset,
+                description=amount_description or TR.words__amount,
+            )
+
+    async def confirm_tron_summary(
+        title: str | None,
+        amount: str | None,
+        fee: str | None,
+        account_details: tuple[str | None, str] | None = None,
+    ) -> None:
+        account_items = (
+            [
+                (TR.words__account, account_details[0], False),
+                (TR.address_details__derivation_path, account_details[1], False),
+            ]
+            if account_details
+            else None
+        )
+        # caesar's confirm_summary always displays the fee row; when there is no
+        # fee but there is an amount, pass the amount into the fee slot so it
+        # is shown correctly. When there is no amount, hide the amount row.
+        if amount and not fee:
+            display_amount, display_amount_label = None, None
+            display_fee, display_fee_label = amount, TR.words__amount
+        elif fee and not amount:
+            display_amount, display_amount_label = None, None
+            display_fee, display_fee_label = fee, TR.words__fee_limit
+        else:
+            display_amount, display_amount_label = amount or "", (
+                TR.words__amount if amount else ""
+            )
+            display_fee, display_fee_label = fee or "", (
+                TR.words__fee_limit if fee else ""
+            )
         await raise_if_not_confirmed(
             trezorui_api.confirm_summary(
-                amount=amount or "",
-                amount_label=TR.send__total_amount if amount else "",
-                fee=fee or "",
-                fee_label=TR.words__fee_limit if fee else "",
+                title=title or TR.words__title_summary,
+                amount=display_amount,
+                amount_label=display_amount_label,
+                fee=display_fee,
+                fee_label=display_fee_label,
+                account_items=account_items,
+                account_title=TR.address_details__account_info,
             ),
-            br_name="tron/send",
+            br_name="tron/summary",
             br_code=ButtonRequestType.SignTx,
         )
 
-    # TODO: #6359 Reword the TR strings to be ETH agnostic.
+    async def confirm_tron_send(
+        amount: str | None,
+        fee: str | None,
+        account_details: tuple[str | None, str],
+        address: str,
+        chunkify: bool = True,
+    ) -> None:
+        await confirm_address(
+            title=TR.words__send,
+            subtitle=TR.words__recipient,
+            address=address,
+            verb=TR.buttons__continue,
+            chunkify=chunkify,
+            br_name="tron/send",
+            info_items=[
+                (TR.words__account, account_details[0], False),
+                (TR.address_details__derivation_path, account_details[1], False),
+            ],
+            info_title=TR.address_details__account_info,
+        )
+        await confirm_tron_summary(
+            TR.words__send,
+            amount,
+            fee,
+            account_details,
+        )
+
     async def confirm_tron_approve(
         recipient_addr: str,
         amount_str: str,
