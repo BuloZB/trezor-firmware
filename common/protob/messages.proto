@@ -72,12 +72,15 @@ enum MessageType {
     MessageType_UnlockBootloader = 96 [(bitcoin_only) = true, (wire_in) = true];
     MessageType_AuthenticateDevice = 97 [(bitcoin_only) = true, (wire_in) = true];
     MessageType_AuthenticityProof = 98 [(bitcoin_only) = true, (wire_out) = true];
+    MessageType_AuthenticityProofSizes = 99 [(bitcoin_only) = true, (wire_out) = true];
     MessageType_ChangeLanguage = 990 [(bitcoin_only) = true, (wire_in) = true];
     MessageType_DataChunkRequest = 991 [(bitcoin_only) = true, (wire_out) = true];
     MessageType_DataChunkAck = 992 [(bitcoin_only) = true, (wire_in) = true];
     MessageType_SetBrightness = 993 [(bitcoin_only) = true, (wire_in) = true];
     MessageType_GetSerialNumber = 996 [(bitcoin_only) = true, (wire_in) = true];
     MessageType_SerialNumber = 997 [(bitcoin_only) = true, (wire_out) = true];
+    MessageType_GetAuthenticityProofChunk = 998 [(bitcoin_only) = true, (wire_in) = true];
+    MessageType_AuthenticityProofChunk = 999 [(bitcoin_only) = true, (wire_out) = true];
 
     MessageType_SetU2FCounter = 63 [(wire_in) = true];
     MessageType_GetNextU2FCounter = 80 [(wire_in) = true];
@@ -337,6 +340,9 @@ enum MessageType {
     MessageType_SolanaAddress = 903 [(wire_out) = true];
     MessageType_SolanaSignTx = 904 [(wire_in) = true];
     MessageType_SolanaTxSignature = 905 [(wire_out) = true];
+    MessageType_SolanaSignMessage = 906 [(wire_in) = true];
+    MessageType_SolanaMessageSignature = 907 [(wire_out) = true];
+    MessageType_SolanaVerifyMessage = 908 [(wire_in) = true];
 
     // THP
     MessageType_ThpCreateNewSession = 1000 [(wire_in) = true, (bitcoin_only) = true];

@@ -279,6 +279,12 @@ class SdProtectOperationType(IntEnum):
     REFRESH = 2
 
 
+class AuthenticityProofType(IntEnum):
+    OPTIGA = 0
+    TROPIC = 1
+    MCU = 2
+
+
 class RecoveryDeviceInputMethod(IntEnum):
     ScrambledWords = 0
     Matrix = 1
@@ -351,9 +357,12 @@ class EthereumABIType(IntEnum):
     ABI_UINT16 = 14
     ABI_UINT8 = 15
     ABI_BOOL = 16
-    ABI_BYTES32 = 17
-    ABI_BYTES = 20
-    ABI_STRING = 21
+    ABI_BYTES32 = 20
+    ABI_BYTES16 = 21
+    ABI_BYTES8 = 22
+    ABI_BYTES4 = 23
+    ABI_BYTES = 30
+    ABI_STRING = 31
 
 
 class EthereumERC7730FieldFormatterType(IntEnum):
@@ -532,12 +541,15 @@ class MessageType(IntEnum):
     UnlockBootloader = 96
     AuthenticateDevice = 97
     AuthenticityProof = 98
+    AuthenticityProofSizes = 99
     ChangeLanguage = 990
     DataChunkRequest = 991
     DataChunkAck = 992
     SetBrightness = 993
     GetSerialNumber = 996
     SerialNumber = 997
+    GetAuthenticityProofChunk = 998
+    AuthenticityProofChunk = 999
     SetU2FCounter = 63
     GetNextU2FCounter = 80
     NextU2FCounter = 81
@@ -737,6 +749,9 @@ class MessageType(IntEnum):
     SolanaAddress = 903
     SolanaSignTx = 904
     SolanaTxSignature = 905
+    SolanaSignMessage = 906
+    SolanaMessageSignature = 907
+    SolanaVerifyMessage = 908
     ThpCreateNewSession = 1000
     ThpCredentialRequest = 1016
     ThpCredentialResponse = 1017
@@ -3726,14 +3741,17 @@ class AuthenticateDevice(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 97
     FIELDS = {
         1: protobuf.Field("challenge", "bytes", repeated=False, required=True),
+        2: protobuf.Field("stream", "bool", repeated=False, required=False, default=None),
     }
 
     def __init__(
         self,
         *,
         challenge: "bytes",
+        stream: Optional["bool"] = None,
     ) -> None:
         self.challenge = challenge
+        self.stream = stream
 
 
 class AuthenticityProof(protobuf.MessageType):
@@ -3763,6 +3781,72 @@ class AuthenticityProof(protobuf.MessageType):
         self.optiga_signature = optiga_signature
         self.tropic_signature = tropic_signature
         self.mcu_signature = mcu_signature
+
+
+class AuthenticityProofSizes(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 99
+    FIELDS = {
+        1: protobuf.Field("optiga_certificates", "uint32", repeated=True, required=False, default=None),
+        2: protobuf.Field("optiga_signature", "uint32", repeated=False, required=True),
+        3: protobuf.Field("tropic_certificates", "uint32", repeated=True, required=False, default=None),
+        4: protobuf.Field("tropic_signature", "uint32", repeated=False, required=False, default=None),
+        5: protobuf.Field("mcu_certificates", "uint32", repeated=True, required=False, default=None),
+        6: protobuf.Field("mcu_signature", "uint32", repeated=False, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        optiga_signature: "int",
+        optiga_certificates: Optional[Sequence["int"]] = None,
+        tropic_certificates: Optional[Sequence["int"]] = None,
+        mcu_certificates: Optional[Sequence["int"]] = None,
+        tropic_signature: Optional["int"] = None,
+        mcu_signature: Optional["int"] = None,
+    ) -> None:
+        self.optiga_certificates: Sequence["int"] = optiga_certificates if optiga_certificates is not None else []
+        self.tropic_certificates: Sequence["int"] = tropic_certificates if tropic_certificates is not None else []
+        self.mcu_certificates: Sequence["int"] = mcu_certificates if mcu_certificates is not None else []
+        self.optiga_signature = optiga_signature
+        self.tropic_signature = tropic_signature
+        self.mcu_signature = mcu_signature
+
+
+class GetAuthenticityProofChunk(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 998
+    FIELDS = {
+        1: protobuf.Field("proof_type", "AuthenticityProofType", repeated=False, required=False, default=None),
+        2: protobuf.Field("index", "uint32", repeated=False, required=False, default=None),
+        3: protobuf.Field("offset", "uint32", repeated=False, required=True),
+        4: protobuf.Field("size", "uint32", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        offset: "int",
+        size: "int",
+        proof_type: Optional["AuthenticityProofType"] = None,
+        index: Optional["int"] = None,
+    ) -> None:
+        self.offset = offset
+        self.size = size
+        self.proof_type = proof_type
+        self.index = index
+
+
+class AuthenticityProofChunk(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 999
+    FIELDS = {
+        1: protobuf.Field("chunk", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        chunk: "bytes",
+    ) -> None:
+        self.chunk = chunk
 
 
 class WipeDevice(protobuf.MessageType):
@@ -4728,7 +4812,7 @@ class EthereumABIValueInfo(protobuf.MessageType):
 class EthereumERC7730Path(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = None
     FIELDS = {
-        1: protobuf.Field("path", "uint32", repeated=True, required=False, default=None),
+        1: protobuf.Field("path", "sint32", repeated=True, required=False, default=None),
         2: protobuf.Field("container_path", "EthereumERC7730ContainerPath", repeated=False, required=False, default=None),
     }
 
@@ -7755,6 +7839,57 @@ class SolanaTxSignature(protobuf.MessageType):
         signature: "bytes",
     ) -> None:
         self.signature = signature
+
+
+class SolanaSignMessage(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 906
+    FIELDS = {
+        1: protobuf.Field("address_n", "uint32", repeated=True, required=False, default=None),
+        2: protobuf.Field("message", "bytes", repeated=False, required=True),
+        3: protobuf.Field("chunkify", "bool", repeated=False, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        message: "bytes",
+        address_n: Optional[Sequence["int"]] = None,
+        chunkify: Optional["bool"] = None,
+    ) -> None:
+        self.address_n: Sequence["int"] = address_n if address_n is not None else []
+        self.message = message
+        self.chunkify = chunkify
+
+
+class SolanaMessageSignature(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 907
+    FIELDS = {
+        1: protobuf.Field("signature", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        signature: "bytes",
+    ) -> None:
+        self.signature = signature
+
+
+class SolanaVerifyMessage(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 908
+    FIELDS = {
+        1: protobuf.Field("envelope", "bytes", repeated=False, required=True),
+        2: protobuf.Field("chunkify", "bool", repeated=False, required=False, default=None),
+    }
+
+    def __init__(
+        self,
+        *,
+        envelope: "bytes",
+        chunkify: Optional["bool"] = None,
+    ) -> None:
+        self.envelope = envelope
+        self.chunkify = chunkify
 
 
 class StellarAsset(protobuf.MessageType):

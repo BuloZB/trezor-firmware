@@ -989,6 +989,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__cancel_and_exit;
   MP_QSTR_words__cancel_question;
   MP_QSTR_words__chain;
+  MP_QSTR_words__comm_continue;
   MP_QSTR_words__comm_trouble;
   MP_QSTR_words__confirm;
   MP_QSTR_words__confirm_all;
@@ -1016,6 +1017,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__keep_it_safe;
   MP_QSTR_words__know_what_your_doing;
   MP_QSTR_words__led;
+  MP_QSTR_words__made_in;
   MP_QSTR_words__manage;
   MP_QSTR_words__my_trezor;
   MP_QSTR_words__name;
@@ -1404,6 +1406,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ripple__destination_tag_missing;
   MP_QSTR_ripple__destination_tag_template;
   MP_QSTR_solana__account_index;
+  MP_QSTR_solana__app_domain;
   MP_QSTR_solana__associated_token_account;
   MP_QSTR_solana__base_fee;
   MP_QSTR_solana__claim;
@@ -1419,6 +1422,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_solana__max_fees_rent;
   MP_QSTR_solana__max_rent_fee;
   MP_QSTR_solana__multiple_signers;
+  MP_QSTR_solana__offchain_is_multisig;
   MP_QSTR_solana__priority_fee;
   MP_QSTR_solana__stake;
   MP_QSTR_solana__stake_account;

@@ -22,13 +22,12 @@ jobs:
     name: Device tests
     runs-on:
       - self-hosted
-      - ${{ matrix.model == 'T2B1' && 'runner3' || 'hw-t2t1' }}
-      # runner4 does not work at the moment
-      # - ${{ matrix.model == 'T2B1' && 'hw-t2b1' || 'hw-t2t1' }}
+      # FIXME runner4 with t2b1 does not work at the moment
+      - ${{ matrix.model == 'T2B1' && 'runner3' || matrix.model == 'T3T1' && 'hw-t3t1' || matrix.model == 'T3B1' && 'hw-t3b1' || matrix.model == 'T3W1' && 'hw-t3w1' || 'hw-t2t1' }}
     strategy:
       fail-fast: false
       matrix:
-        model: [T2T1, T2B1]
+        model: [T2T1, T2B1, T3B1, T3T1, T3W1]
         coins: [universal, btconly]
     env:
       TREZOR_MODEL: ${{ matrix.model }}
@@ -36,8 +35,9 @@ jobs:
       PYTEST_TIMEOUT: 600  # 10m single test timeout
       PYOPT: 0
       DISABLE_OPTIGA: 1
+      DISABLE_TROPIC: 1
       STORAGE_INSECURE_TESTING_MODE: 1
-      BOOTLOADER_DEVEL: ${{ matrix.model == 'T2B1' && '1' || '0' }}
+      BOOTLOADER_DEVEL: ${{ matrix.model == 'T2T1' && '0' || '1' }}
       # TODO: enable SD-related tests after fixing #4924
       # Disable authenticity test since it requires DISABLE_OPTIGA=0
       # 5.5h pytest global timeout
@@ -46,17 +46,23 @@ jobs:
         -k 'not test_authenticate_device'
         --durations=50
         --session-timeout 19800
-      TT_UHUB_PORT: 1
-      QUIET_MODE: 1
+      TT_UHUB_PORT: all
     timeout-minutes: 360  # 6h CI job timeout
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1
         with:
           submodules: recursive
+          persist-credentials: false
+        if: matrix.model == 'T2B1' || matrix.model == 'T2T1'
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # actions/checkout@v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+        if: matrix.model != 'T2B1' && matrix.model != 'T2T1'
       - uses: ./.github/actions/environment
       - run: nix-shell --arg hardwareTest true --run uhubctl
       - run: nix-shell --run "uv run make -C core build_firmware"
-      - run: nix-shell --arg hardwareTest true --run "uv run python ci/hardware_tests/bootstrap.py ${{ matrix.model }} core/build/firmware/firmware.bin"
+      - run: nix-shell --arg hardwareTest true --run "uv run python ci/hardware_tests/bootstrap.py ${{ matrix.model }} core/build-xtask/artifacts/latest/firmware.bin"
       - run: nix-shell --run "uv run trezorctl list"
       - run: nix-shell --run "uv run trezorctl get-features"
       - run: |
@@ -64,44 +70,46 @@ jobs:
           nix-shell --run "uv run pytest -v --verbose-log-file pytest.log tests/device_tests $TESTOPTS"
       - run: tail -n50 trezor.log || true
         if: failure()
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # actions/upload-artifact@v4.6.2
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # actions/upload-artifact@v7.0.0
         with:
           name: core-hardware-${{ matrix.model }}-${{ matrix.coins }}
           path: |
             trezor.log
             pytest.log
           retention-days: 7
-        if: always()
+        if: always() && matrix.model != 'T2B1' && matrix.model != 'T2T1'
 
   core_monero_test:
     name: Monero tests
     runs-on:
       - self-hosted
-      - ${{ matrix.model == 'T2B1' && 'runner3' || 'hw-t2t1' }}
-      # runner4 does not work at the moment
-      # - ${{ matrix.model == 'T2B1' && 'hw-t2b1' || 'hw-t2t1' }}
+      # FIXME runner4 with t2b1 does not work at the moment
+      - ${{ matrix.model == 'T2B1' && 'runner3' || matrix.model == 'T3T1' && 'hw-t3t1' || matrix.model == 'T3B1' && 'hw-t3b1' || matrix.model == 'T3W1' && 'hw-t3w1' || 'hw-t2t1' }}
+    if: false  # FIXME https://github.com/trezor/trezor-firmware/issues/3128
     strategy:
       fail-fast: false
       matrix:
-        model: [T2T1, T2B1]
+        model: [T2T1, T2B1, T3B1, T3T1, T3W1]
     env:
       TREZOR_MODEL: ${{ matrix.model }}
       PYTEST_TIMEOUT: 1200
       PYOPT: 0
       DISABLE_OPTIGA: 1
-      BOOTLOADER_DEVEL: ${{ matrix.model == 'T2B1' && '1' || '0' }}
-      TT_UHUB_PORT: 1
-      QUIET_MODE: 1
+      DISABLE_TROPIC: 1
+      STORAGE_INSECURE_TESTING_MODE: 1
+      BOOTLOADER_DEVEL: ${{ matrix.model == 'T2T1' && '0' || '1' }}
+      TT_UHUB_PORT: all
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # actions/checkout@v6.0.2
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: ./.github/actions/environment
         with:
           full-deps: "true"
       - run: nix-shell --arg hardwareTest true --run uhubctl
       - run: nix-shell --run "uv run make -C core build_firmware"
-      - run: nix-shell --arg hardwareTest true --run "uv run python ci/hardware_tests/bootstrap.py ${{ matrix.model }} core/build/firmware/firmware.bin"
+      - run: nix-shell --arg hardwareTest true --run "uv run python ci/hardware_tests/bootstrap.py ${{ matrix.model }} core/build-xtask/artifacts/latest/firmware.bin"
       - run: nix-shell --run "uv run trezorctl list"
       - run: nix-shell --run "uv run trezorctl get-features"
       - run: |
@@ -109,7 +117,7 @@ jobs:
           nix-shell --arg fullDeps true --run "./core/tests/run_tests_device_emu_monero.sh --trezor-path webusb:"
       - run: tail -n50 trezor.log || true
         if: failure()
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # actions/upload-artifact@v4.6.2
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # actions/upload-artifact@v7.0.0
         with:
           name: core-hardware-monero-${{ matrix.model }}
           path: trezor.log
@@ -137,6 +145,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: ./.github/actions/environment
       - run: nix-shell --arg hardwareTest true --run uhubctl
       - run: nix-shell --run "uv run legacy/script/setup"

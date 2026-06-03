@@ -22,12 +22,13 @@ from copy import copy
 from enum import Enum
 
 import construct as c
-from construct_classes import Struct, subcon
+from construct_classes import subcon
 
 from .. import cosi, merkle_tree
-from ..construct_helpers import EnumAdapter, TupleAdapter
+from ..construct_helpers import EnumAdapter, Reserved, TupleAdapter
 from . import consts, models, util
 from .models import Model
+from .sanity_struct import SanityCheckedStruct
 from .vendor import VendorHeader
 
 __all__ = [
@@ -44,9 +45,10 @@ class HeaderType(Enum):
     FIRMWARE = b"TRZF"
     BOOTLOADER = b"TRZB"
     BOOTLOADER_V2 = b"TRZQ"
+    NRF_FIRMWARE = bytes.fromhex("3DB8F396")
 
 
-class FirmwareHeader(Struct):
+class FirmwareHeader(SanityCheckedStruct):
     magic: HeaderType
     header_len: int
     expiry: int
@@ -56,11 +58,13 @@ class FirmwareHeader(Struct):
     hw_model: Model | bytes
     hw_revision: int
     monotonic: int
+    reserved_0: bytes
     hashes: list[bytes]
 
     v1_signatures: list[bytes]
     v1_key_indexes: list[int]
 
+    reserved_1: bytes
     sigmask: int
     signature: bytes
 
@@ -81,13 +85,13 @@ class FirmwareHeader(Struct):
         "hw_model" / EnumAdapter(c.Bytes(4), Model),
         "hw_revision" / c.Int8ul,
         "monotonic" / c.Int8ul,
-        "_reserved" / c.Padding(2),
+        "reserved_0" / Reserved(2),
         "hashes" / c.Bytes(32)[16],
 
         "v1_signatures" / c.Bytes(64)[consts.V1_SIGNATURE_SLOTS],
         "v1_key_indexes" / c.Int8ul[consts.V1_SIGNATURE_SLOTS],  # pylint: disable=E1136
 
-        "_reserved" / c.Padding(220),
+        "reserved_1" / Reserved(220),
         "sigmask" / c.Byte,
         "signature" / c.Bytes(64),
 
@@ -104,7 +108,7 @@ class FirmwareHeader(Struct):
     # fmt: on
 
 
-class FirmwareImage(Struct):
+class FirmwareImage(SanityCheckedStruct):
     """Raw firmware image.
 
     Consists of firmware header and code block.
@@ -176,7 +180,7 @@ class FirmwareImage(Struct):
         return None
 
 
-class VendorFirmware(Struct):
+class VendorFirmware(SanityCheckedStruct):
     """Firmware image prefixed by a vendor header.
 
     This is the expected format of firmware binaries for Trezor core models."""
@@ -218,7 +222,7 @@ class VendorFirmware(Struct):
         return self.firmware.model()
 
 
-class BootHeader(Struct):
+class BootHeader(SanityCheckedStruct):
     magic: HeaderType
     hw_model: Model | bytes
     hw_revision: int
@@ -226,6 +230,8 @@ class BootHeader(Struct):
     fix_version: tuple[int, int, int, int]
     min_prev_version: tuple[int, int, int, int]
     monotonic: int
+    sigmask: int
+    reserved: bytes
     auth_len: int
     header_len: int
     code_length: int
@@ -234,6 +240,7 @@ class BootHeader(Struct):
     firmware_root: bytes
 
     _pre_padding_len: int
+    padding: bytes
     _post_padding_len: int
 
     # fmt: off
@@ -248,7 +255,7 @@ class BootHeader(Struct):
         "min_prev_version" / TupleAdapter(c.Int8ul, c.Int8ul, c.Int8ul, c.Int8ul),
         "monotonic" / c.Int8ul,
         "sigmask" / c.Int8ul,
-        "_reserved" / c.Padding(2),
+        "reserved" / Reserved(2),
         "header_len" / c.Int32ul,
         "auth_len" / c.Int32ul,
         "code_length" / c.Rebuild(
@@ -262,13 +269,13 @@ class BootHeader(Struct):
 
         # Variable-length padding that's part of the authenticated header
         "_pre_padding_len" / c.Tell,
-        "_padding" / c.Padding(c.this.auth_len - c.this._pre_padding_len),
+        "padding" / Reserved(c.this.auth_len - c.this._pre_padding_len),
         "_post_padding_len" / c.Tell,
     )
     # fmt: on
 
 
-class BootHeaderUnauth(Struct):
+class BootHeaderUnauth(SanityCheckedStruct):
     """Unauthenticated part of the boot header."""
 
     merkle_proof: list[bytes]
@@ -291,7 +298,7 @@ class BootHeaderUnauth(Struct):
     # fmt: on
 
 
-class BootableImage(Struct):
+class BootableImage(SanityCheckedStruct):
     """Raw firmware image.
 
     Consists of boot header and code block.
@@ -348,6 +355,26 @@ class BootableImage(Struct):
         if isinstance(self.header.hw_model, Model):
             return self.header.hw_model
         return None
+
+    def insert_sigmask(self, sigmask: int) -> None:
+        self.header.sigmask = sigmask
+
+    def insert_signatures(
+        self, slh_signature: bytes, ec_signature: bytes, slot_idx: int
+    ) -> None:
+        if not (
+            0 <= slot_idx < len(self.unauth.slh_signatures)
+            and 0 <= slot_idx < len(self.unauth.ec_signatures)
+        ):
+            raise ValueError("Invalid pubkey-pair slot_idx")
+        if len(slh_signature) != 7856:
+            raise ValueError(
+                f"slh_signature must be 7856 bytes, got {len(slh_signature)}"
+            )
+        if len(ec_signature) != 64:
+            raise ValueError(f"ec_signature must be 64 bytes, got {len(ec_signature)}")
+        self.unauth.slh_signatures[slot_idx] = slh_signature
+        self.unauth.ec_signatures[slot_idx] = ec_signature
 
     def public_pq_keys(self, dev_keys: bool = False) -> t.Sequence[bytes]:
         if dev_keys:

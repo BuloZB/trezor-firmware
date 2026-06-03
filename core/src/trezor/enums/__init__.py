@@ -247,6 +247,11 @@ if TYPE_CHECKING:
         ENABLE = 1
         REFRESH = 2
 
+    class AuthenticityProofType(IntEnum):
+        OPTIGA = 0
+        TROPIC = 1
+        MCU = 2
+
     class RecoveryDeviceInputMethod(IntEnum):
         ScrambledWords = 0
         Matrix = 1
@@ -310,9 +315,12 @@ if TYPE_CHECKING:
         ABI_UINT16 = 14
         ABI_UINT8 = 15
         ABI_BOOL = 16
-        ABI_BYTES32 = 17
-        ABI_BYTES = 20
-        ABI_STRING = 21
+        ABI_BYTES32 = 20
+        ABI_BYTES16 = 21
+        ABI_BYTES8 = 22
+        ABI_BYTES4 = 23
+        ABI_BYTES = 30
+        ABI_STRING = 31
 
     class EthereumERC7730FieldFormatterType(IntEnum):
         FORMATTER_ADDRESS_NAME = 0
@@ -473,12 +481,15 @@ if TYPE_CHECKING:
         UnlockBootloader = 96
         AuthenticateDevice = 97
         AuthenticityProof = 98
+        AuthenticityProofSizes = 99
         ChangeLanguage = 990
         DataChunkRequest = 991
         DataChunkAck = 992
         SetBrightness = 993
         GetSerialNumber = 996
         SerialNumber = 997
+        GetAuthenticityProofChunk = 998
+        AuthenticityProofChunk = 999
         SetU2FCounter = 63
         GetNextU2FCounter = 80
         NextU2FCounter = 81
@@ -678,6 +689,9 @@ if TYPE_CHECKING:
         SolanaAddress = 903
         SolanaSignTx = 904
         SolanaTxSignature = 905
+        SolanaSignMessage = 906
+        SolanaMessageSignature = 907
+        SolanaVerifyMessage = 908
         ThpCreateNewSession = 1000
         ThpCredentialRequest = 1016
         ThpCredentialResponse = 1017

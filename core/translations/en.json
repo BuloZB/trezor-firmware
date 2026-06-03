@@ -2595,6 +2595,7 @@
       "Eckhart": "Serial number"
     },
     "solana__account_index": "Account index",
+    "solana__app_domain": "Application domain",
     "solana__associated_token_account": "Associated token account",
     "solana__base_fee": "Base fee",
     "solana__claim": "Claim",
@@ -2610,6 +2611,7 @@
     "solana__max_fees_rent": "Max fees and rent",
     "solana__max_rent_fee": "Max rent fee",
     "solana__multiple_signers": "Multiple signers",
+    "solana__offchain_is_multisig": "The following message requires multiple signers.",
     "solana__priority_fee": "Priority fee",
     "solana__stake": "Stake",
     "solana__stake_account": "Stake account",
@@ -3077,7 +3079,8 @@
       "Eckhart": "Cancel?"
     },
     "words__chain": "Chain",
-    "words__comm_trouble": "Your Trezor is having trouble communicating with your connected device.",
+    "words__comm_continue": "Communication with your connected device failed. It's safe to continue.",
+    "words__comm_trouble": "Communication with your connected device failed. Cancel and try again.",
     "words__confirm": "Confirm",
     "words__confirm_all": "Confirm all",
     "words__confirm_fee": "Confirm fee",
@@ -3129,6 +3132,12 @@
     },
     "words__know_what_your_doing": "Continue only if you know what you are doing!",
     "words__led": "LED",
+    "words__made_in": {
+      "Bolt": "",
+      "Caesar": "",
+      "Delizia": "",
+      "Eckhart": "Made in"
+    },
     "words__manage": "Manage",
     "words__my_trezor": "My Trezor",
     "words__name": "Name",

@@ -48,12 +48,15 @@ trezor_message_impl! {
     UnlockBootloader => MessageType_UnlockBootloader,
     AuthenticateDevice => MessageType_AuthenticateDevice,
     AuthenticityProof => MessageType_AuthenticityProof,
+    AuthenticityProofSizes => MessageType_AuthenticityProofSizes,
     ChangeLanguage => MessageType_ChangeLanguage,
     DataChunkRequest => MessageType_DataChunkRequest,
     DataChunkAck => MessageType_DataChunkAck,
     SetBrightness => MessageType_SetBrightness,
     GetSerialNumber => MessageType_GetSerialNumber,
     SerialNumber => MessageType_SerialNumber,
+    GetAuthenticityProofChunk => MessageType_GetAuthenticityProofChunk,
+    AuthenticityProofChunk => MessageType_AuthenticityProofChunk,
     SetU2FCounter => MessageType_SetU2FCounter,
     GetNextU2FCounter => MessageType_GetNextU2FCounter,
     NextU2FCounter => MessageType_NextU2FCounter,
@@ -284,6 +287,9 @@ trezor_message_impl! {
     SolanaAddress => MessageType_SolanaAddress,
     SolanaSignTx => MessageType_SolanaSignTx,
     SolanaTxSignature => MessageType_SolanaTxSignature,
+    SolanaSignMessage => MessageType_SolanaSignMessage,
+    SolanaMessageSignature => MessageType_SolanaMessageSignature,
+    SolanaVerifyMessage => MessageType_SolanaVerifyMessage,
 }
 
 #[cfg(feature = "stellar")]

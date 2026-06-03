@@ -20,7 +20,9 @@ use crate::{
 };
 
 use super::super::{
-    component::{Footer, Frame, PromptScreen, SwipeContent, VerticalMenu, VerticalMenuChoiceMsg},
+    component::{
+        Footer, Frame, Header, PromptScreen, SwipeContent, VerticalMenu, VerticalMenuChoiceMsg,
+    },
     theme,
 };
 
@@ -74,7 +76,7 @@ pub struct ConfirmActionOptions {
     pub swipe_up: bool,
     pub page_limit: Option<u16>,
     pub page_counter: bool,
-    pub frame_margin: usize,
+    pub frame_margin: u8,
 }
 
 impl ConfirmActionOptions {
@@ -114,7 +116,7 @@ impl ConfirmActionOptions {
         self
     }
 
-    pub fn with_frame_margin(mut self, frame_margin: usize) -> Self {
+    pub fn with_frame_margin(mut self, frame_margin: u8) -> Self {
         self.frame_margin = frame_margin;
         self
     }
@@ -333,19 +335,27 @@ fn new_confirm_action_uni<T: Component + Paginate + MaybeTrace + 'static>(
     let (prompt_screen, prompt_pages, flow, page) =
         create_flow(strings.title, strings.prompt_screen, options.hold, &extra);
 
-    let mut content = Frame::left_aligned(strings.title, content)
+    let header = Header::left_aligned(strings.title);
+    let has_external_menu = matches!(extra, ConfirmActionExtra::ExternalMenu);
+    let mut header = match extra {
+        ConfirmActionExtra::ExternalMenu => header.with_menu_button(),
+        ConfirmActionExtra::Menu(_) => header.with_menu_button(),
+        ConfirmActionExtra::Cancel => header.with_cancel_button(),
+    };
+    if let Some(subtitle) = strings.subtitle {
+        header = header.with_subtitle(subtitle);
+    }
+
+    let mut content = Frame::with_header(header, content)
         .with_margin(options.frame_margin)
         .with_swipeup_footer(strings.footer_description)
         .with_vertical_pages();
+    if has_external_menu {
+        content = content.with_external_menu();
+    }
     if options.swipe_down {
         content = content.with_swipe(Direction::Down, SwipeSettings::Default);
     }
-
-    content = match extra {
-        ConfirmActionExtra::ExternalMenu => content.with_menu_button().with_external_menu(),
-        ConfirmActionExtra::Menu { .. } => content.with_menu_button(),
-        ConfirmActionExtra::Cancel => content.with_cancel_button(),
-    };
 
     if options.page_counter {
         fn footer_update_fn<T: Component + Paginate>(
@@ -359,10 +369,6 @@ fn new_confirm_action_uni<T: Component + Paginate + MaybeTrace + 'static>(
         content = content
             .with_footer_counter(TR::instructions__tap_to_continue.into())
             .register_footer_update_fn(footer_update_fn::<T>);
-    }
-
-    if let Some(subtitle) = strings.subtitle {
-        content = content.with_subtitle(subtitle);
     }
 
     let content = content
@@ -449,7 +455,8 @@ fn create_menu(
     menu = menu.cancel_item(menu_strings.verb_cancel);
     unwrap!(menu_items.push(MENU_ITEM_CANCEL));
 
-    let content_menu = Frame::left_aligned("".into(), menu).with_cancel_button();
+    let content_menu =
+        Frame::with_header(Header::left_aligned("".into()).with_cancel_button(), menu);
 
     let content_menu = content_menu.map(move |msg| match msg {
         VerticalMenuChoiceMsg::Selected(i) => {
@@ -483,17 +490,16 @@ fn create_confirm(
         )
     };
 
-    let mut content_confirm = Frame::left_aligned(prompt_title, SwipeContent::new(prompt))
+    let mut header = Header::left_aligned(prompt_title);
+    if matches!(extra, ConfirmActionExtra::Menu(_)) {
+        header = header.with_menu_button();
+    }
+    if let Some(subtitle) = subtitle {
+        header = header.with_subtitle(subtitle);
+    }
+    let content_confirm = Frame::with_header(header, SwipeContent::new(prompt))
         .with_footer(prompt_action, None)
         .with_swipe(Direction::Down, SwipeSettings::Default);
-
-    if matches!(extra, ConfirmActionExtra::Menu(_)) {
-        content_confirm = content_confirm.with_menu_button();
-    }
-
-    if let Some(subtitle) = subtitle {
-        content_confirm = content_confirm.with_subtitle(subtitle);
-    }
 
     flow.add_page(
         prompt_state,

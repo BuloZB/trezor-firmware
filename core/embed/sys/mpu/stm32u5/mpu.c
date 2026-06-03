@@ -40,7 +40,7 @@
 #define MPUX_TYPE_FLASH_DATA 3
 #define MPUX_TYPE_SRAM_CODE 4
 
-const static struct {
+static const struct {
   uint32_t xn;    // executable
   uint32_t attr;  // attribute index
   uint32_t sh;    // shareable
@@ -490,7 +490,7 @@ mpu_mode_t mpu_reconfig(mpu_mode_t mode) {
     case MPU_MODE_BOOTARGS:
       SET_REGION( 6, BOOTARGS_START,           BOOTARGS_SIZE,      SRAM,        YES,    NO );
       break;
-#ifdef USE_BOOT_UCB
+#if defined(USE_BOOT_UCB) && !defined(KERNEL)
     case MPU_MODE_BOOTUCB:
       SET_REGION( 6, BOOTUCB_START,            BOOTUCB_MAXSIZE,    FLASH_DATA,  YES,    NO );
       break;

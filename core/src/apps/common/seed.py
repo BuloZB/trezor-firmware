@@ -30,6 +30,13 @@ if not utils.USE_THP:
     from .passphrase import get as get_passphrase_legacy
 
 
+def raise_if_not_initialized() -> None:
+    if not storage_device.is_initialized():
+        from trezor.wire import NotInitialized
+
+        raise NotInitialized("Device is not initialized")
+
+
 class Slip21Node:
     """
     This class implements the SLIP-0021 hierarchical derivation of symmetric keys, see
@@ -79,13 +86,10 @@ if utils.USE_THP:
             if msg.passphrase is not None and msg.on_device:
                 raise DataError("Passphrase provided when it shouldn't be!")
 
+            raise_if_not_initialized()
+
             if ctx.cache.is_set(APP_COMMON_SEED):
                 raise Exception("Seed is already set!")
-
-            from trezor import wire
-
-            if not storage_device.is_initialized():
-                raise wire.NotInitialized("Device is not initialized")
 
             passphrase = await get_passphrase(msg)
             common_seed = mnemonic.get_seed(passphrase)
@@ -101,10 +105,7 @@ if utils.USE_THP:
             if msg.passphrase is not None and msg.on_device:
                 raise DataError("Passphrase provided when it shouldn't be!")
 
-            from trezor import wire
-
-            if not storage_device.is_initialized():
-                raise wire.NotInitialized("Device is not initialized")
+            raise_if_not_initialized()
 
             if ctx.cache.is_set(APP_CARDANO_ICARUS_SECRET):
                 raise Exception("Cardano icarus secret is already set!")
@@ -119,13 +120,16 @@ if utils.USE_THP:
                 ctx.cache.set_bool(APP_COMMON_DERIVE_CARDANO, True)
                 derive_and_store_secrets(ctx, passphrase)
 
-else:
+else:  # v1 protocol
+
     if utils.BITCOIN_ONLY:
         # === Bitcoin-only variant ===
         # We use the simple version of `get_seed` that never needs to derive anything else.
 
         @cache.stored_async(APP_COMMON_SEED)
         async def get_seed() -> bytes:
+            raise_if_not_initialized()
+
             passphrase = await get_passphrase_legacy()
             return mnemonic.get_seed(passphrase=passphrase)
 
@@ -142,10 +146,7 @@ else:
             return common_seed
 
         async def derive_and_store_roots_legacy() -> None:
-            from trezor import wire
-
-            if not storage_device.is_initialized():
-                raise wire.NotInitialized("Device is not initialized")
+            raise_if_not_initialized()
 
             ctx = get_context()
             need_seed = not ctx.cache.is_set(APP_COMMON_SEED)

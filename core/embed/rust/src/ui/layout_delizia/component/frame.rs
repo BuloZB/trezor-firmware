@@ -1,4 +1,4 @@
-use super::{header::HeaderMsg, theme, ButtonStyleSheet, Footer, Header};
+use super::{theme, Footer, Header};
 use crate::{
     strutil::TString,
     ui::{
@@ -6,14 +6,12 @@ use crate::{
             base::AttachType,
             paginated::Paginate,
             swipe_detect::{SwipeConfig, SwipeSettings},
-            text::TextStyle,
             Component,
             Event::{self, Swipe},
             EventCtx, FlowMsg, MsgMap, SwipeDetect,
         },
-        display::{Color, Icon},
         event::SwipeEvent,
-        geometry::{Alignment, Direction, Insets, Point, Rect},
+        geometry::{Direction, Insets, Point, Rect},
         lerp::Lerp,
         shape::{self, Renderer},
     },
@@ -88,13 +86,13 @@ impl HorizontalSwipe {
 pub struct Frame<T> {
     bounds: Rect,
     content: T,
-    header: Header,
+    header: Option<Header>,
     header_update_fn: Option<fn(&T, &mut EventCtx, &mut Header)>,
     footer: Option<Footer<'static>>,
     footer_update_fn: Option<fn(&T, &mut EventCtx, &mut Footer<'static>)>,
     swipe: SwipeConfig,
     horizontal_swipe: HorizontalSwipe,
-    margin: usize,
+    margin: u8,
     #[cfg(feature = "ui_debug")]
     has_menu: bool,
     #[cfg(feature = "ui_debug")]
@@ -110,11 +108,20 @@ impl<T> Frame<T>
 where
     T: Component + Paginate,
 {
-    pub const fn new(alignment: Alignment, title: TString<'static>, content: T) -> Self {
+    pub const fn with_header(header: Header, content: T) -> Self {
+        Self::new(Some(header), content)
+    }
+
+    pub const fn content(content: T) -> Self {
+        Self::new(None, content)
+    }
+
+    #[inline(never)]
+    const fn new(header: Option<Header>, content: T) -> Self {
         Self {
             bounds: Rect::zero(),
             content,
-            header: Header::new(alignment, title),
+            header,
             header_update_fn: None,
             footer: None,
             footer_update_fn: None,
@@ -128,58 +135,8 @@ where
         }
     }
 
-    #[inline(never)]
-    pub const fn left_aligned(title: TString<'static>, content: T) -> Self {
-        Self::new(Alignment::Start, title, content)
-    }
-
-    #[inline(never)]
-    pub const fn right_aligned(title: TString<'static>, content: T) -> Self {
-        Self::new(Alignment::End, title, content)
-    }
-
-    #[inline(never)]
-    pub const fn centered(title: TString<'static>, content: T) -> Self {
-        Self::new(Alignment::Center, title, content)
-    }
-
-    #[inline(never)]
-    pub fn with_subtitle(mut self, subtitle: TString<'static>) -> Self {
-        self.header = self.header.with_subtitle(subtitle);
-        self
-    }
-
-    #[inline(never)]
-    fn with_button(mut self, icon: Icon, msg: HeaderMsg, enabled: bool) -> Self {
-        self.header = self.header.with_button(icon, enabled, msg);
-        self
-    }
-
-    pub fn with_cancel_button(self) -> Self {
-        self.with_button(theme::ICON_CLOSE, HeaderMsg::Cancelled, true)
-    }
-
-    pub fn with_menu_button(self) -> Self {
-        self.with_button(theme::ICON_MENU, HeaderMsg::Info, true)
-    }
-
-    pub fn with_danger_menu_button(self) -> Self {
-        self.with_button(theme::ICON_MENU, HeaderMsg::Info, true)
-            .button_styled(theme::button_warning_high())
-    }
-
-    pub fn with_warning_low_icon(self) -> Self {
-        self.with_button(theme::ICON_WARNING, HeaderMsg::Info, false)
-            .button_styled(theme::button_warning_low())
-    }
-
-    pub fn with_danger_icon(self) -> Self {
-        self.with_button(theme::ICON_WARNING, HeaderMsg::Info, false)
-            .button_styled(theme::button_danger())
-    }
-
     // `has_menu` is used to gradually introduce multi-item menus (#5189).
-    // TODO: After the migration, this flag should be set in `with_button()`.
+    // TODO: After the migration, this flag should be set in `self.header`.
     #[cfg(feature = "ui_debug")]
     pub fn with_external_menu(mut self) -> Self {
         // Allow visiting this menu automatically by tests
@@ -203,26 +160,6 @@ where
     }
     #[cfg(not(feature = "ui_debug"))]
     pub fn with_flow_menu(self) -> Self {
-        self
-    }
-
-    pub fn title_styled(mut self, style: TextStyle) -> Self {
-        self.header = self.header.styled(style);
-        self
-    }
-
-    pub fn subtitle_styled(mut self, style: TextStyle) -> Self {
-        self.header = self.header.subtitle_styled(style);
-        self
-    }
-
-    pub fn button_styled(mut self, style: ButtonStyleSheet) -> Self {
-        self.header = self.header.button_styled(style);
-        self
-    }
-
-    pub fn with_result_icon(mut self, icon: Icon, color: Color) -> Self {
-        self.header = self.header.with_result_icon(icon, color);
         self
     }
 
@@ -288,17 +225,15 @@ where
         self
     }
 
-    pub fn with_danger(self) -> Self {
-        self.button_styled(theme::button_danger())
-            .title_styled(theme::label_title_danger())
-    }
-
     pub fn inner(&self) -> &T {
         &self.content
     }
 
     pub fn update_title(&mut self, ctx: &mut EventCtx, new_title: TString<'static>) {
-        self.header.update_title(ctx, new_title);
+        debug_assert!(self.header.is_some());
+        if let Some(header) = &mut self.header {
+            header.update_title(ctx, new_title)
+        }
     }
 
     pub fn update_content<F, R>(&mut self, ctx: &mut EventCtx, update_fn: F) -> R
@@ -331,7 +266,7 @@ where
         }
     }
 
-    pub fn with_margin(mut self, margin: usize) -> Self {
+    pub fn with_margin(mut self, margin: u8) -> Self {
         self.margin = margin;
         self
     }
@@ -407,7 +342,9 @@ where
         };
 
         if let Some(header_update_fn) = self.header_update_fn {
-            header_update_fn(&self.content, ctx, &mut self.header);
+            if let Some(header) = &mut self.header {
+                header_update_fn(&self.content, ctx, header);
+            }
         }
 
         if let Some(footer_update_fn) = self.footer_update_fn {
@@ -432,35 +369,37 @@ where
 fn frame_event(
     horizontal_swipe: &mut HorizontalSwipe,
     swipe_config: SwipeConfig,
-    header: &mut Header,
+    header: &mut Option<Header>,
     ctx: &mut EventCtx,
     event: Event,
 ) -> Option<FlowMsg> {
     // horizontal_swipe does not return any message
     horizontal_swipe.event(event, swipe_config);
     // msg type of header is FlowMsg, which will be the return value
-    header.event(ctx, event)
+    header.as_mut()?.event(ctx, event)
 }
 
 fn frame_place(
-    header: &mut Header,
+    header: &mut Option<Header>,
     footer: &mut Option<Footer>,
     bounds: Rect,
-    margin: usize,
+    margin: u8,
 ) -> Rect {
-    let header_area = header.place(bounds);
-    let mut content_area = bounds
-        .inset(Insets::top(header_area.height().max(TITLE_HEIGHT)))
-        .inset(Insets::top(theme::SPACING))
-        .inset(Insets::top(margin as i16));
+    let margin: i16 = margin.into();
 
+    let mut content_area = if let Some(header) = header.as_mut() {
+        let header_height = header.place(bounds).height().max(TITLE_HEIGHT);
+        bounds.inset(Insets::top(header_height + theme::SPACING + margin))
+    } else {
+        bounds
+    };
     if let Some(footer) = footer {
         // FIXME: spacer at the bottom might be applied also for usage without footer
         // but not for VerticalMenu
         content_area = content_area.inset(Insets::bottom(theme::SPACING));
         let (remaining, footer_area) = content_area.split_bottom(footer.height());
         footer.place(footer_area);
-        content_area = remaining.inset(Insets::bottom(margin as i16));
+        content_area = remaining.inset(Insets::bottom(margin));
     }
     content_area
 }
@@ -483,7 +422,9 @@ where
 {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("Frame");
-        t.child("header", &self.header);
+        if let Some(header) = &self.header {
+            t.child("header", header);
+        }
         t.child("content", &self.content);
 
         if let Some(footer) = &self.footer {

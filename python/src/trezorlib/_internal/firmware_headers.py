@@ -29,6 +29,7 @@ from typing_extensions import Protocol, Self, runtime_checkable
 
 from .. import _ed25519, cosi, firmware
 from ..firmware import models as fw_models
+from ..firmware.sanity_struct import STRICT_SANITY_CHECK_DEFAULT
 
 SYM_OK = click.style("\u2714", fg="green")
 SYM_FAIL = click.style("\u274c", fg="red")
@@ -57,7 +58,9 @@ def all_zero(data: bytes) -> bool:
     return all(b == 0 for b in data)
 
 
-def _check_signature_any(fw: "SignableImageProto", is_devel: bool = False) -> Status:
+def check_signature_any(
+    fw: SignableImageProto | BootloaderV2Image, is_devel: bool = False
+) -> Status:
     if not fw.signature_present():
         return Status.MISSING
     try:
@@ -80,13 +83,19 @@ class LiteralStr(str):
     pass
 
 
-def _format_container(
+def chunkify(data: bytes) -> str:
+    s = data.hex()
+    return " ".join(s[i : i + 4] for i in range(0, len(s), 4))
+
+
+def format_container(
     pb: t.Union[c.Container, Struct, dict],
     indent: int = 0,
     sep: str = " " * 4,
     truncate_after: t.Optional[int] = 64,
     truncate_to: t.Optional[int] = 32,
 ) -> str:
+
     def mostly_printable(bytes: bytes | bytearray) -> bool:
         if not bytes:
             return True
@@ -178,8 +187,8 @@ def format_header(
     all_ok = SYM_OK if hash_status.is_ok() and sig_status.is_ok() else SYM_FAIL
 
     output = [
-        "Firmware Header " + _format_container(header_out),
-        f"Fingerprint: {click.style(digest.hex(), bold=True)}",
+        "Firmware Header " + format_container(header_out),
+        f"Fingerprint: {click.style(chunkify(digest), bold=True)}",
         f"{all_ok} Signature is {sig_status.value}, hashes are {hash_status.value}",
     ]
 
@@ -187,7 +196,7 @@ def format_header(
 
 
 def format_secmon_header(
-    header: firmware.SecmonHeader,
+    header: firmware.secmon.SecmonHeader,
     code_hash: bytes,
     digest: bytes,
     sig_status: Status,
@@ -213,9 +222,9 @@ def format_secmon_header(
     all_ok = SYM_OK if hash_status.is_ok() and sig_status.is_ok() else SYM_FAIL
 
     output = [
-        "SECMON Header " + _format_container(header_out),
-        "Code hash: " + click.style(code_hash.hex(), bold=True),
-        f"Fingerprint: {click.style(digest.hex(), bold=True)}",
+        "SECMON Header " + format_container(header_out),
+        f"Code hash:   {click.style(chunkify(code_hash), bold=True)}",
+        f"Fingerprint: {click.style(chunkify(digest), bold=True)}",
         f"{all_ok} Signature is {sig_status.value}, hash is {hash_status.value}",
     ]
 
@@ -264,6 +273,8 @@ class CosiSignedImage(SignableImageProto, Protocol):
 
     def insert_signature(self, signature: bytes, sigmask: int) -> None: ...
 
+    def public_keys(self, dev_keys: bool = False) -> t.Sequence[bytes]: ...
+
 
 @runtime_checkable
 class LegacySignedImage(SignableImageProto, Protocol):
@@ -298,7 +309,7 @@ class CosiSignedMixin:
 
 class VendorHeader(firmware.VendorHeader, CosiSignedMixin):
     NAME: t.ClassVar[str] = "vendorheader"
-    DEV_KEYS = _make_dev_keys(b"\x44", b"\x45")
+    DEV_KEYS: t.ClassVar[t.Sequence[bytes]] = _make_dev_keys(b"\x44", b"\x45")
 
     SUBCON = c.Struct(*firmware.VendorHeader.SUBCON.subcons, c.Terminated)
 
@@ -308,7 +319,7 @@ class VendorHeader(firmware.VendorHeader, CosiSignedMixin):
     def _format(self, terse: bool) -> str:
         if not terse:
             output = [
-                "Vendor Header " + _format_container(self),
+                "Vendor Header " + format_container(self),
                 f"Pubkey bundle hash: {self.vhash().hex()}",
             ]
         else:
@@ -321,9 +332,11 @@ class VendorHeader(firmware.VendorHeader, CosiSignedMixin):
             ]
 
         if not terse:
-            output.append(f"Fingerprint: {click.style(self.digest().hex(), bold=True)}")
+            output.append(
+                f"Fingerprint: {click.style(chunkify(self.digest()), bold=True)}"
+            )
 
-        sig_status = _check_signature_any(self)
+        sig_status = check_signature_any(self)
         sym = SYM_OK if sig_status.is_ok() else SYM_FAIL
         output.append(f"{sym} Signature is {sig_status.value}")
 
@@ -338,7 +351,7 @@ class VendorHeader(firmware.VendorHeader, CosiSignedMixin):
 
 class VendorFirmware(firmware.VendorFirmware, CosiSignedMixin):
     NAME: t.ClassVar[str] = "firmware"
-    DEV_KEYS = _make_dev_keys(b"\x47", b"\x48")
+    DEV_KEYS: t.ClassVar[t.Sequence[bytes]] = _make_dev_keys(b"\x47", b"\x48")
 
     def get_header(self) -> CosiSignatureHeaderProto:
         return self.firmware.header
@@ -356,7 +369,7 @@ class VendorFirmware(firmware.VendorFirmware, CosiSignedMixin):
                 self.firmware.header,
                 self.firmware.code_hashes(),
                 self.digest(),
-                _check_signature_any(self, is_devel),
+                check_signature_any(self, is_devel),
             )
         )
 
@@ -372,7 +385,7 @@ class VendorFirmware(firmware.VendorFirmware, CosiSignedMixin):
 
 class BootloaderImage(firmware.FirmwareImage, CosiSignedMixin):
     NAME: t.ClassVar[str] = "bootloader"
-    DEV_KEYS = _make_dev_keys(b"\x41", b"\x42")
+    DEV_KEYS: t.ClassVar[t.Sequence[bytes]] = _make_dev_keys(b"\x41", b"\x42")
 
     def get_header(self) -> CosiSignatureHeaderProto:
         return self.header
@@ -382,7 +395,7 @@ class BootloaderImage(firmware.FirmwareImage, CosiSignedMixin):
             self.header,
             self.code_hashes(),
             self.digest(),
-            _check_signature_any(self),
+            check_signature_any(self),
         )
 
     def verify(self, dev_keys: bool = False) -> None:
@@ -405,7 +418,7 @@ class BootloaderImage(firmware.FirmwareImage, CosiSignedMixin):
 
 class SecmonImage(firmware.SecmonImage, CosiSignedMixin):
     NAME: t.ClassVar[str] = "secmon"
-    DEV_KEYS = _make_dev_keys(b"\x41", b"\x42")
+    DEV_KEYS: t.ClassVar[t.Sequence[bytes]] = _make_dev_keys(b"\x41", b"\x42")
 
     def get_header(self) -> CosiSignatureHeaderProto:
         return self.header
@@ -415,7 +428,7 @@ class SecmonImage(firmware.SecmonImage, CosiSignedMixin):
             self.header,
             self.code_hash(),
             self.digest(),
-            _check_signature_any(self),
+            check_signature_any(self),
         )
 
     def verify(self, dev_keys: bool = False) -> None:
@@ -475,10 +488,14 @@ class BootloaderV2Image(firmware.BootableImage):
             if "version" in key:
                 header_out[key] = LiteralStr(_format_version(val))
 
+        sig_status = check_signature_any(self)
+        all_ok = SYM_OK if sig_status.is_ok() else SYM_FAIL
+
         output = [
-            "Firmware Header " + _format_container(header_out),
-            f"Leaf hash: {click.style(self.leaf_hash().hex(), bold=True)}",
-            f"Merkle root: {click.style(self.merkle_root().hex(), bold=True)}",
+            "Firmware Header " + format_container(header_out),
+            f"Leaf hash:   {click.style(chunkify(self.leaf_hash()), bold=True)}",
+            f"Merkle root: {click.style(chunkify(self.merkle_root()), bold=True)}",
+            f"{all_ok} Signature is {sig_status.value}",
         ]
 
         return "\n".join(output)
@@ -487,18 +504,44 @@ class BootloaderV2Image(firmware.BootableImage):
         digest = self.merkle_root()
 
         hash_fn = self.get_hash_params().hash_function
+        mask = self.header.sigmask
 
-        for idx, key in enumerate(self.public_ec_keys(dev_keys)):
-            ext_digest = hash_fn(digest + self.unauth.slh_signatures[idx]).digest()
+        if (mask.bit_length() > len(self.public_ec_keys(dev_keys))) or (
+            mask.bit_length() > len(self.public_pq_keys(dev_keys))
+        ):
+            raise ValueError("Sigmask specifies more public keys than provided.")
+
+        # Verify ed25519 signatures
+        if mask.bit_count() != len(  # pyright: ignore[reportAttributeAccessIssue] # bit_count() is not available with Python 3.9
+            self.unauth.ec_signatures
+        ):
+            raise ValueError("Sigmask does not specify valid number of ed25519 keys.")
+
+        sig_idx = 0
+        for pubkey_idx, key in enumerate(self.public_ec_keys(dev_keys)):
+            if not (mask & (1 << pubkey_idx)):
+                continue
+            ext_digest = hash_fn(digest + self.unauth.slh_signatures[sig_idx]).digest()
             try:
-                _ed25519.checkvalid(self.unauth.ec_signatures[idx], ext_digest, key)
+                _ed25519.checkvalid(self.unauth.ec_signatures[sig_idx], ext_digest, key)
             except _ed25519.SignatureMismatch:
                 raise firmware.InvalidSignatureError("Invalid bootloader signature")
+            sig_idx += 1
 
-        for idx, key in enumerate(self.public_pq_keys(dev_keys)):
-            key = PublicKey.from_digest(key, sha2_128s)
-            if not key.verify(digest, self.unauth.slh_signatures[idx]):
+        # Verify slh-dsa signatures
+        if mask.bit_count() != len(  # pyright: ignore[reportAttributeAccessIssue] # bit_count() is not available with Python 3.9
+            self.unauth.slh_signatures
+        ):
+            raise ValueError("Sigmask does not specify valid number of slh-dsa keys.")
+
+        sig_idx = 0
+        for pubkey_idx, key in enumerate(self.public_pq_keys(dev_keys)):
+            if not (mask & (1 << pubkey_idx)):
+                continue
+            pq_key = PublicKey.from_digest(key, sha2_128s)
+            if not pq_key.verify(digest, self.unauth.slh_signatures[sig_idx]):
                 raise firmware.InvalidSignatureError("Invalid bootloader signature")
+            sig_idx += 1
 
 
 class LegacyFirmware(firmware.LegacyFirmware):
@@ -528,7 +571,7 @@ class LegacyFirmware(firmware.LegacyFirmware):
         else:
             embedded_content = ""
 
-        return _format_container(contents) + embedded_content
+        return format_container(contents) + embedded_content
 
     def public_keys(
         self, dev_keys: bool = False, signature_version: int = 2
@@ -567,7 +610,7 @@ class LegacyV2Firmware(firmware.LegacyV2Firmware):
             self.header,
             self.code_hashes(),
             self.digest(),
-            _check_signature_any(self),
+            check_signature_any(self),
         )
 
     def public_keys(
@@ -587,34 +630,36 @@ class LegacyV2Firmware(firmware.LegacyV2Firmware):
         return self.header.v1_key_indexes
 
 
-def parse_image(image: bytes) -> SignableImageProto:
+def parse_image(
+    image: bytes, strict: bool = STRICT_SANITY_CHECK_DEFAULT
+) -> SignableImageProto:
     try:
-        return VendorFirmware.parse(image)
+        return VendorFirmware.parse(image, strict=strict)
     except c.ConstructError:
         pass
 
     try:
-        return VendorHeader.parse(image)
+        return VendorHeader.parse(image, strict=strict)
     except c.ConstructError:
         pass
 
     try:
-        return SecmonImage.parse(image)
+        return SecmonImage.parse(image, strict=strict)
     except c.ConstructError:
         pass
 
     try:
-        firmware_img = firmware.core.FirmwareImage.parse(image)
+        firmware_img = firmware.core.FirmwareImage.parse(image, strict=strict)
         if firmware_img.header.magic == firmware.core.HeaderType.BOOTLOADER:
-            return BootloaderImage.parse(image)
+            return BootloaderImage.parse(image, strict=strict)
         if firmware_img.header.magic == firmware.core.HeaderType.FIRMWARE:
-            return LegacyV2Firmware.parse(image)
+            return LegacyV2Firmware.parse(image, strict=strict)
         raise ValueError("Unrecognized firmware header magic")
     except c.ConstructError:
         pass
 
     try:
-        return LegacyFirmware.parse(image)
+        return LegacyFirmware.parse(image, strict=strict)
     except c.ConstructError:
         pass
 
