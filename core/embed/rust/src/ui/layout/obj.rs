@@ -1,59 +1,47 @@
-use core::{
-    cell::{RefCell, RefMut},
-    convert::{TryFrom, TryInto},
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
-};
-use num_traits::FromPrimitive;
+use core::cell::{RefCell, RefMut};
+use core::convert::{TryFrom, TryInto};
+use core::marker::PhantomData;
+use core::ops::{Deref, DerefMut};
 
-#[cfg(feature = "touch")]
-use crate::ui::{event::TouchEvent, geometry::Direction};
+use num_traits::FromPrimitive;
 #[cfg(feature = "touch")]
 use num_traits::ToPrimitive;
 
+use super::base::{Layout, LayoutState};
+use crate::error::Error;
+use crate::maybe_trace::MaybeTrace;
+use crate::micropython::buffer::StrBuffer;
+use crate::micropython::gc::{self, Gc, GcBox};
+use crate::micropython::macros::{
+    obj_dict, obj_fn_1, obj_fn_2, obj_fn_3, obj_fn_var, obj_map, obj_type,
+};
+use crate::micropython::map::Map;
+use crate::micropython::obj::{Obj, ObjBase};
+use crate::micropython::qstr::Qstr;
+use crate::micropython::simple_type::SimpleTypeObj;
+use crate::micropython::typ::Type;
+use crate::micropython::util;
+use crate::time::Duration;
+use crate::ui::button_request::ButtonRequest;
+use crate::ui::component::base::{AttachType, TimerToken};
+use crate::ui::component::{Component, Event, EventCtx, Never};
+use crate::ui::display::{self, Color};
 #[cfg(feature = "ble")]
 use crate::ui::event::BLEEvent;
-
+#[cfg(feature = "power_manager")]
+use crate::ui::event::PMEvent;
+use crate::ui::event::USBEvent;
+use crate::ui::shape::render_on_display;
+#[cfg(any(feature = "rgb_led", feature = "ui_debug"))]
+use crate::ui::shape::Renderer;
+#[cfg(feature = "touch")]
+use crate::ui::{event::TouchEvent, geometry::Direction};
+use crate::ui::{CommonUI, ModelUI};
 #[cfg(feature = "button")]
 use crate::{
     trezorhal::button::{PhysicalButton, PhysicalButtonEvent},
     ui::event::ButtonEvent,
 };
-
-#[cfg(feature = "power_manager")]
-use crate::ui::event::PMEvent;
-
-use super::base::{Layout, LayoutState};
-use crate::{
-    error::Error,
-    maybe_trace::MaybeTrace,
-    micropython::{
-        buffer::StrBuffer,
-        gc::{self, Gc, GcBox},
-        macros::{obj_dict, obj_fn_1, obj_fn_2, obj_fn_3, obj_fn_var, obj_map, obj_type},
-        map::Map,
-        obj::{Obj, ObjBase},
-        qstr::Qstr,
-        simple_type::SimpleTypeObj,
-        typ::Type,
-        util,
-    },
-    time::Duration,
-    ui::{
-        button_request::ButtonRequest,
-        component::{
-            base::{AttachType, TimerToken},
-            Component, Event, EventCtx, Never,
-        },
-        display::{self, Color},
-        event::USBEvent,
-        shape::render_on_display,
-        CommonUI, ModelUI,
-    },
-};
-
-#[cfg(any(feature = "rgb_led", feature = "ui_debug"))]
-use crate::ui::shape::Renderer;
 
 impl AttachType {
     fn to_obj(self) -> Obj {
@@ -212,6 +200,8 @@ struct LayoutObjInner {
     button_request: Option<ButtonRequest>,
 }
 
+const NO_LAYOUT: Error = Error::RuntimeError(c"No layout");
+
 impl LayoutObjInner {
     /// Create a new `LayoutObj`, wrapping a root component.
     #[inline(never)]
@@ -229,7 +219,7 @@ impl LayoutObjInner {
         };
 
         // invoke the initial placement
-        new.root_mut().place();
+        new.root_mut()?.place();
         // cause a repaint pass to update the number of pages
         let msg = new.obj_event(Event::RequestPaint);
         assert!(matches!(msg, Ok(s) if s == Obj::const_none()));
@@ -247,22 +237,23 @@ impl LayoutObjInner {
         self.timer_fn = timer_fn;
     }
 
-    fn root(&self) -> &impl Deref<Target = dyn LayoutMaybeTrace> {
-        unwrap!(self.root.as_ref())
+    fn root(&self) -> Result<&impl Deref<Target = dyn LayoutMaybeTrace>, Error> {
+        self.root.as_ref().ok_or(NO_LAYOUT)
     }
 
-    fn root_mut(&mut self) -> &mut impl DerefMut<Target = dyn LayoutMaybeTrace> {
-        unwrap!(self.root.as_mut())
+    fn root_mut(&mut self) -> Result<&mut impl DerefMut<Target = dyn LayoutMaybeTrace>, Error> {
+        self.root.as_mut().ok_or(NO_LAYOUT)
     }
 
-    fn obj_request_repaint(&mut self) {
+    fn obj_request_repaint(&mut self) -> Result<(), Error> {
         self.repaint = Repaint::Full;
         let mut event_ctx = EventCtx::new();
-        let paint_msg = self.root_mut().event(&mut event_ctx, Event::RequestPaint);
+        let paint_msg = self.root_mut()?.event(&mut event_ctx, Event::RequestPaint);
         // paint_msg must not change the state
         assert!(paint_msg.is_none());
         // there must be no timers set
         assert!(event_ctx.pop_timer().is_none());
+        Ok(())
     }
 
     /// Run an event pass over the component tree. After the traversal, any
@@ -270,7 +261,7 @@ impl LayoutObjInner {
     /// in case the timer callback raises or one of the components returns
     /// an error, `Ok` with the message otherwise.
     fn obj_event(&mut self, event: Event) -> Result<Obj, Error> {
-        let root = unwrap!(self.root.as_mut());
+        let root = self.root.as_mut().ok_or(NO_LAYOUT)?;
 
         // Get the event context ready for a new event
         self.event_ctx.clear();
@@ -279,7 +270,7 @@ impl LayoutObjInner {
         let msg = root.event(&mut self.event_ctx, event);
 
         match msg {
-            Some(LayoutState::Done) => return Ok(msg.into()), // short-circuit
+            Some(LayoutState::Done) => return msg.try_into(), // short-circuit
             Some(LayoutState::Attached(br)) => {
                 assert!(self.button_request.is_none());
                 self.button_request = br;
@@ -295,7 +286,7 @@ impl LayoutObjInner {
 
         // Check if we should repaint next time
         if self.event_ctx.needs_repaint_root() {
-            self.obj_request_repaint();
+            self.obj_request_repaint()?;
         } else if self.event_ctx.needs_repaint() && self.repaint == Repaint::None {
             self.repaint = Repaint::Partial;
         }
@@ -319,7 +310,7 @@ impl LayoutObjInner {
             self.page_count = count;
         }
 
-        Ok(msg.into())
+        msg.try_into()
     }
 
     /// Run a paint pass over the component tree. Returns true if any component
@@ -329,7 +320,7 @@ impl LayoutObjInner {
 
         if self.repaint != Repaint::None {
             self.repaint = Repaint::None;
-            self.root_mut().paint().map(|_| true)
+            self.root_mut()?.paint().map(|_| true)
         } else {
             Ok(false)
         }
@@ -339,7 +330,7 @@ impl LayoutObjInner {
     /// with each piece of tracing information. Panics in case the callback
     /// raises an exception.
     #[cfg(feature = "ui_debug")]
-    fn obj_trace(&self, callback: Obj) {
+    fn obj_trace(&self, callback: Obj) -> Result<(), Error> {
         use crate::trace::JsonTracer;
 
         let mut tracer = JsonTracer::new(|text: &str| {
@@ -354,9 +345,9 @@ impl LayoutObjInner {
         // to claim that it implements `Trace`, and we also can't upcast it to
         // `&dyn Trace` because trait upcasting is unstable.
         // Luckily, calling `root.trace()` works perfectly fine in spite of the above.)
-        tracer.root(&|t| {
-            self.root().trace(t);
-        });
+        let root = self.root()?;
+        tracer.root(&|t| root.trace(t));
+        Ok(())
     }
 
     fn obj_page_count(&self) -> Obj {
@@ -375,7 +366,7 @@ impl LayoutObjInner {
     }
 
     fn obj_return_value(&self) -> Result<Obj, Error> {
-        self.root()
+        self.root()?
             .value()
             .cloned()
             .unwrap_or(Ok(Obj::const_none()))
@@ -651,7 +642,7 @@ extern "C" fn ui_layout_paint(this: Obj) -> Obj {
 extern "C" fn ui_layout_request_complete_repaint(this: Obj) -> Obj {
     let block = || {
         let this: Gc<LayoutObj> = this.try_into()?;
-        this.inner_mut().obj_request_repaint();
+        this.inner_mut().obj_request_repaint()?;
         Ok(Obj::const_none())
     };
     unsafe { util::try_or_raise(block) }
@@ -703,7 +694,7 @@ pub extern "C" fn ui_debug_layout_type() -> &'static Type {
 extern "C" fn ui_layout_trace(this: Obj, callback: Obj) -> Obj {
     let block = || {
         let this: Gc<LayoutObj> = this.try_into()?;
-        this.inner_mut().obj_trace(callback);
+        this.inner_mut().obj_trace(callback)?;
         Ok(Obj::const_none())
     };
     unsafe { util::try_or_raise(block) }

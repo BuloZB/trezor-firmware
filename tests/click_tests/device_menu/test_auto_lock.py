@@ -18,7 +18,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from ... import translations as TR
+from trezorlib.testing import translations as TR
+
 from ..test_pin import PIN4
 from .common import (
     Menu,
@@ -33,8 +34,7 @@ from .common import (
 if TYPE_CHECKING:
     from trezorlib.debuglink import DebugLink
     from trezorlib.messages import Features
-
-    from ...device_handler import BackgroundDeviceHandler
+    from trezorlib.testing.device_handler import BackgroundDeviceHandler
 # Trezor Safe 7 only
 pytestmark = [pytest.mark.models("eckhart")]
 
@@ -100,7 +100,7 @@ def test_auto_lock_battery_change(device_handler: "BackgroundDeviceHandler"):
     # Confirm changes
     debug.click(debug.screen_buttons.ok())
     # Make sure we are back at the security menu and go to homescreen
-    assert_device_screen(debug, Menu.SECURITY)
+    assert_device_screen(debug, Menu.AUTO_LOCK)
     close_device_menu(debug)
 
     # Refresh features
@@ -138,7 +138,7 @@ def test_auto_lock_usb_change(device_handler: "BackgroundDeviceHandler"):
     # Confirm changes
     debug.click(debug.screen_buttons.ok())
     # Make sure we are back at the security menu and go to homescreen
-    assert_device_screen(debug, Menu.SECURITY)
+    assert_device_screen(debug, Menu.AUTO_LOCK)
     close_device_menu(debug)
 
     # Refresh features
@@ -175,7 +175,7 @@ def test_auto_lock_battery_cancel(device_handler: "BackgroundDeviceHandler"):
     # Cancel auto-lock change
     debug.click(debug.screen_buttons.cancel())
     # Make sure we are back at the security menu and go to homescreen
-    assert_device_screen(debug, Menu.SECURITY)
+    assert_device_screen(debug, Menu.AUTO_LOCK)
     close_device_menu(debug)
 
     # Refresh features
@@ -210,7 +210,7 @@ def test_auto_lock_usb_cancel(device_handler: "BackgroundDeviceHandler"):
     # Cancel auto-lock change
     debug.click(debug.screen_buttons.cancel())
     # Make sure we are back at the security menu and go to homescreen
-    assert_device_screen(debug, Menu.SECURITY)
+    assert_device_screen(debug, Menu.AUTO_LOCK)
     close_device_menu(debug)
 
     # Refresh features

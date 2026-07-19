@@ -1,20 +1,18 @@
+use super::theme;
+use crate::strutil::TString;
+use crate::time::ShortDuration;
 #[cfg(feature = "haptic")]
 use crate::trezorhal::haptic::{self, HapticEffect};
-use crate::{
-    strutil::TString,
-    time::ShortDuration,
-    ui::{
-        component::{
-            Component, ComponentExt, Event, EventCtx, FixedHeightBar, MsgMap, Split, Timer,
-        },
-        display::{toif::Icon, Color, Font},
-        event::TouchEvent,
-        geometry::{Alignment2D, Insets, Offset, Point, Rect},
-        shape::{self, Renderer},
-    },
+use crate::ui::component::{
+    Component, ComponentExt, Event, EventCtx, FixedHeightBar, MsgMap, Split, Timer,
 };
-
-use super::theme;
+use crate::ui::constant;
+use crate::ui::display::toif::Icon;
+use crate::ui::display::{Color, Font};
+use crate::ui::event::TouchEvent;
+use crate::ui::geometry::{Alignment2D, Insets, Offset, Point, Rect};
+use crate::ui::shape::{self, Renderer};
+use crate::ui::util::split_two_lines;
 
 #[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
 pub enum ButtonMsg {
@@ -183,7 +181,7 @@ impl Button {
                 .with_bg(style.button_color)
                 .with_fg(style.border_color)
                 .with_thickness(style.border_width)
-                .with_radius(style.border_radius as i16)
+                .with_radius(i16::from(style.border_radius))
                 .render(target),
         }
     }
@@ -192,15 +190,26 @@ impl Button {
         match &self.content {
             ButtonContent::Empty => {}
             ButtonContent::Text(text) => {
-                let width = text.map(|c| style.font.text_width(c));
                 let height = style.font.text_height();
-                let start_of_baseline = self.area.center()
-                    + Offset::new(-width / 2, height / 2)
-                    + Offset::y(Self::BASELINE_OFFSET);
-                text.map(|text| {
-                    shape::Text::new(start_of_baseline, text, style.font)
+                let mut show_line = |line: &str, y_offset: i16| {
+                    let width = style.font.text_width(line);
+                    let start_of_baseline = self.area.center()
+                        + Offset::new(-width / 2, height / 2)
+                        + Offset::y(Self::BASELINE_OFFSET + y_offset);
+                    shape::Text::new(start_of_baseline, line, style.font)
                         .with_fg(style.text_color)
                         .render(target);
+                };
+                text.map(|text| {
+                    let (t1, t2) = split_two_lines(text, style.font, self.area.width());
+                    if t1.is_empty() || t2.is_empty() {
+                        // The text fits on a single line (or has no place to break).
+                        show_line(text, 0);
+                    } else {
+                        let half = (height + constant::LINE_SPACE) / 2;
+                        show_line(t1, -half);
+                        show_line(t2, half);
+                    }
                 });
             }
             ButtonContent::Icon(icon) => {

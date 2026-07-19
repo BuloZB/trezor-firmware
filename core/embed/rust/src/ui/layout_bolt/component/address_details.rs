@@ -1,23 +1,18 @@
 use heapless::Vec;
 
-use crate::{
-    error::Error,
-    micropython::buffer::StrBuffer,
-    strutil::TString,
-    translations::TR,
-    ui::{
-        component::{
-            text::paragraphs::{Paragraph, ParagraphSource, ParagraphVecShort, Paragraphs, VecExt},
-            Component, Event, EventCtx, Paginate, Qr,
-        },
-        geometry::Rect,
-        layout::util::MAX_XPUBS,
-        shape::Renderer,
-        util::Pager,
-    },
-};
-
 use super::{theme, Frame, FrameMsg};
+use crate::error::Error;
+use crate::micropython::buffer::StrBuffer;
+use crate::strutil::TString;
+use crate::translations::TR;
+use crate::ui::component::text::paragraphs::{
+    Paragraph, ParagraphSource, ParagraphVecShort, Paragraphs, VecExt,
+};
+use crate::ui::component::{Component, Event, EventCtx, Paginate, Qr};
+use crate::ui::geometry::Rect;
+use crate::ui::layout::util::MAX_XPUBS;
+use crate::ui::shape::Renderer;
+use crate::ui::util::Pager;
 
 pub struct AddressDetails {
     qr_code: Frame<Qr>,
@@ -122,7 +117,11 @@ impl AddressDetails {
 
     fn total_pages(&self) -> u16 {
         // Base pages (QR and details) plus sum of all xpub pages
-        2 + self.xpub_page_count.iter().map(|&x| x as u16).sum::<u16>()
+        2 + self
+            .xpub_page_count
+            .iter()
+            .map(|&x| u16::from(x))
+            .sum::<u16>()
     }
 }
 

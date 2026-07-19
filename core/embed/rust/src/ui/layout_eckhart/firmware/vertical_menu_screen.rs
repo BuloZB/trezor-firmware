@@ -1,25 +1,20 @@
-use crate::{
-    strutil::TString,
-    time::Instant,
-    ui::{
-        component::{
-            swipe_detect::{SwipeConfig, SwipeSettings},
-            text::{layout::LayoutFit, TextStyle},
-            Component, Event, EventCtx, Label, LineBreaking, SwipeDetect, TextLayout,
-        },
-        display::Icon,
-        event::SwipeEvent,
-        flow::Swipable,
-        geometry::{Alignment2D, Direction, Insets, Offset, Rect},
-        shape::{Renderer, ToifImage},
-        util::{animation_disabled, Pager},
-    },
+use super::super::component::HapticMode;
+use super::constant::SCREEN;
+use super::{theme, Header, HeaderMsg, MenuItems, ShortMenuVec, VerticalMenu, VerticalMenuMsg};
+use crate::strutil::TString;
+use crate::time::Instant;
+use crate::ui::component::swipe_detect::{SwipeConfig, SwipeSettings};
+use crate::ui::component::text::layout::LayoutFit;
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{
+    Component, Event, EventCtx, Label, LineBreaking, SwipeDetect, TextLayout,
 };
-
-use super::{
-    super::component::HapticMode, constant::SCREEN, theme, Header, HeaderMsg, MenuItems,
-    ShortMenuVec, VerticalMenu, VerticalMenuMsg,
-};
+use crate::ui::display::Icon;
+use crate::ui::event::SwipeEvent;
+use crate::ui::flow::Swipable;
+use crate::ui::geometry::{Alignment2D, Direction, Insets, Offset, Rect};
+use crate::ui::shape::{Renderer, ToifImage};
+use crate::ui::util::{animation_disabled, Pager};
 
 pub struct VerticalMenuScreen<T> {
     header: Header,
@@ -35,6 +30,8 @@ pub struct VerticalMenuScreen<T> {
     swipe_config: SwipeConfig,
     /// Inertia scrolling state
     inertia: InertiaState,
+    /// Initial vertical offset
+    initial_offset: i16,
 }
 
 pub enum VerticalMenuScreenMsg {
@@ -68,6 +65,7 @@ impl<T: MenuItems> VerticalMenuScreen<T> {
                 .with_swipe(Direction::Up, SwipeSettings::Default)
                 .with_swipe(Direction::Down, SwipeSettings::Default),
             inertia: InertiaState::new(),
+            initial_offset: 0,
         }
     }
 
@@ -86,13 +84,25 @@ impl<T: MenuItems> VerticalMenuScreen<T> {
         self
     }
 
+    pub fn with_initial_offset(mut self, offset: i16) -> Self {
+        self.initial_offset = offset;
+        self
+    }
+
+    pub fn get_offset(&self) -> i16 {
+        self.menu.get_offset()
+    }
+
     /// Update swipe detection and buttons state based on menu size
     pub fn initialize_screen(&mut self, ctx: &mut EventCtx) {
+        // `self.initial_offset` replaced with 0, so next screens are not "resumed".
+        let initial_offset = core::mem::take(&mut self.initial_offset);
+
         if animation_disabled() {
             self.swipe = Some(SwipeDetect::new());
             ctx.enable_swipe();
             // Set default position for the sliding window
-            self.menu.set_offset(0);
+            self.menu.set_offset(initial_offset);
             // Update the menu buttons state
             self.menu.update_button_states(ctx);
             return;
@@ -110,7 +120,7 @@ impl<T: MenuItems> VerticalMenuScreen<T> {
         }
 
         // Set default position for the sliding window
-        self.menu.set_offset(0);
+        self.menu.set_offset(initial_offset);
         // Update button states
         self.menu.update_button_states(ctx);
     }
@@ -150,8 +160,9 @@ impl<T: MenuItems> VerticalMenuScreen<T> {
             if let Some(displacement) = self.inertia.advance(ctx) {
                 let current = self.menu.get_offset();
                 // Perform addition in a wider type and clamp to the valid offset range
-                let new_offset_i32 = current as i32 + displacement as i32;
-                let new_offset = new_offset_i32.clamp(i16::MIN as i32, i16::MAX as i32) as i16;
+                let new_offset_i32 = i32::from(current) + i32::from(displacement);
+                let new_offset =
+                    new_offset_i32.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
                 self.menu.set_offset(new_offset);
 
                 // If we hit a boundary, stop coasting
@@ -363,7 +374,7 @@ impl InertiaState {
         if let Some(prev_time) = self.last_move_time {
             let dt_ms = now.saturating_duration_since(prev_time).to_millis() as f32;
             if dt_ms > 0.0 {
-                let delta = (offset - self.last_offset) as f32;
+                let delta = f32::from(offset - self.last_offset);
                 let instant_velocity = delta / dt_ms;
                 // Exponential moving average
                 self.velocity = self.velocity * (1.0 - Self::VELOCITY_SMOOTHING)
@@ -414,10 +425,10 @@ impl InertiaState {
         // Apply velocity to get fractional displacement
         let displacement = self.velocity * dt_ms + self.remainder;
         // Clamp to i16 range before truncation to avoid saturating cast surprises
-        let displacement = displacement.clamp(i16::MIN as f32, i16::MAX as f32);
+        let displacement = displacement.clamp(f32::from(i16::MIN), f32::from(i16::MAX));
         // Split into integer part (to apply) and fractional remainder (to accumulate)
         let int_displacement = displacement as i16;
-        self.remainder = displacement - int_displacement as f32;
+        self.remainder = displacement - f32::from(int_displacement);
 
         // Apply friction: v *= friction^dt
         // First-order Taylor: a^dt ≈ 1 + dt*ln(a)
@@ -458,7 +469,8 @@ impl<T: MenuItems> crate::trace::Trace for VerticalMenuScreen<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::VerticalMenu, *};
+    use super::super::VerticalMenu;
+    use super::*;
 
     #[test]
     fn test_min_offset() {

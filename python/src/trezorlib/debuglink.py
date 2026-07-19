@@ -86,7 +86,7 @@ class LayoutType(Enum):
             return cls.Bolt
         if model in (models.T2B1, models.T3B1):
             return cls.Caesar
-        if model in (models.T3T1,):
+        if model in (models.T3T1, models.T3T2):
             return cls.Delizia
         if model in (models.T3W1,):
             return cls.Eckhart
@@ -103,7 +103,7 @@ class LayoutType(Enum):
             return cls.Bolt
         if internal_name in (models.T2B1.internal_name, models.T3B1.internal_name):
             return cls.Caesar
-        if internal_name in (models.T3T1.internal_name,):
+        if internal_name in (models.T3T1.internal_name, models.T3T2.internal_name):
             return cls.Delizia
         if internal_name in (models.T3W1.internal_name,):
             return cls.Eckhart
@@ -540,7 +540,7 @@ class DebugLink:
         self.allow_interactions = auto_interact
         self.mapping = mapping.DEFAULT_MAPPING
 
-        # To be set by TrezorClientDebugLink (is not known during creation time)
+        # To be set by TrezorTestContext (is not known during creation time)
         self.model: models.TrezorModel | None = None
         self.version: tuple[int, int, int] = (0, 0, 0)
 
@@ -622,7 +622,7 @@ class DebugLink:
         msg = self.mapping.decode(msg_type, msg_bytes)
 
         # Collapse tokens to make log use less lines.
-        if isinstance(msg, (messages.DebugLinkState, messages.DebugLinkLayout)):
+        if isinstance(msg, messages.DebugLinkState):
             msg.tokens = ["".join(msg.tokens)]
 
         return msg
@@ -682,14 +682,10 @@ class DebugLink:
             wait_type = None
         return LayoutContent(self.state(wait_type=wait_type).tokens)
 
-    def wait_layout(self, wait_for_external_change: bool = False) -> LayoutContent:
+    def wait_layout(self) -> LayoutContent:
         # Next layout change will be caused by external event
         # (e.g. device being auto-locked or as a result of device_handler.run_with_session(xxx))
         # and not by our debug actions/decisions.
-        # Resetting the debug state so we wait for the next layout change
-        # (and do not return the current state).
-        if wait_for_external_change:
-            self.reset_debug_events()
 
         obj = self._call(
             messages.DebugLinkGetState(wait_layout=DebugWaitType.NEXT_LAYOUT),
@@ -738,11 +734,6 @@ class DebugLink:
                 wait=False,
             )
 
-    def reset_debug_events(self) -> None:
-        # Only supported on TT and above certain version
-        if (self.model is not models.T1B1) and not self.legacy_debug:
-            self._call(messages.DebugLinkResetDebugEvents(), expect=messages.Success)
-
     def synchronize_at(
         self, layout_text: str | list[str], timeout: float = 5
     ) -> LayoutContent:
@@ -756,15 +747,6 @@ class DebugLink:
             if time.monotonic() - now > timeout:
                 raise RuntimeError("Timeout waiting for layout")
             time.sleep(0.1)
-
-    def watch_layout(self, watch: bool) -> None:
-        """Enable or disable watching layouts.
-        If disabled, wait_layout will not work.
-
-        The message is missing on T1. Use `TrezorClientDebugLink.watch_layout` for
-        cross-version compatibility.
-        """
-        self._call(messages.DebugLinkWatchLayout(watch=watch), expect=messages.Success)
 
     def encode_pin(self, pin: str, matrix: str | None = None) -> str:
         """Transform correct PIN according to the displayed matrix."""
@@ -1145,7 +1127,11 @@ class DebugUI:
         is_flow_menu = False
         if layout.has_menu():
             is_menu = True
-            self.debuglink.press_info()
+            if self.debuglink.layout_type is LayoutType.Caesar:
+                self.debuglink.press_right()
+            else:
+                self.debuglink.click(self.debuglink.screen_buttons.menu())
+
         elif layout.has_flow_menu():
             is_flow_menu = True
             self.debuglink.click(self.debuglink.screen_buttons.menu())
@@ -1406,6 +1392,8 @@ class TrezorTestContext:
         self.debug.model = self.model = self.client.model
         self.layout_type = self.debug.layout_type
         self.is_emulator = self.features.fw_vendor == "EMULATOR"
+        # Optiga's presence is detected from the presence of its security counter.
+        self.has_optiga = self.features.optiga_sec is not None
 
     def _get_client(self) -> client.TrezorClient:
         if self.protocol_version is ProtocolVersion.V1:
@@ -1503,6 +1491,9 @@ class TrezorTestContext:
         if self.is_thp():
             assert isinstance(self.client, TrezorClientThp)
             self.client.channel = channel
+            # destroy the old interactive context associated with the previous channel
+            # tests in device_tests/thp/test_handshake.py don't work without it
+            self.client._interact_ctx = self.client._interact()
             return
         raise AttributeError("Channel is not available for this protocol")
 
@@ -1539,19 +1530,6 @@ class TrezorTestContext:
 
     def ping(self, message: str) -> str:
         return self.client.ping(message)
-
-    def watch_layout(self, watch: bool = True) -> None:
-        """Enable or disable watching layout changes.
-
-        Since trezor-core v2.3.2, it is necessary to call `watch_layout()` before
-        using `debug.wait_layout()`, otherwise layout changes are not reported.
-        """
-        if self.version >= (2, 3, 2):
-            # version check is necessary because otherwise we cannot reliably detect
-            # whether and where to wait for reply:
-            # - T1 reports unknown debuglink messages on the wirelink
-            # - TT < 2.3.0 does not reply to unknown debuglink messages due to a bug
-            self.debug.watch_layout(watch)
 
     def use_pin_sequence(self, pins: t.Iterable[str]) -> None:
         """Respond to PIN prompts from device with the provided PINs.

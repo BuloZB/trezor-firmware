@@ -1,49 +1,41 @@
 use core::cmp::Ordering;
 
-use crate::{
-    error::Error,
-    io::BinaryData,
-    maybe_trace::MaybeTrace,
-    micropython::{buffer::StrBuffer, gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
-    strutil::TString,
-    translations::TR,
-    ui::{
-        component::{
-            text::{
-                op::OpTextLayout,
-                paragraphs::{
-                    Checklist, Paragraph, ParagraphSource, ParagraphVecLong, ParagraphVecShort,
-                    Paragraphs, VecExt,
-                },
-                TextStyle,
-            },
-            Component, ComponentExt, Empty, FormattedText, Label, LineBreaking, Paginate, Timeout,
-        },
-        geometry,
-        layout::{
-            obj::{LayoutMaybeTrace, LayoutObj, RootComponent},
-            util::{ConfirmValueParams, RecoveryType},
-        },
-        notification::Notification,
-        ui_firmware::{
-            FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS,
-            MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
-        },
-        ModelUI,
-    },
-};
-
-use super::{
-    component::{
-        AddressDetails, ButtonActions, ButtonDetails, ButtonLayout, ButtonPage, ChoiceControls,
-        CoinJoinProgress, ConfirmHomescreen, Flow, FlowPages, Frame, Homescreen, Lockscreen,
-        NumberInput, Page, PassphraseEntry, PinEntry, Progress, ScrollableFrame, ShareWords,
-        ShowMore, SimpleChoice, WordlistEntry, WordlistType,
-    },
-    constant, fonts, theme, UICaesar,
-};
-
 use heapless::Vec;
+
+use super::component::{
+    AddressDetails, ButtonActions, ButtonDetails, ButtonLayout, ButtonPage, ChoiceControls,
+    CoinJoinProgress, ConfirmHomescreen, Flow, FlowPages, Frame, Homescreen, Lockscreen,
+    NumberInput, Page, PassphraseEntry, PinEntry, Progress, ScrollableFrame, ShareWords, ShowMore,
+    SimpleChoice, WordlistEntry, WordlistType,
+};
+use super::{constant, fonts, theme, UICaesar};
+use crate::error::Error;
+use crate::io::BinaryData;
+use crate::maybe_trace::MaybeTrace;
+use crate::micropython::buffer::StrBuffer;
+use crate::micropython::gc::Gc;
+use crate::micropython::iter::IterBuf;
+use crate::micropython::list::List;
+use crate::micropython::obj::Obj;
+use crate::micropython::util;
+use crate::strutil::TString;
+use crate::translations::TR;
+use crate::ui::component::text::op::OpTextLayout;
+use crate::ui::component::text::paragraphs::{
+    Checklist, Paragraph, ParagraphSource, ParagraphVecLong, ParagraphVecShort, Paragraphs, VecExt,
+};
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{
+    Component, ComponentExt, Empty, FormattedText, Label, LineBreaking, Paginate, Timeout,
+};
+use crate::ui::layout::obj::{LayoutMaybeTrace, LayoutObj, RootComponent};
+use crate::ui::layout::util::{ConfirmValueParams, PropsList, RecoveryType};
+use crate::ui::notification::Notification;
+use crate::ui::ui_firmware::{
+    FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS, MAX_PAIRED_DEVICES,
+    MAX_WORD_QUIZ_ITEMS,
+};
+use crate::ui::{geometry, ModelUI};
 
 impl FirmwareUI for UICaesar {
     fn confirm_action(
@@ -439,7 +431,7 @@ impl FirmwareUI for UICaesar {
         verb: Option<TString<'static>>,
         external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        let paragraphs = parse_properties(items)?;
+        let paragraphs = PropsList::new(items)?;
 
         let button_text = verb.unwrap_or(if hold {
             TR::buttons__hold_to_confirm.into()
@@ -562,9 +554,11 @@ impl FirmwareUI for UICaesar {
                     if let Some(amount) = amount {
                         if let Some(amount_label) = amount_label {
                             has_amount = true;
-                            ops.add_text_with_font(amount_label, fonts::FONT_BOLD)
-                                .add_newline()
-                                .add_text_with_font(amount, fonts::FONT_MONO);
+                            ops.add_text_with_font(amount_label, fonts::FONT_BOLD);
+                            if !amount_label.is_empty() && !amount.is_empty() {
+                                ops.add_newline();
+                            }
+                            ops.add_text_with_font(amount, fonts::FONT_MONO);
                         }
                     }
 
@@ -1098,6 +1092,7 @@ impl FirmwareUI for UICaesar {
 
     fn show_device_menu(
         _init_submenu_idx: Option<u8>,
+        _init_submenu_offset: i16,
         _backup_failed: bool,
         _backup_needed: bool,
         _ble_enabled: bool,
@@ -1359,12 +1354,6 @@ impl FirmwareUI for UICaesar {
         Err::<Gc<LayoutObj>, Error>(Error::NotImplementedError)
     }
 
-    fn show_wait_text(text: TString<'static>) -> Result<impl LayoutMaybeTrace, Error> {
-        Ok(RootComponent::new(
-            Paragraph::new(&theme::TEXT_NORMAL, text).into_paragraphs(),
-        ))
-    }
-
     fn show_warning(
         title: Option<TString<'static>>,
         button: TString<'static>,
@@ -1563,20 +1552,4 @@ fn add_paragraphs<'a>(
         };
         paragraphs.add(Paragraph::new(style, value));
     }
-}
-
-fn parse_properties(items: Obj) -> Result<ParagraphVecLong<'static>, Error> {
-    let mut paragraphs = ParagraphVecLong::new();
-
-    for para in IterBuf::new().try_iterate(items)? {
-        let [key, value, is_data]: [Obj; 3] = util::iter_into_array(para)?;
-        add_paragraphs(
-            &mut paragraphs,
-            key.try_into_option()?,
-            value.try_into_option()?,
-            is_data.try_into()?,
-        );
-    }
-
-    Ok(paragraphs)
 }

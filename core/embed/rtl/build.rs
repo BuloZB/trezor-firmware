@@ -1,6 +1,6 @@
-use xbuild::{Result, WrapErr, bail, ensure};
-
 use std::process::Command;
+
+use xbuild::{Result, WrapErr, bail, ensure};
 
 fn main() -> Result<()> {
     xbuild::build(|lib| {
@@ -90,9 +90,10 @@ fn add_crypto(lib: &mut xbuild::CLibrary) -> Result<()> {
         ("USE_CARDANO", val),
     ]);
 
-    let val = cfg!(feature = "universal_fw") && cfg!(feature = "model_t2t1");
-    let val = Some(if val { "1" } else { "0" });
-    lib.add_defines([("USE_NEM", val), ("USE_EOS", val)]);
+    let nem = cfg!(feature = "universal_fw") && cfg!(feature = "nem");
+    lib.add_define("USE_NEM", Some(if nem { "1" } else { "0" }));
+    let eos = cfg!(feature = "universal_fw") && cfg!(feature = "eos");
+    lib.add_define("USE_EOS", Some(if eos { "1" } else { "0" }));
 
     if cfg!(feature = "ed25519_no_precomp") {
         lib.add_define("ED25519_NO_PRECOMP", None);
@@ -204,7 +205,7 @@ fn add_crypto(lib: &mut xbuild::CLibrary) -> Result<()> {
     }
 
     if cfg!(feature = "noise") {
-        lib.add_sources_in_dir_with_attrs(crypto_path, ["noise.c"], Some(crypto_attrs.clone()));
+        lib.add_sources_in_dir_with_attrs(crypto_path, ["noise_kk1.c"], Some(crypto_attrs.clone()));
     }
 
     if cfg!(feature = "secp256k1_zkp") {

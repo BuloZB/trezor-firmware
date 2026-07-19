@@ -1,19 +1,11 @@
-use crate::{
-    error::Error,
-    trezorhal::bitblt::{BitBltCopy, BitBltFill},
-    ui::{
-        display::Color,
-        geometry::{Offset, Point, Rect},
-    },
-};
-
-use super::{
-    super::{Bitmap, BitmapFormat, BitmapView},
-    BasicCanvas, Canvas, CanvasBuilder, Viewport,
-};
-
 #[cfg(feature = "ui_blurring")]
 use super::super::DrawingCache;
+use super::super::{Bitmap, BitmapFormat, BitmapView};
+use super::{BasicCanvas, Canvas, CanvasBuilder, Viewport};
+use crate::error::Error;
+use crate::trezorhal::bitblt::{BitBltCopy, BitBltFill};
+use crate::ui::display::Color;
+use crate::ui::geometry::{Offset, Point, Rect};
 
 /// A struct representing 8-bit monochromatic canvas
 pub struct Mono8Canvas<'a> {
@@ -107,8 +99,9 @@ impl<'a> Canvas for Mono8Canvas<'a> {
             if let Some(row) = self.row_mut(pt.y) {
                 let pixel = &mut row[pt.x as usize];
                 let fg_color = color.luminance() as u16;
-                let bg_color = *pixel as u16;
-                *pixel = ((fg_color * alpha as u16 + bg_color * (255 - alpha) as u16) / 255) as u8;
+                let bg_color = u16::from(*pixel);
+                *pixel =
+                    ((fg_color * u16::from(alpha) + bg_color * u16::from(255 - alpha)) / 255) as u8;
             }
         }
     }

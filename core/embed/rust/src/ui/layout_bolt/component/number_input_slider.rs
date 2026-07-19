@@ -1,12 +1,10 @@
-use crate::ui::{
-    component::{base::ComponentExt, Child, Component, Event, EventCtx},
-    constant::screen,
-    event::TouchEvent,
-    geometry::{Grid, Insets, Point, Rect},
-    shape::{self, Renderer},
-};
-
 use super::{theme, Button, ButtonMsg};
+use crate::ui::component::base::ComponentExt;
+use crate::ui::component::{Child, Component, Event, EventCtx};
+use crate::ui::constant::screen;
+use crate::ui::event::TouchEvent;
+use crate::ui::geometry::{Grid, Insets, Point, Rect};
+use crate::ui::shape::{self, Renderer};
 
 pub enum NumberInputSliderDialogMsg {
     Changed(u8),
@@ -27,10 +25,8 @@ impl NumberInputSliderDialog {
         Self {
             area: Rect::zero(),
             input: NumberInputSlider::new(min, max, init_value).into_child(),
-            cancel_button: Button::with_text("CANCEL".into())
-                .styled(theme::button_cancel())
-                .into_child(),
-            confirm_button: Button::with_text("CONFIRM".into())
+            cancel_button: Button::with_icon(theme::ICON_CANCEL).into_child(),
+            confirm_button: Button::with_icon(theme::ICON_CONFIRM)
                 .styled(theme::button_confirm())
                 .into_child(),
         }
@@ -114,7 +110,7 @@ impl NumberInputSlider {
             let filled = pos.x - self.area.x0;
             let filled = filled.clamp(0, self.area.width());
             let val_pct = (filled as u16 * 100) / self.area.width() as u16;
-            let val = ((val_pct * (self.max - self.min) as u16) / 100) as u8 + self.min;
+            let val = ((val_pct * u16::from(self.max - self.min)) / 100) as u8 + self.min;
 
             if val != self.value {
                 self.value = val;
@@ -147,7 +143,7 @@ impl Component for NumberInputSlider {
     }
 
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
-        let val_pct = (100 * (self.value - self.min) as u16) / (self.max - self.min) as u16;
+        let val_pct = (100 * u16::from(self.value - self.min)) / u16::from(self.max - self.min);
 
         shape::Bar::new(self.area)
             .with_radius(2)
@@ -173,6 +169,6 @@ impl Component for NumberInputSlider {
 impl crate::trace::Trace for NumberInputSlider {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("NumberInputSlider");
-        t.int("value", self.value as i64);
+        t.int("value", i64::from(self.value));
     }
 }

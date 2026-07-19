@@ -1,95 +1,100 @@
+use std::path::{Path, PathBuf};
+use std::{fs, process};
+
 use anyhow::{Context, Result, ensure};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    process,
-};
 
-use crate::{
-    args::{Component, Model},
-    helpers,
-};
+use crate::args::Project;
+use crate::config::{ModelConfig, ProjectProfile};
+use crate::helpers;
+use crate::model::Model;
 
-/// Extracts appropriate sections from the ELF file and creates a raw unsigned binary.
+/// Extracts appropriate sections from the ELF file and creates a raw unsigned
+/// binary. Section lists are read from the project's `project.toml`;
+/// model-specific split behaviour is controlled by `model_config`.
 pub fn elf_to_bin(
     source: &Path,
-    component: Component,
-    model: Model,
+    project: Project,
+    model_config: &ModelConfig,
     use_dev_keys: bool,
 ) -> Result<PathBuf> {
-    match component {
-        Component::Boardloader => objcopy(
-            source,
-            [
-                ".vector_table",
-                ".text",
-                ".data",
-                ".rodata",
-                ".capabilities",
-            ],
-        ),
+    let project_profile = ProjectProfile::load(project)?;
 
-        Component::Bootloader | Component::BootloaderCi => {
-            objcopy(source, [".header", ".flash", ".data"])
-        }
-
-        Component::Secmon => objcopy(
-            source,
-            [".secmon_header", ".flash", ".data", ".gnu.sgstubs"],
-        ),
-
-        Component::Kernel => objcopy(source, [".flash", ".data"]),
-
-        Component::Firmware => {
-            if matches!(model, Model::T2T1 | Model::T2B1 | Model::D001) {
-                // On STM32F427 models, the firmware is not contiguous in flash.
-                // It is split into two parts, with the storage area in between.
-                // We therefore extract the two parts separately and concatenate them.
+    match project {
+        Project::Firmware => {
+            if model_config.is_stm32f4() {
+                // STM32F4 firmware flash is non-contiguous — two banks separated
+                // by the storage area must be extracted and concatenated.
+                // Part1 uses the same elf_sections as the flat (non-split) path.
+                let pad_to = project_profile
+                    .split_pad_to
+                    .as_deref()
+                    .ok_or_else(|| anyhow::anyhow!("firmware project.toml missing split_pad_to"))?;
+                let part2_sections =
+                    project_profile
+                        .split_part2_sections
+                        .as_ref()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("firmware project.toml missing split_part2_sections")
+                        })?;
                 let part1 = objcopy_ex(
                     source,
                     "part1",
-                    [".vendorheader", ".header", ".flash", ".data"],
-                    ["--pad-to", "0x08100000"],
+                    &project_profile.elf_sections,
+                    ["--pad-to", pad_to],
                 )?;
-                let part2 = objcopy_ex(source, "part2", [".flash2"], [] as [&str; 0])?;
+                let part2 = objcopy_ex(source, "part2", part2_sections, [] as [&str; 0])?;
                 concat_files(part1.with_extension("ubin"), [part1, part2])
             } else {
-                objcopy(source, [".vendorheader", ".header", ".flash", ".data"])
+                objcopy(source, &project_profile.elf_sections)
             }
         }
 
-        Component::Prodtest => {
-            if matches!(model, Model::T3W1 | Model::D002) {
-                let body_bin = objcopy_ex(
-                    source,
-                    "body.bin",
-                    [".secmon_header", ".flash", ".data"],
-                    [] as [&str; 0],
-                )?;
-
-                sign_binary(&body_bin, Component::Prodtest, model, use_dev_keys)?;
-
-                let header_bin = objcopy_ex(
-                    source,
-                    "header.bin",
-                    [".vendorheader", ".header"],
-                    [] as [&str; 0],
-                )?;
-
+        Project::Prodtest => {
+            if model_config.secmon {
+                // On secmon models prodtest is a secmon-signed body with a plain
+                // vendor header prepended. The body is signed before concatenation.
+                let body_sections =
+                    project_profile
+                        .secmon_body_sections
+                        .as_ref()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("prodtest project.toml missing secmon_body_sections")
+                        })?;
+                let header_sections =
+                    project_profile
+                        .secmon_header_sections
+                        .as_ref()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("prodtest project.toml missing secmon_header_sections")
+                        })?;
+                let body_bin = objcopy_ex(source, "body.bin", body_sections, [] as [&str; 0])?;
+                sign_binary(&body_bin, project, model_config, use_dev_keys)?;
+                let header_bin =
+                    objcopy_ex(source, "header.bin", header_sections, [] as [&str; 0])?;
                 concat_files(source.with_extension("bin"), [header_bin, body_bin])
             } else {
-                objcopy(source, [".vendorheader", ".header", ".flash", ".data"])
+                objcopy(source, &project_profile.elf_sections)
             }
         }
+
+        _ => objcopy(source, &project_profile.elf_sections),
     }
 }
 
 pub fn sign_binary(
     binary: &Path,
-    target: Component,
-    model: Model,
+    project: Project,
+    model_config: &ModelConfig,
     use_dev_keys: bool,
 ) -> Result<()> {
+    let header_tool = match project {
+        Project::Bootloader | Project::BootloaderCi => model_config
+            .bootloader_header_tool
+            .as_deref()
+            .unwrap_or("headertool"),
+        _ => "headertool",
+    };
+
     println!(
         "xtask: Signing binary `{}`",
         binary
@@ -97,8 +102,6 @@ pub fn sign_binary(
             .context("Failed to get binary file name")?
             .to_string_lossy()
     );
-
-    let header_tool = header_tool_name(target, model);
 
     let mut cmd = process::Command::new(header_tool);
 
@@ -121,18 +124,9 @@ pub fn sign_binary(
     Ok(())
 }
 
-fn header_tool_name(target: Component, model: Model) -> &'static str {
-    match (target, model) {
-        (Component::Bootloader, Model::T3W1)
-        | (Component::BootloaderCi, Model::T3W1)
-        | (Component::Bootloader, Model::D002)
-        | (Component::BootloaderCi, Model::D002) => "headertool_pq",
-        _ => "headertool",
-    }
-}
-
-/// Extracts specified sections from an ELF file into a raw binary using objcopy.
-/// The output file is created in the same directory as the input with the same name but .bin extension.
+/// Extracts specified sections from an ELF file into a raw binary using
+/// objcopy. The output file is created in the same directory as the input with
+/// the same name but .bin extension.
 fn objcopy<S, I>(input: &Path, sections: I) -> Result<PathBuf>
 where
     S: AsRef<str>,
@@ -142,9 +136,7 @@ where
 }
 
 /// A more flexible version of objcopy that allows specifying extra arguments
-/// and output extension. Used for the special case of the firmware on
-/// STM32F427 models, where we need to extract two separate parts of
-/// the ELF and concatenate them.
+/// and a custom output extension.
 fn objcopy_ex<S1, S2, I1, I2>(
     input: &Path,
     output_extension: &str,
@@ -267,25 +259,30 @@ pub fn merge_compile_commands(inputs: &[&Path], output: &Path) -> Result<()> {
 }
 
 /// Copies a built binary to `artifacts/pub`.
-/// The filename includes the component, model, version, git revision,
+/// The filename includes the project, model, version, git revision,
 /// and dirty state, for example `bootloader-T3W1-2.1.17-9e4bbc68-dirty.bin`.
+/// Prefix goes at the very beginning of the filename. Infix goes between
+/// model and version.
 pub fn publish_artifact(
     binary: &Path,
-    component: Component,
+    project: Project,
     model: Model,
     version_file: &Path,
     prefix: Option<&str>,
+    infix: Option<&str>,
 ) -> Result<()> {
     let pub_dir = helpers::publish_dir()?;
     helpers::ensure_directory(&pub_dir)?;
 
     let prefix = prefix.unwrap_or("");
+    let infix = infix.map(|s| format!("-{s}")).unwrap_or("".into());
 
     let name = format!(
-        "{}{}-{}-{}-{}{}.bin",
+        "{}{}-{}{}-{}-{}{}.bin",
         prefix,
-        component.binary_name(),
+        project.binary_name(),
         model.model_id(),
+        infix,
         &helpers::parse_version_file(version_file)?,
         &helpers::git_revision()?[..8],
         if helpers::git_modified()? {
@@ -308,26 +305,11 @@ pub fn publish_artifact(
 
 #[cfg(test)]
 mod tests {
-    use super::{header_tool_name, merge_compile_commands};
-    use crate::args::{Component, Model};
-    use serde_json::Value;
     use std::fs;
 
-    #[test]
-    fn picks_pq_header_tool_only_for_supported_targets() {
-        assert_eq!(
-            header_tool_name(Component::Bootloader, Model::T3W1),
-            "headertool_pq"
-        );
-        assert_eq!(
-            header_tool_name(Component::BootloaderCi, Model::D002),
-            "headertool_pq"
-        );
-        assert_eq!(
-            header_tool_name(Component::Firmware, Model::T3W1),
-            "headertool"
-        );
-    }
+    use serde_json::Value;
+
+    use super::merge_compile_commands;
 
     #[test]
     fn merge_compile_commands_prefers_first_input_for_duplicates() {

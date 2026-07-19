@@ -5,12 +5,11 @@
 //! selection, and the top-level `build_and_link()` entry point that ties
 //! them together.
 
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+use std::{env, fs};
 
-use color_eyre::{Result, eyre::bail};
+use color_eyre::Result;
+use color_eyre::eyre::{WrapErr, bail};
 
 use crate::CLibrary;
 use crate::helpers::{is_rust_analyzer, links_name};
@@ -19,16 +18,39 @@ fn package_name() -> Result<String> {
     Ok(env::var("CARGO_PKG_NAME")?)
 }
 
-/// Returns the current model id (T2T1, ..) based on the enabled feature.
+/// Returns the current model id (T2T1, ..) from the DEP_MODELS_MODEL
+/// environment variable emitted by the `models` crate's build script.
+///
+/// The variable is empty when no model feature is selected; that is treated as
+/// an error since callers need a concrete model.
 pub fn current_model_id() -> Result<String> {
-    for (key, value) in env::vars() {
-        if let Some(model) = key.strip_prefix("CARGO_FEATURE_MODEL_")
-            && value == "1"
-        {
-            return Ok(model.to_string());
-        }
+    let model = env::var("DEP_MODELS_MODEL").unwrap_or_default();
+    if model.is_empty() {
+        bail!(
+            "DEP_MODELS_MODEL is unset or empty — is `models` a direct dependency with a model feature selected?"
+        );
     }
-    bail!("No model feature enabled")
+    Ok(model)
+}
+
+/// Returns the sorted list of model ids found in `models_dir` — the names of
+/// subdirectories that contain a `model.toml`. Emits `rerun-if-changed` for the
+/// directory and each `model.toml` so callers rebuild when the model set
+/// changes.
+pub fn model_ids(models_dir: &Path) -> Result<Vec<String>> {
+    println!("cargo::rerun-if-changed={}", models_dir.display());
+    let mut models = Vec::new();
+    for entry in fs::read_dir(models_dir).context("Failed to read models directory")? {
+        let entry = entry?;
+        let model_toml = entry.path().join("model.toml");
+        if !model_toml.exists() {
+            continue;
+        }
+        println!("cargo::rerun-if-changed={}", model_toml.display());
+        models.push(entry.file_name().to_string_lossy().into_owned());
+    }
+    models.sort();
+    Ok(models)
 }
 
 /// Returns the path to the vendor header binary for the given build target.
@@ -44,10 +66,10 @@ pub fn vendor_header_path(models_dir: impl AsRef<Path>, target: &str) -> Result<
     }
 
     let vendor = if target == "prodtest" {
-        get_prodtest_vendor()
+        get_prodtest_vendor()?
     } else {
         // firmware, secmon and kernel all must use the same vendor header
-        get_firmware_vendor()
+        get_firmware_vendor()?
     };
 
     Ok(models_dir
@@ -57,8 +79,12 @@ pub fn vendor_header_path(models_dir: impl AsRef<Path>, target: &str) -> Result<
         .join(format!("vendorheader_{}.bin", vendor)))
 }
 
-fn get_firmware_vendor() -> &'static str {
-    if has_feature("bootloader_devel") {
+fn is_bitcoin_only() -> bool {
+    !has_feature("universal_fw")
+}
+
+fn get_firmware_vendor() -> Result<&'static str> {
+    Ok(if has_feature("bootloader_devel") {
         if has_feature("unsafe_fw") {
             "unsafe_signed_dev"
         } else {
@@ -66,23 +92,23 @@ fn get_firmware_vendor() -> &'static str {
         }
     } else if !has_feature("production") {
         "unsafe_signed_prod"
-    } else if has_feature("model_t2t1") {
+    } else if current_model_id()? == "T2T1" {
         "satoshilabs_signed_prod"
-    } else if has_feature("bitcoin_only") {
+    } else if is_bitcoin_only() {
         "trezor_btconly_signed_prod"
     } else {
         "trezor_signed_prod"
-    }
+    })
 }
 
-fn get_prodtest_vendor() -> &'static str {
-    if has_feature("bootloader_devel") {
+fn get_prodtest_vendor() -> Result<&'static str> {
+    Ok(if has_feature("bootloader_devel") {
         "prodtest_DO_NOT_SIGN_signed_dev"
     } else if has_feature("production") {
         "prodtest_signed_prod"
     } else {
         "unsafe_signed_prod"
-    }
+    })
 }
 
 /// Entry point for build scripts that compile C libraries.
@@ -200,6 +226,8 @@ impl CLibrary {
             // final binary according to the selected binary type.
             let target_ld = if has_feature("mcu_stm32u5g") {
                 format!("sys/linker/stm32u5g/{binary_type}.ld")
+            } else if has_feature("mcu_stm32u5a") {
+                format!("sys/linker/stm32u5a/{binary_type}.ld")
             } else if has_feature("mcu_stm32u58") {
                 format!("sys/linker/stm32u58/{binary_type}.ld")
             } else if has_feature("mcu_stm32f4") {

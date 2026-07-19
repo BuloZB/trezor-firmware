@@ -1,26 +1,17 @@
-use crate::{
-    strutil::ShortString,
-    trezorhal::slip39,
-    ui::{
-        component::{
-            text::common::{TextBox, TextEdit},
-            Component, Event, EventCtx,
-        },
-        display::Icon,
-        geometry::{Alignment, Alignment2D, Offset, Rect},
-        shape::{Renderer, Text, ToifImage},
-        util::ResultExt,
-    },
+use super::super::super::component::{Button, ButtonMsg};
+use super::super::super::firmware::keyboard::common::{render_pending_marker, MultiTapKeyboard};
+use super::super::super::firmware::keyboard::mnemonic::{
+    MnemonicInput, MnemonicInputMsg, MNEMONIC_KEY_COUNT,
 };
-
-use super::super::super::{
-    component::{Button, ButtonMsg},
-    firmware::keyboard::{
-        common::{render_pending_marker, MultiTapKeyboard},
-        mnemonic::{MnemonicInput, MnemonicInputMsg, MNEMONIC_KEY_COUNT},
-    },
-    theme,
-};
+use super::super::super::theme;
+use crate::strutil::ShortString;
+use crate::trezorhal::slip39;
+use crate::ui::component::text::common::{TextBox, TextEdit};
+use crate::ui::component::{Component, Event, EventCtx};
+use crate::ui::display::Icon;
+use crate::ui::geometry::{Alignment, Alignment2D, Offset, Rect};
+use crate::ui::shape::{Renderer, Text, ToifImage};
+use crate::ui::util::ResultExt;
 
 const MAX_LENGTH: usize = 8;
 
@@ -159,7 +150,7 @@ impl Component for Slip39Input {
 
             // Initial position for drawing the icons
             let mut cursor = area.center().ofs(Offset::x(-self.width() / 2));
-            let visible_icons = input_len.saturating_sub(last.is_some() as usize);
+            let visible_icons = input_len.saturating_sub(usize::from(last.is_some()));
 
             for _ in 0..visible_icons {
                 ToifImage::new(cursor, Self::ICON.toif)

@@ -37,17 +37,15 @@ async def sign_tx_eip1559(
 ) -> EthereumTxRequest:
     from trezor import TR, wire
     from trezor.crypto import rlp  # local_cache_global
-    from trezor.crypto.hashlib import sha3_256
     from trezor.ui.layouts import show_continue_in_app
-    from trezor.utils import HashWriter
 
     from apps.common import paths
 
-    from .helpers import format_ethereum_amount, get_fee_items_eip1559
+    from .helpers import format_ethereum_amount, get_fee_items_eip1559, keccak256
     from .sign_tx import (
         check_common_fields,
-        confirm_data_and_summary,
         confirm_tx_data,
+        create_data_chunk_loader,
         request_initial_data,
     )
 
@@ -86,7 +84,7 @@ async def sign_tx_eip1559(
             msg.payment_req, slip44_id, keychain, amount_size_bytes=32
         )
 
-    sha = HashWriter(sha3_256(keccak=True))
+    sha = keccak256()
 
     rlp.write(sha, _TX_TYPE)
     rlp.write_header(sha, _get_digest_length(msg, data_length), rlp.LIST_HEADER_BYTE)
@@ -105,20 +103,18 @@ async def sign_tx_eip1559(
 
     initial_data = await request_initial_data(msg, sha)
 
-    confirm_data_chunk, confirm_summary = await confirm_tx_data(
+    # Confirm the transaction, using special layouts for staking, yielding and clear-signing (if supported).
+    await confirm_tx_data(
         initial_data,
         msg,
         defs,
-        None,
         address_bytes,
         maximum_fee,
         fee_items,
         payment_req_verifier,
         sender_bytes,
-    )
-
-    await confirm_data_and_summary(
-        confirm_data_chunk, confirm_summary, initial_data, data_length, sha
+        # Hash and confirm the rest of transaction calldata while loading it from the host.
+        create_data_chunk_loader(sha),
     )
 
     # write_access_list

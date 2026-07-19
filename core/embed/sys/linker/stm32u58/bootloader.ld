@@ -22,12 +22,25 @@ _bss_section_end = ADDR(.bss) + SIZEOF(.bss);
 _bootargs_ram_start = BOOTARGS_START;
 _bootargs_ram_end = BOOTARGS_START + BOOTARGS_SIZE;
 
+/* _bootloader_code_size is used by the PQ (boot_ucb) header; _codelen is used
+   by the classic header.S. Both are defined so this single script serves both
+   bootloader header formats. */
+_bootloader_code_size = _bootloader_code_end - ADDR(.padding);
 _codelen = _bootloader_code_end - ADDR(.flash);
+
+/* Size of the zero fill that pads the image to the full BOOTLOADER_MAXSIZE.
+   Reported by the memory-usage tool so it can show real content vs padding. */
+__flash_padding_size = _bootloader_code_end - __flash_padding_start;
 
 SECTIONS {
   .header : ALIGN(4) {
     KEEP(*(.header));
-  } >FLASH AT>FLASH
+  } >FLASH
+
+  .padding : ALIGN(4) {
+    . = ALIGN(4);
+    . = ALIGN(CODE_ALIGNMENT);
+  } >FLASH
 
   .flash : ALIGN(CODE_ALIGNMENT) {
     KEEP(*(.vector_table));
@@ -36,7 +49,7 @@ SECTIONS {
     . = ALIGN(4);
     *(.rodata*);
     . = ALIGN(4);
-  } >FLASH AT>FLASH
+  } >FLASH
 
   .data : ALIGN(4) {
     *(.data*);
@@ -80,12 +93,12 @@ SECTIONS {
     . = ALIGN(8);
   } >BOOT_ARGS
 
-  .flash : ALIGN(4) {
+  .flash : {
     /* Pad the rest of bootloader area with zeros */
+    __flash_padding_start = .;
     BYTE(0x00)
     FILL(0x00)
-    /* Use alignment required by the boardloader */
-    . = ALIGN(512);
+    . = ADDR(.header) + BOOTLOADER_MAXSIZE;
     _bootloader_code_end = .;
   } >FLASH
 }

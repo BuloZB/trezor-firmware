@@ -1,16 +1,16 @@
 use std::path::{Path, PathBuf};
 
-use color_eyre::{Result, eyre::WrapErr};
+use color_eyre::Result;
+use color_eyre::eyre::WrapErr;
 
 use super::CLibrary;
 use crate::attrs::CompileAttrs;
 use crate::dep_tracking::{run_command, run_command_with_cc_dep};
-use crate::parallel::run_parallel;
-
 use crate::helpers::{
     derive_output_path, ensure_parent_directory, join_paths_lexically, links_name, measure_time,
     path_from_env,
 };
+use crate::parallel::run_parallel;
 
 // Represents a single compilation task
 #[derive(Clone)]
@@ -27,6 +27,21 @@ struct CompileUnit {
     // Optional per-source compile attributes that are merged with the
     // library-level attributes
     attrs: Option<CompileAttrs>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum OutputType {
+    Object,
+    Preprocessed(&'static str),
+}
+
+impl OutputType {
+    pub fn extension(&self) -> &'static str {
+        match self {
+            OutputType::Object => "o",
+            OutputType::Preprocessed(ext) => ext,
+        }
+    }
 }
 
 // Represents the result of compiling a single source file
@@ -52,7 +67,7 @@ impl CompileUnit {
             cmd.arg("-MMD").arg("-MF").arg(cc_dep);
         }
 
-        cmd.arg("-c").arg("-o").arg(&self.output).arg(&self.input);
+        cmd.arg("-o").arg(&self.output).arg(&self.input);
 
         run_command_with_cc_dep(
             &mut cmd,
@@ -70,20 +85,23 @@ impl CompileUnit {
 }
 
 impl CLibrary {
-    /// Compiles all sources in parallel and generates object files for the library.
+    /// Compiles all sources in parallel and generates object files for the
+    /// library.
     ///
-    /// This function compiles all source files associated with the library in parallel,
-    /// creates a static library archive, and exports the library's metadata for downstream crates.
+    /// This function compiles all source files associated with the library in
+    /// parallel, creates a static library archive, and exports the
+    /// library's metadata for downstream crates.
     ///
     /// # Errors
     ///
-    /// Returns an error if compilation or archiving fails, or if required environment variables are missing.
+    /// Returns an error if compilation or archiving fails, or if required
+    /// environment variables are missing.
     pub(crate) fn compile(&self) -> Result<()> {
         let lib_name = links_name()?;
 
         measure_time(format!("@@ {} compiled in", lib_name), || {
             // Run parallel build on all sources
-            let objects = self.process_sources("o", None, None)?;
+            let objects = self.process_sources(OutputType::Object, None, None)?;
             // Append manually added objects (e.g., vendor header)
             let objects = objects
                 .into_iter()
@@ -101,16 +119,18 @@ impl CLibrary {
     ///
     /// # Parameters
     ///
-    /// - `output_ext`: The file extension for the output files (e.g., `"upydef"`).
+    /// - `output_ext`: The file extension for the output files (e.g.,
+    ///   `"upydef"`).
     /// - `extra_args`: Additional compiler/preprocessor flags.
-    /// - `extra_sources`: Additional source files to process beyond the library's own sources.
+    /// - `extra_sources`: Additional source files to process beyond the
+    ///   library's own sources.
     ///
     /// # Returns
     ///
     /// A vector of paths to the generated output files.
     pub fn process_sources(
         &self,
-        output_ext: &str,
+        output_type: OutputType,
         extra_args: Option<&[&str]>,
         extra_sources: Option<&[PathBuf]>,
     ) -> Result<Vec<PathBuf>> {
@@ -132,13 +152,12 @@ impl CLibrary {
         for (index, (src, attrs)) in sources.into_iter().enumerate() {
             // Derive absolute paths for input and output files
             let input = join_paths_lexically(&base_dir, &src);
-            let output = derive_output_path(&base_dir, &src, &out_dir, output_ext);
+            let output = derive_output_path(&base_dir, &src, &out_dir, output_type.extension());
 
             // Only generate .d files for object files compiled from C/C++ sources
-            let cc_dep = if output_ext == "o"
-                && src
-                    .extension()
-                    .is_some_and(|ext| ext == "c" || ext == "cpp" || ext == "cc")
+            let cc_dep = if src
+                .extension()
+                .is_some_and(|ext| ext == "c" || ext == "cpp" || ext == "cc")
             {
                 Some(output.with_extension("d"))
             } else {
@@ -166,6 +185,15 @@ impl CLibrary {
             }
         }
 
+        match output_type {
+            OutputType::Object => {
+                attrs.add_flag("-c");
+            }
+            OutputType::Preprocessed(..) => {
+                attrs.add_flag("-E");
+            }
+        }
+
         // Compile all units in parallel
         let artifacts = compile_parallel(units, &attrs)?;
         let outputs = artifacts.into_iter().map(|a| a.output).collect();
@@ -175,12 +203,14 @@ impl CLibrary {
 
     /// Preprocesses a C header or source file using the configured C compiler.
     ///
-    /// This runs the compiler in preprocessor mode (`-E`) and writes the output to the specified file.
+    /// This runs the compiler in preprocessor mode (`-E`) and writes the output
+    /// to the specified file.
     ///
     /// # Parameters
     ///
     /// - `input`: Path to the input C header or source file.
-    /// - `output`: Path to the output file where the preprocessed result will be written.
+    /// - `output`: Path to the output file where the preprocessed result will
+    ///   be written.
     ///
     /// # Errors
     ///

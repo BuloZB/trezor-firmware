@@ -1,9 +1,7 @@
-use crate::ui::{
-    component::{Component, Event, EventCtx},
-    event::TouchEvent,
-    geometry::{Direction, Point, Rect},
-    shape::Renderer,
-};
+use crate::ui::component::{Component, Event, EventCtx};
+use crate::ui::event::TouchEvent;
+use crate::ui::geometry::{Direction, Point, Rect};
+use crate::ui::shape::Renderer;
 
 #[derive(Clone)]
 pub struct Swipe {
@@ -63,7 +61,7 @@ impl Swipe {
     }
 
     fn ratio(&self, dist: i16) -> f32 {
-        (dist as f32 / Self::DISTANCE as f32).min(1.0)
+        (f32::from(dist) / Self::DISTANCE as f32).min(1.0)
     }
 }
 

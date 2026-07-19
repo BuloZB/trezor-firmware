@@ -1,3 +1,5 @@
+.PHONY: clean
+
 CC = cc
 
 CFLAGS = -Wall -Wshadow -Wextra -Wpedantic -Werror -Wno-missing-braces
@@ -27,6 +29,8 @@ SRC += crypto/chacha20poly1305/chacha_merged.c
 SRC += crypto/hmac.c
 SRC += crypto/sha2.c
 SRC += crypto/memzero.c
+SRC += crypto/consteq.c
+SRC += crypto/fault_handler_noop.c
 
 OBJ = $(SRC:%.c=build/%.o)
 

@@ -1,30 +1,27 @@
+use std::path::Path;
+use std::{fs, process};
+
 use anyhow::{Context, Result, ensure};
-use std::{
-    fs,
-    {path::Path, process},
-};
 
-use crate::{
-    args::{FlashArgs, FlashEraseArgs, FlashSection},
-    helpers,
-};
+use crate::args::{FlashArgs, FlashEraseArgs, FlashSection, Model, ResetArgs};
+use crate::helpers;
 
-/// Flashes the specified component to the device using OpenOCD.
+/// Flashes the specified project to the device using OpenOCD.
 pub fn flash(args: FlashArgs) -> Result<()> {
     ensure!(
-        args.component.flashable(),
+        args.project.flashable(),
         "Flashing is not supported for `{}`",
-        args.component.binary_name()
+        args.project.binary_name()
     );
 
     let binary =
-        helpers::artifacts_dir(args.model)?.join(format!("{}.bin", args.component.binary_name()));
+        helpers::artifacts_dir(args.model)?.join(format!("{}.bin", args.project.binary_name()));
 
     let binary = binary
         .canonicalize()
         .with_context(|| format!("Failed to locate `{}` for flashing", binary.display()))?;
 
-    let flash_start = args.component.flash_start_symbol()?;
+    let flash_start = args.project.flash_start_symbol()?;
     let memory_ld = args.model.model_memory_ld()?;
     let address = helpers::read_symbol(&memory_ld, flash_start)?;
 
@@ -36,34 +33,37 @@ pub fn flash(args: FlashArgs) -> Result<()> {
 
     let flash_instruction = build_flash_write_instruction(&binary, address);
 
-    let status = process::Command::new("openocd")
-        .args(["-f", "interface/stlink.cfg"])
-        .args(["-c", "transport select hla_swd"])
-        .args(["-f", args.model.openocd_target()])
-        .arg("-c")
-        .arg(flash_instruction)
-        .status()
-        .context("Failed to spawn `openocd`")?;
-
-    ensure!(status.success(), "`openocd` failed with status: {status}");
-
-    Ok(())
+    run_openocd(args.model, &flash_instruction)
 }
 
-/// Erase specified flash section using OpenOCD. The section boundaries are determined
-/// by reading symbols from the model's memory.ld file.
+/// Erase specified flash section using OpenOCD. The section boundaries are
+/// determined by reading symbols from the model's memory.ld file.
 pub fn flash_erase(args: FlashEraseArgs) -> Result<()> {
     let mem_ld = args.model.model_memory_ld()?;
     let content = fs::read_to_string(&mem_ld)
         .with_context(|| format!("Failed to read `{}`", mem_ld.display()))?;
     let instr = build_flash_erase_instruction(&content, args.section)?;
 
+    run_openocd(args.model, &instr)
+}
+
+/// Resets the connected device using OpenOCD.
+pub fn reset(args: ResetArgs) -> Result<()> {
+    println!("Resetting `{:?}`", args.model);
+
+    run_openocd(args.model, "init; reset; exit")
+}
+
+/// Runs OpenOCD instructions against the connected device for the given model.
+fn run_openocd(model: Model, instructions: &str) -> Result<()> {
+    let model_config = model.config()?;
+
     let status = process::Command::new("openocd")
         .args(["-f", "interface/stlink.cfg"])
         .args(["-c", "transport select hla_swd"])
-        .args(["-f", args.model.openocd_target()])
+        .args(["-f", model_config.openocd_target()?])
         .arg("-c")
-        .arg(instr)
+        .arg(instructions)
         .status()
         .context("Failed to spawn `openocd`")?;
 
@@ -118,9 +118,10 @@ fn build_flash_erase_instruction(content: &str, section: FlashSection) -> Result
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::{build_flash_erase_instruction, build_flash_write_instruction};
     use crate::args::FlashSection;
-    use std::path::Path;
 
     #[test]
     fn builds_flash_write_instruction() {

@@ -167,6 +167,8 @@ secbool secret_key_writable(uint8_t slot) {
   return secret_key_present(slot) == secfalse;
 }
 
+void secret_reset(void) {}
+
 void secret_prepare_fw(secbool allow_run_with_secret,
                        secbool allow_provisioning_access) {
   (void)allow_provisioning_access;
@@ -199,19 +201,35 @@ void secret_bhk_regenerate(void) {}
 
 #include <sec/mcu_attestation.h>
 
-#if defined(TREZOR_MODEL_T3W1)
+#if defined(TREZOR_PRODTEST)
+#define MCU_DEVICE_CERT {0}
+#define MCU_DEVICE_CERT_SIZE 0
+#elif defined(TREZOR_MODEL_T3W1)
 #include "certs/T3W1.h"
 #else
 #error "MCU attestation is only supported for T3W1 model."
 #endif
 
+#ifndef MCU_DEVICE_CERT_SIZE
+#define MCU_DEVICE_CERT_SIZE sizeof((uint8_t[])MCU_DEVICE_CERT)
+#endif
+
+static uint8_t mcu_device_cert[MCU_ATTESTATION_MAX_CERT_SIZE] = MCU_DEVICE_CERT;
+static size_t mcu_device_cert_size = MCU_DEVICE_CERT_SIZE;
+
 secbool secret_mcu_device_cert_write(const uint8_t* cert, size_t cert_size) {
+#ifdef TREZOR_PRODTEST
   if (cert_size > MCU_ATTESTATION_MAX_CERT_SIZE) {
     return secfalse;
   }
   memcpy(mcu_device_cert, cert, cert_size);
   mcu_device_cert_size = cert_size;
   return sectrue;
+#else
+  (void)cert;
+  (void)cert_size;
+  return secfalse;
+#endif
 }
 
 secbool secret_mcu_device_cert_size(size_t* cert_size) {

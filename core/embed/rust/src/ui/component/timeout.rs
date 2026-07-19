@@ -1,11 +1,7 @@
-use crate::{
-    time::Duration,
-    ui::{
-        component::{Component, Event, EventCtx, Timer},
-        geometry::Rect,
-        shape::Renderer,
-    },
-};
+use crate::time::Duration;
+use crate::ui::component::{Component, Event, EventCtx, Timer};
+use crate::ui::geometry::Rect;
+use crate::ui::shape::Renderer;
 
 pub struct Timeout {
     time_ms: u32,
@@ -42,6 +38,6 @@ impl Component for Timeout {
 impl crate::trace::Trace for Timeout {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("Timeout");
-        t.int("time_ms", self.time_ms as i64);
+        t.int("time_ms", i64::from(self.time_ms));
     }
 }

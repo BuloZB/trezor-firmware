@@ -1,0 +1,18 @@
+uses = [
+    "backlight",
+    "boot_ucb",
+    "display",
+    "dma2d",
+    "framebuffer",
+    "hash_processor",
+    "lockable_bootloader",
+    "power_manager",
+    "pvd",
+    "sd_card",
+    "sdram",
+    "secret",
+    "secure_aes",
+    "tamper",
+]
+
+elf_sections = [".vector_table", ".text", ".data", ".rodata", ".capabilities"]

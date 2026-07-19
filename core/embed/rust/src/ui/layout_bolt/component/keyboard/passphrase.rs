@@ -1,33 +1,24 @@
-use crate::{
-    strutil::{ShortString, TString},
-    time::Duration,
-    ui::{
-        component::{
-            base::ComponentExt,
-            text::{
-                common::TextBox,
-                layout::{LayoutFit, LineBreaking},
-                TextStyle,
-            },
-            Child, Component, Event, EventCtx, Never, Pad, Paginate, TextLayout, Timer,
-        },
-        display,
-        event::TouchEvent,
-        geometry::{Alignment, Grid, Insets, Offset, Rect},
-        shape::{Bar, Renderer, Text},
-        util::{DisplayStyle, Pager},
-    },
-};
-
-use super::super::{
-    super::constant::SCREEN,
-    button::{Button, ButtonContent, ButtonMsg},
-    keyboard::common::{render_pending_marker, MultiTapKeyboard},
-    swipe::{Swipe, SwipeDirection},
-    theme, ScrollBar,
-};
-
 use core::cell::Cell;
+
+use super::super::super::constant::SCREEN;
+use super::super::button::{Button, ButtonContent, ButtonMsg};
+use super::super::keyboard::common::{render_pending_marker, MultiTapKeyboard};
+use super::super::swipe::{Swipe, SwipeDirection};
+use super::super::{theme, ScrollBar};
+use crate::strutil::{ShortString, TString};
+use crate::time::Duration;
+use crate::ui::component::base::ComponentExt;
+use crate::ui::component::text::common::TextBox;
+use crate::ui::component::text::layout::{LayoutFit, LineBreaking};
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{
+    Child, Component, Event, EventCtx, Never, Pad, Paginate, TextLayout, Timer,
+};
+use crate::ui::display;
+use crate::ui::event::TouchEvent;
+use crate::ui::geometry::{Alignment, Grid, Insets, Offset, Rect};
+use crate::ui::shape::{Bar, Renderer, Text};
+use crate::ui::util::{DisplayStyle, Pager};
 
 #[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
 pub enum PassphraseKeyboardMsg {
@@ -445,7 +436,7 @@ impl Input {
 
         Bar::new(self.shown_area)
             .with_bg(theme::GREY_DARK)
-            .with_radius(theme::RADIUS as i16)
+            .with_radius(theme::RADIUS.into())
             .render(target);
 
         TextLayout::new(Self::STYLE)
@@ -472,7 +463,7 @@ impl Input {
         let asterisk_width = style.text_font.char_width('*').max(1);
         let max_visible = (available_width / asterisk_width).max(1) as usize;
         let visible_count = pp_len.min(max_visible);
-        let asterisk_count = visible_count.saturating_sub(last_char_visible as usize);
+        let asterisk_count = visible_count.saturating_sub(last_char_visible.into());
 
         // Build asterisks string
         let mut asterisks = ShortString::new();

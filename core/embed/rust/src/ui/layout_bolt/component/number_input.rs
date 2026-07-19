@@ -1,19 +1,13 @@
-use crate::{
-    error::Error,
-    strutil::{self, TString},
-    translations::TR,
-    ui::{
-        component::{
-            base::ComponentExt,
-            text::paragraphs::{Paragraph, Paragraphs},
-            Child, Component, Event, EventCtx, Pad,
-        },
-        geometry::{Alignment, Grid, Insets, Offset, Rect},
-        shape::{self, Renderer},
-    },
-};
-
-use super::{super::fonts, theme, Button, ButtonMsg};
+use super::super::fonts;
+use super::{theme, Button, ButtonMsg};
+use crate::error::Error;
+use crate::strutil::{self, TString};
+use crate::translations::TR;
+use crate::ui::component::base::ComponentExt;
+use crate::ui::component::text::paragraphs::{Paragraph, Paragraphs};
+use crate::ui::component::{Child, Component, Event, EventCtx, Pad};
+use crate::ui::geometry::{Alignment, Grid, Insets, Offset, Rect};
+use crate::ui::shape::{self, Renderer};
 
 #[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
 pub enum NumberInputDialogMsg {
@@ -201,7 +195,7 @@ impl Component for NumberInput {
     fn render<'s>(&'s self, target: &mut impl Renderer<'s>) {
         let mut buf = [0u8; 10];
 
-        if let Some(text) = strutil::format_i64(self.value as i64, &mut buf) {
+        if let Some(text) = strutil::format_i64(i64::from(self.value), &mut buf) {
             let digit_font = fonts::FONT_DEMIBOLD;
             let y_offset = digit_font.text_height() / 2 + Button::BASELINE_OFFSET;
 
@@ -221,6 +215,6 @@ impl Component for NumberInput {
 impl crate::trace::Trace for NumberInput {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("NumberInput");
-        t.int("value", self.value as i64);
+        t.int("value", i64::from(self.value));
     }
 }

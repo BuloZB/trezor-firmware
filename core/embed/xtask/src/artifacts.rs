@@ -1,11 +1,11 @@
-use anyhow::{Context, Result};
-use std::{
-    fs,
-    os::unix,
-    path::{Path, PathBuf},
-};
+use std::fs;
+use std::os::unix;
+use std::path::{Path, PathBuf};
 
-use crate::{args::BuildArgs, helpers};
+use anyhow::{Context, Result};
+
+use crate::args::BuildArgs;
+use crate::helpers;
 
 /// Returns whether a filesystem entry exists without following symlinks, so
 /// broken symlinks are still treated as present and can be replaced.
@@ -71,11 +71,11 @@ pub fn collect_artifacts(args: &BuildArgs, is_dependency: bool) -> Result<()> {
 
     helpers::ensure_directory(&artifact_dir)?;
 
-    let name = args.component.artifact_name(args.emulator);
-    let binary_name = args.component.binary_name();
+    let name = args.project.artifact_name(args.emulator);
+    let binary_name = args.project.binary_name();
     let profile_dir = helpers::profile_dir(args)?;
     let elf = helpers::elf_path(args)?;
-    let package = args.component.package_name(args.emulator);
+    let package = args.project.package_name(args.emulator);
     let compile_commands = profile_dir.join(format!("{package}.cc.json"));
 
     let elf_ext = if args.emulator { "" } else { ".elf" };

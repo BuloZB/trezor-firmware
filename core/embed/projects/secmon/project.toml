@@ -1,0 +1,18 @@
+uses = [
+    "backup_ram",
+    "boot_ucb",
+    "consumption_mask",
+    "hash_processor",
+    "lockable_bootloader",
+    "mcu_attestation",
+    "nrf_auth",
+    "optiga",
+    "secret",
+    "secure_aes",
+    "suspend",
+    "tamper",
+    "telemetry",
+    "tropic",
+]
+
+elf_sections = [".secmon_header", ".flash", ".data", ".gnu.sgstubs"]

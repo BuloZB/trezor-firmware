@@ -1,8 +1,11 @@
-use core::{convert::TryFrom, ops::Deref, ptr, slice, str};
-
-use crate::{error::Error, micropython::obj::Obj, strutil::hexlify};
+use core::convert::TryFrom;
+use core::ops::Deref;
+use core::{ptr, slice, str};
 
 use super::ffi;
+use crate::error::Error;
+use crate::micropython::obj::Obj;
+use crate::strutil::hexlify;
 
 /// Represents an immutable UTF-8 string managed by MicroPython GC.
 /// This either means static data, or a valid GC object.
@@ -200,7 +203,7 @@ fn get_buffer_info(obj: Obj, flags: u32) -> Result<ffi::mp_buffer_info_t, Error>
     // `bufinfo.buf` contains a pointer to data of `bufinfo.len` bytes.
     // EXCEPTION: Does not raise for Micropython's builtin types, and we don't
     // implement custom buffer protocols.
-    if unsafe { ffi::mp_get_buffer(obj, &mut bufinfo, flags as _) } {
+    if unsafe { ffi::mp_get_buffer(obj, &mut bufinfo, flags.into()) } {
         Ok(bufinfo)
     } else {
         Err(Error::TypeError)

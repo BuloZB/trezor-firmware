@@ -1,11 +1,9 @@
-use core::{
-    convert::{TryFrom, TryInto},
-    ffi::CStr,
-};
+use core::convert::{TryFrom, TryInto};
+use core::ffi::CStr;
 
+use super::ffi;
+use super::runtime::catch_exception;
 use crate::error::Error;
-
-use super::{ffi, runtime::catch_exception};
 
 pub type Obj = ffi::mp_obj_t;
 pub type ObjBase = ffi::mp_obj_base_t;
@@ -74,6 +72,12 @@ impl Obj {
         // micropython/py/obj.h
         // #define MP_OBJ_STOP_ITERATION (MP_OBJ_FROM_PTR((void *)0))
         unsafe { Self::from_bits(0) }
+    }
+
+    pub const fn const_sentinel() -> Self {
+        // micropython/py/obj.h
+        // #define MP_OBJ_SENTINEL (MP_OBJ_FROM_PTR((void *)4))
+        unsafe { Self::from_bits(4) }
     }
 
     pub const fn const_none() -> Self {
@@ -342,7 +346,7 @@ impl TryFrom<(Obj, Obj, Obj)> for Obj {
 impl From<u8> for Obj {
     fn from(val: u8) -> Self {
         // `u8` will fit into smallint so no error should happen here.
-        Obj::small_int(val as u16)
+        Obj::small_int(u16::from(val))
     }
 }
 
@@ -373,6 +377,16 @@ impl TryFrom<Obj> for u8 {
 }
 
 impl TryFrom<Obj> for u16 {
+    type Error = Error;
+
+    fn try_from(obj: Obj) -> Result<Self, Self::Error> {
+        let val = i32::try_from(obj)?;
+        let this = Self::try_from(val)?;
+        Ok(this)
+    }
+}
+
+impl TryFrom<Obj> for i16 {
     type Error = Error;
 
     fn try_from(obj: Obj) -> Result<Self, Self::Error> {
@@ -414,14 +428,17 @@ impl TryFrom<Obj> for usize {
     }
 }
 
-impl<T> From<Option<T>> for Obj
+impl<T, E> TryFrom<Option<T>> for Obj
 where
-    T: Into<Obj>,
+    T: TryInto<Obj, Error = E>,
+    E: Into<Error>,
 {
-    fn from(val: Option<T>) -> Self {
+    type Error = Error;
+
+    fn try_from(val: Option<T>) -> Result<Self, Error> {
         match val {
-            Some(v) => v.into(),
-            None => Self::const_none(),
+            Some(v) => v.try_into().map_err(|e| e.into()),
+            None => Ok(Self::const_none()),
         }
     }
 }

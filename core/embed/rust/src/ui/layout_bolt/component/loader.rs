@@ -1,22 +1,16 @@
-use super::{
-    super::cshape::{render_loader, LoaderRange},
-    theme,
-};
+use super::super::constant;
+use super::super::cshape::{render_loader, LoaderRange};
+use super::theme;
+use crate::time::{Duration, Instant};
 #[cfg(feature = "haptic")]
 use crate::trezorhal::haptic::{self, HapticEffect};
-use crate::{
-    time::{Duration, Instant},
-    ui::{
-        animation::Animation,
-        component::{Component, Event, EventCtx, Pad},
-        display::{self, toif::Icon, Color, LOADER_MAX},
-        geometry::{Alignment2D, Offset, Rect},
-        shape::{self, Renderer},
-        util::animation_disabled,
-    },
-};
-
-use super::super::constant;
+use crate::ui::animation::Animation;
+use crate::ui::component::{Component, Event, EventCtx, Pad};
+use crate::ui::display::toif::Icon;
+use crate::ui::display::{self, Color, LOADER_MAX};
+use crate::ui::geometry::{Alignment2D, Offset, Rect};
+use crate::ui::shape::{self, Renderer};
+use crate::ui::util::animation_disabled;
 
 const GROWING_DURATION_MS: u32 = 1000;
 const SHRINKING_DURATION_MS: u32 = 500;
@@ -191,8 +185,8 @@ impl Component for Loader {
                         use crate::ui::lerp::Lerp;
 
                         if matches!(self.state, State::Growing(_)) {
-                            let progress =
-                                self.progress(now).unwrap() as f32 / display::LOADER_MAX as f32;
+                            let progress = f32::from(self.progress(now).unwrap())
+                                / f32::from(display::LOADER_MAX);
                             let ampl = i16::lerp(0, HAPTIC_AMPLITUDE_MAX_PCT, progress);
                             haptic::play_custom(ampl as i8, HAPTIC_AMPLITUDE_DURATION_MS);
                         }
@@ -240,7 +234,7 @@ impl Component for Loader {
                 active_color
             };
 
-            let end = 360.0 * progress as f32 / 1000.0;
+            let end = 360.0 * f32::from(progress) / 1000.0;
             let start = 0.0;
 
             render_loader(

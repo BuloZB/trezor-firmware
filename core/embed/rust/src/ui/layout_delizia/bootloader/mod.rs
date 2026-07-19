@@ -1,48 +1,33 @@
-use heapless::String;
-
-use super::{
-    bootloader::welcome::Welcome,
-    component::{
-        bl_confirm::{Confirm, ConfirmTitle},
-        Button, ResultScreen, WelcomeScreen,
-    },
-    cshape::{render_loader, LoaderRange},
-    fonts,
-    theme::{
-        backlight,
-        bootloader::{
-            button_bld, button_bld_menu, button_confirm, button_wipe_cancel, button_wipe_confirm,
-            BLD_BG, BLD_FG, BLD_TITLE_COLOR, BLD_WARN_COLOR, BLD_WIPE_COLOR, CHECK24, CHECK40,
-            DOWNLOAD24, FIRE32, FIRE40, RESULT_FW_INSTALL, RESULT_WIPE, TEXT_BOLD, TEXT_NORMAL,
-            TEXT_WIPE_BOLD, TEXT_WIPE_NORMAL, WARNING40, WELCOME_COLOR, X24,
-        },
-        GREEN_LIGHT, GREY,
-    },
-    UIDelizia,
-};
-
-use crate::{
-    bootloader::run,
-    time::Duration,
-    trezorhal::time,
-    ui::{
-        component::Label,
-        display::{self, toif::Toif, Color, Icon, LOADER_MAX},
-        geometry::{Alignment, Alignment2D, Offset, Point, Rect},
-        layout::simplified::show,
-        shape,
-        shape::render_on_display,
-        ui_bootloader::BootloaderUI,
-        util::animation_disabled,
-        CommonUI,
-    },
-};
-
-use ufmt::uwrite;
-
 use connect::Connect;
+use heapless::String;
 use intro::Intro;
 use menu::Menu;
+use ufmt::uwrite;
+
+use super::bootloader::welcome::Welcome;
+use super::component::bl_confirm::{Confirm, ConfirmTitle};
+use super::component::{Button, ResultScreen, WelcomeScreen};
+use super::cshape::{render_loader, LoaderRange};
+use super::theme::bootloader::{
+    button_bld, button_bld_menu, button_confirm, button_wipe_cancel, button_wipe_confirm, BLD_BG,
+    BLD_FG, BLD_TITLE_COLOR, BLD_WARN_COLOR, BLD_WIPE_COLOR, CHECK24, CHECK40, DOWNLOAD24, FIRE32,
+    FIRE40, RESULT_FW_INSTALL, RESULT_WIPE, TEXT_BOLD, TEXT_NORMAL, TEXT_WIPE_BOLD,
+    TEXT_WIPE_NORMAL, WARNING40, WELCOME_COLOR, X24,
+};
+use super::theme::{backlight, GREEN_LIGHT, GREY};
+use super::{fonts, UIDelizia};
+use crate::bootloader::run;
+use crate::time::Duration;
+use crate::trezorhal::time;
+use crate::ui::component::Label;
+use crate::ui::display::toif::Toif;
+use crate::ui::display::{self, Color, Icon, LOADER_MAX};
+use crate::ui::geometry::{Alignment, Alignment2D, Offset, Point, Rect};
+use crate::ui::layout::simplified::show;
+use crate::ui::shape::render_on_display;
+use crate::ui::ui_bootloader::BootloaderUI;
+use crate::ui::util::animation_disabled;
+use crate::ui::{shape, CommonUI};
 
 pub mod intro;
 pub mod menu;
@@ -83,7 +68,7 @@ impl UIDelizia {
             let center_text_offset: i16 = 10;
             let center = SCREEN.center() + Offset::y(loader_offset);
             let inactive_color = bg_color.blend(fg_color, 85);
-            let end = 360.0 * progress as f32 / 1000.0;
+            let end = 360.0 * f32::from(progress) / 1000.0;
 
             render_loader(
                 center,
@@ -157,7 +142,7 @@ impl BootloaderUI for UIDelizia {
             // in practice, restart_seconds is 5 or less so this is fine
             let seconds_char = b'0' + restart_seconds % 10;
             unwrap!(reboot_msg.push(seconds_char as char));
-            let progress = (5 - (restart_seconds as u16)).clamp(0, 5) * 200;
+            let progress = (5 - u16::from(restart_seconds)).clamp(0, 5) * 200;
 
             Self::screen_progress(
                 "Restarting device",
@@ -209,11 +194,11 @@ impl BootloaderUI for UIDelizia {
         unwrap!(version_str.push_str(vendor));
 
         let title_str = if is_newinstall {
-            "INSTALL FIRMWARE"
+            "INSTALL FW"
         } else if is_newvendor {
             "CHANGE FW\nVENDOR"
         } else if version_cmp > 0 {
-            "UPDATE FIRMWARE"
+            "UPDATE FW"
         } else if version_cmp == 0 {
             "REINSTALL FW"
         } else {

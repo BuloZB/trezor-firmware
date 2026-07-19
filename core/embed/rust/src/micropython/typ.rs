@@ -1,7 +1,5 @@
-use super::{
-    ffi,
-    obj::{Obj, ObjBase},
-};
+use super::ffi;
+use super::obj::{Obj, ObjBase};
 
 pub type Type = ffi::mp_obj_type_t;
 
@@ -25,7 +23,7 @@ impl Type {
         unsafe { Obj::from_ptr(self as *const _ as *mut _) }
     }
 
-    #[cfg(feature = "debug")]
+    #[cfg(any(feature = "debug", feature = "dbg_console"))]
     pub fn name(&self) -> &'static str {
         use super::qstr::Qstr;
 

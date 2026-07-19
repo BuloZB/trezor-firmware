@@ -308,6 +308,7 @@ STATIC int usage(char **argv) {
   printf(
       "usage: %s [<opts>] [-X <implopt>] [-c <command>] [<filename>]\n"
       "Options:\n"
+      "--emulator-properties : print basic emulator info and exit\n"
       "-v : verbose (trace various operations); can be multiple\n"
       "-O[N] : apply bytecode optimizations of level N\n"
       "\n"
@@ -440,7 +441,9 @@ reimport:
     exit(handle_uncaught_exception(nlr.ret_val) & 0xff);
   }
 
-  if (mp_obj_is_package(mod) && !subpkg_tried) {
+  mp_obj_t dest[2];
+  mp_load_method_maybe(mod, MP_QSTR___path__, dest);
+  if (dest[0] != MP_OBJ_NULL && !subpkg_tried) {
     subpkg_tried = true;
     vstr_t vstr;
     int len = strlen(modname);

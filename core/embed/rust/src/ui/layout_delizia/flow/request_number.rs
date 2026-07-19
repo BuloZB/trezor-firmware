@@ -1,25 +1,16 @@
-use crate::{
-    error,
-    strutil::TString,
-    translations::TR,
-    ui::{
-        flow::{
-            base::{Decision, DecisionBuilder as _},
-            FlowController, FlowMsg, SwipeFlow,
-        },
-        geometry::Direction,
-    },
-};
-
 use core::sync::atomic::{AtomicU16, Ordering};
 
-use super::super::{
-    component::{
-        Frame, Header, NumberInputDialog, NumberInputDialogMsg, SwipeContent, UpdatableMoreInfo,
-        VerticalMenu,
-    },
-    theme,
+use super::super::component::{
+    Frame, Header, NumberInputDialog, NumberInputDialogMsg, SwipeContent, UpdatableMoreInfo,
+    VerticalMenu,
 };
+use super::super::theme;
+use crate::error;
+use crate::strutil::TString;
+use crate::translations::TR;
+use crate::ui::flow::base::{Decision, DecisionBuilder as _};
+use crate::ui::flow::{FlowController, FlowMsg, SwipeFlow};
+use crate::ui::geometry::Direction;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum RequestNumber {
@@ -70,7 +61,7 @@ pub fn new_request_number(
     // wrap the closure for obtaining MoreInfo text and call it with NUM_DISPLAYED
     let info_closure = move || {
         let curr_number = NUM_DISPLAYED.load(Ordering::Relaxed);
-        info_closure(curr_number as u32)
+        info_closure(u32::from(curr_number))
     };
 
     let number_input_dialog = NumberInputDialog::new(

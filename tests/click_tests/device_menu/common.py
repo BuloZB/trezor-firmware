@@ -18,14 +18,12 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING, Callable
 
 from trezorlib.messages import BackupAvailability
-
-from ... import translations as TR
+from trezorlib.testing import translations as TR
 
 if TYPE_CHECKING:
     from trezorlib.debuglink import DebugLink
     from trezorlib.messages import Features
-
-    from ...device_handler import BackgroundDeviceHandler
+    from trezorlib.testing.device_handler import BackgroundDeviceHandler
 
 PIN4 = "1234"
 
@@ -61,14 +59,16 @@ def format_duration_ms(milliseconds: int) -> str:
     assert milliseconds >= 0
 
     unit_plurals = {
-        "millisecond": TR.plurals__lock_after_x_milliseconds,
-        "second": TR.plurals__lock_after_x_seconds,
-        "minute": TR.plurals__lock_after_x_minutes,
-        "hour": TR.plurals__lock_after_x_hours,
+        "millisecond": TR.plurals__milliseconds,
+        "second": TR.plurals__seconds,
+        "minute": TR.plurals__minutes,
+        "hour": TR.plurals__hours,
+        "day": TR.plurals__days,
     }
 
     # Pick appropriate unit and divisor
     units: tuple[tuple[str, int], ...] = (
+        (unit_plurals["day"], 24 * 60 * 60 * 1000),
         (unit_plurals["hour"], 60 * 60 * 1000),
         (unit_plurals["minute"], 60 * 1000),
         (unit_plurals["second"], 1000),

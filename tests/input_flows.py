@@ -22,17 +22,19 @@ from trezorlib.debuglink import DebugLink, DebugSession, LayoutContent, LayoutTy
 from trezorlib.debuglink import TrezorTestContext as Client
 from trezorlib.debuglink import multipage_content
 from trezorlib.exceptions import TrezorFailure
-
-from . import translations as TR
-from .common import (
+from trezorlib.testing import translations as TR
+from trezorlib.testing.common import (
     BRGeneratorType,
+    get_text_possible_pagination,
+    swipe_if_necessary,
+)
+
+from .common import (
     check_pin_backoff_time,
     click_info_button_bolt,
     click_info_button_delizia_eckhart,
     click_through,
-    get_text_possible_pagination,
     read_and_confirm_mnemonic,
-    swipe_if_necessary,
 )
 from .input_flows_helpers import (
     BackupFlow,
@@ -60,7 +62,6 @@ class InputFlowBase:
         self.layout_type = client.layout_type
 
     def get(self) -> Callable[[], BRGeneratorType]:
-        self.client.watch_layout(True)
 
         # There could be one common input flow for all models
         if hasattr(self, "input_flow_common"):
@@ -124,7 +125,7 @@ class InputFlowNewWipeCodeCancel(InputFlowBase):
         self.debug.synchronize_at("VerticalMenu")
         self.debug.button_actions.navigate_to_menu_item(0)
 
-        self.debug.read_layout().title == TR.wipe_code__cancel_setup
+        assert self.debug.read_layout().title() == TR.wipe_code__cancel_setup
         self.debug.swipe_up()
         self.debug.read_layout()
         self.debug.synchronize_at("PromptScreen")
@@ -138,7 +139,7 @@ class InputFlowNewWipeCodeCancel(InputFlowBase):
         self.debug.synchronize_at("VerticalMenu")
         self.debug.button_actions.navigate_to_menu_item(0)
 
-        self.debug.read_layout().title == TR.wipe_code__cancel_setup
+        assert TR.wipe_code__cancel_setup in self.debug.read_layout().text_content()
         self.debug.press_no()
 
 
@@ -768,9 +769,7 @@ class InputFlowShowMultisigXPUBs(InputFlowBase):
 
     def input_flow_delizia(self) -> BRGeneratorType:
         yield  # multisig address warning
-        self.debug.click(self.debug.screen_buttons.menu())
-        self.debug.synchronize_at("VerticalMenu")
-        self.debug.button_actions.navigate_to_menu_item(1)
+        self.debug.press_yes()
 
         yield  # show address
         layout = self.debug.read_layout()
@@ -820,9 +819,7 @@ class InputFlowShowMultisigXPUBs(InputFlowBase):
 
     def input_flow_eckhart(self) -> BRGeneratorType:
         yield  # multisig address warning
-        self.debug.click(self.debug.screen_buttons.menu())
-        self.debug.synchronize_at("VerticalMenu")
-        self.debug.button_actions.navigate_to_menu_item(1)
+        self.debug.press_yes()
 
         yield  # show address
         layout = self.debug.read_layout()
@@ -891,7 +888,7 @@ class InputFlowShowXpubQRCode(InputFlowBase):
         self.debug.click(self.debug.screen_buttons.menu())
         self.debug.press_no()
         self.debug.press_no()
-        for _ in range(br.pages - 1):
+        for _ in range((br.pages or 1) - 1):
             self.debug.swipe_up()
         self.debug.press_yes()
 
@@ -989,7 +986,7 @@ class InputFlowShowXpubQRCode(InputFlowBase):
 
         # In case of page overflow, paginate to the last page
         # The last page is the confirm page
-        if br.pages > 1:
+        if br.pages and br.pages > 1:
             for _ in range(br.pages - 1):
                 self.debug.click(self.debug.screen_buttons.ok())
 
@@ -1122,9 +1119,7 @@ def sign_tx_go_to_info_delizia(
     if multi_account:
         yield
         client.debug.read_layout()
-        client.debug.click(client.debug.screen_buttons.menu())
-        client.debug.synchronize_at("VerticalMenu")
-        client.debug.button_actions.navigate_to_menu_item(1)
+        client.debug.press_yes()
 
     yield  # confirm transaction
     client.debug.read_layout()
@@ -1164,9 +1159,7 @@ def sign_tx_go_to_info_eckhart(
     if multi_account:
         yield
         client.debug.read_layout()
-        client.debug.click(client.debug.screen_buttons.menu())
-        client.debug.synchronize_at("VerticalMenu")
-        client.debug.button_actions.navigate_to_menu_item(1)
+        client.debug.press_yes()
 
     yield  # confirm transaction
     client.debug.read_layout()
@@ -1794,51 +1787,54 @@ class InputFlowEthereumSignTxStaking(InputFlowBase):
         yield from self.ETH.confirm_tx_staking(info=True)
 
 
-def get_mnemonic(
-    debug: DebugLink,
-    confirm_success: bool = True,
-) -> Generator[None, "messages.ButtonRequest", str]:
+def get_mnemonic(debug: DebugLink) -> Generator[None, "messages.ButtonRequest", str]:
+    """Used for BIP39 or SLIP-39 1-of-1 backup."""
     # mnemonic phrases
-    mnemonic = yield from read_and_confirm_mnemonic(debug)
-
-    is_slip39 = len(mnemonic.split()) in (20, 33)
-    if debug.layout_type in (LayoutType.Bolt, LayoutType.Caesar) or is_slip39:
-        br = yield  # confirm recovery share check
-        assert br.code == B.Success
-        debug.press_yes()
-
-    if confirm_success:
-        br = yield
-        assert br.code == B.Success
-
-    debug.press_yes()
-
-    assert mnemonic is not None
+    [mnemonic] = yield from load_N_shares(debug, n=1)
     return mnemonic
 
 
 class InputFlowBip39Backup(InputFlowBase):
-    def __init__(self, client: Client, confirm_success: bool = True):
+    def __init__(
+        self,
+        client: Client,
+        method: messages.BackupMethod = messages.BackupMethod.Display,
+    ):
         super().__init__(client)
         self.mnemonic = None
-        self.confirm_success = confirm_success
+        self.method = method
 
     def input_flow_common(self) -> BRGeneratorType:
-        # 1. Backup intro
-        # 2. Backup warning
-        yield from click_through(self.debug, screens=2, code=B.ResetDevice)
-
         # mnemonic phrases and rest
-        self.mnemonic = yield from get_mnemonic(self.debug, self.confirm_success)
+        if self.method is messages.BackupMethod.Display:
+            # 1. Backup intro
+            # 2. Backup warning
+            yield from click_through(self.debug, screens=2, code=B.ResetDevice)
+            self.mnemonic = yield from get_mnemonic(self.debug)
+        elif self.method is messages.BackupMethod.N4W1:
+            assert (yield).name == "backup_write"
+            self.mnemonic = n4w1_handle_write(self.debug).decode()
+            br = yield
+            assert br.name == "success_backup"
+            assert br.code == B.Success
+            self.debug.press_yes()
+        else:
+            raise RuntimeError
 
 
 class InputFlowBip39ResetBackup(InputFlowBase):
-    def __init__(self, client: Client | DebugSession):
+    def __init__(
+        self,
+        client: Client | DebugSession,
+        method: messages.BackupMethod = messages.BackupMethod.Display,
+    ):
         super().__init__(client)
         self.mnemonic = None
+        self.method = method
 
     # NOTE: same as above, just two more YES
     def input_flow_bolt(self) -> BRGeneratorType:
+        assert self.method is messages.BackupMethod.Display
         # 1. Confirm Reset
         # 2. Backup your seed
         # 3. Backup intro
@@ -1849,6 +1845,7 @@ class InputFlowBip39ResetBackup(InputFlowBase):
         self.mnemonic = yield from get_mnemonic(self.debug)
 
     def input_flow_caesar(self) -> BRGeneratorType:
+        assert self.method is messages.BackupMethod.Display
         # 1. Confirm Reset
         # 2. Backup your seed
         # 3. Backup intro
@@ -1859,6 +1856,7 @@ class InputFlowBip39ResetBackup(InputFlowBase):
         self.mnemonic = yield from get_mnemonic(self.debug)
 
     def input_flow_delizia(self) -> BRGeneratorType:
+        assert self.method is messages.BackupMethod.Display
         # 1. Confirm Reset
         # 2. Wallet created
         # 3. Backup your seed
@@ -1870,15 +1868,31 @@ class InputFlowBip39ResetBackup(InputFlowBase):
         self.mnemonic = yield from get_mnemonic(self.debug)
 
     def input_flow_eckhart(self) -> BRGeneratorType:
-        # 1. Confirm Reset
-        # 2. Wallet created
-        # 3. Backup your seed
-        # 4. Backup intro
-        # 5. Confirm warning
-        yield from click_through(self.debug, screens=5, code=B.ResetDevice)
+        if self.method is messages.BackupMethod.Display:
+            # 1. Confirm Reset
+            # 2. Wallet created
+            # 3. Backup your seed
+            # 4. Backup intro
+            # 5. Confirm warning
+            yield from click_through(self.debug, screens=5, code=B.ResetDevice)
 
-        # mnemonic phrases and rest
-        self.mnemonic = yield from get_mnemonic(self.debug)
+            # mnemonic phrases and rest
+            self.mnemonic = yield from get_mnemonic(self.debug)
+        elif self.method is messages.BackupMethod.N4W1:
+            # 1. Confirm Reset
+            # 2. Wallet created
+            # 3. Backup your seed
+            yield from click_through(self.debug, screens=3, code=B.ResetDevice)
+            # 4. Backup using N4W1
+            assert (yield).name == "backup_write"
+            self.mnemonic = n4w1_handle_write(self.debug).decode()
+            # 5. Success
+            br = yield
+            assert br.name == "success_backup"
+            assert br.code == B.Success
+            self.debug.press_yes()
+        else:
+            raise RuntimeError
 
 
 class InputFlowBip39ResetPIN(InputFlowBase):
@@ -1974,14 +1988,27 @@ def load_N_shares(
             mnemonic = yield from read_and_confirm_mnemonic(debug)
             assert mnemonic is not None
             mnemonics.append(mnemonic)
-            br = yield  # Confirm continue to next
-            assert br.code == B.Success
-            debug.press_yes()
+
+            if n > 1 or debug.layout_type in (LayoutType.Bolt, LayoutType.Caesar):
+                expected_br_name = "success_share_confirm"
+                if debug.layout_type is LayoutType.Eckhart:
+                    expected_br_name = "success_recovery"
+
+                br = yield  # Confirm continue to next
+                assert br.code == B.Success
+                assert br.name == expected_br_name
+                debug.press_yes()
+
         elif method is messages.BackupMethod.N4W1:
             assert (yield).name == "backup_write"
             mnemonics.append(n4w1_handle_write(debug).decode())
         else:
             raise RuntimeError
+
+    br = yield
+    assert br.code == B.Success
+    assert br.name == "success_backup"
+    debug.press_yes()
 
     return mnemonics
 
@@ -2030,10 +2057,6 @@ class InputFlowSlip39BasicBackup(InputFlowBase):
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, 5)
 
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
-
     def input_flow_caesar(self) -> BRGeneratorType:
         assert self.method is messages.BackupMethod.Display
         if self.repeated:
@@ -2063,10 +2086,6 @@ class InputFlowSlip39BasicBackup(InputFlowBase):
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, 5)
 
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
-
     def input_flow_delizia(self) -> BRGeneratorType:
         assert self.method is messages.BackupMethod.Display
         if self.repeated:
@@ -2095,10 +2114,6 @@ class InputFlowSlip39BasicBackup(InputFlowBase):
 
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, 5)
-
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
 
     def input_flow_eckhart(self) -> BRGeneratorType:
         assert self.method in (
@@ -2136,10 +2151,6 @@ class InputFlowSlip39BasicBackup(InputFlowBase):
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, 5, self.method)
 
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
-
 
 class InputFlowSlip39BasicResetRecovery(InputFlowBase):
     def __init__(
@@ -2166,10 +2177,6 @@ class InputFlowSlip39BasicResetRecovery(InputFlowBase):
 
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, 5)
-
-        br = yield  # safety warning
-        assert br.code == B.Success
-        self.debug.press_yes()
 
     def input_flow_caesar(self) -> BRGeneratorType:
         assert self.method is messages.BackupMethod.Display
@@ -2199,10 +2206,6 @@ class InputFlowSlip39BasicResetRecovery(InputFlowBase):
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, 5)
 
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
-
     def input_flow_delizia(self) -> BRGeneratorType:
         assert self.method is messages.BackupMethod.Display
         # 1. Confirm Reset
@@ -2219,10 +2222,6 @@ class InputFlowSlip39BasicResetRecovery(InputFlowBase):
 
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, 5)
-
-        br = yield  # success screen
-        assert br.code == B.Success
-        self.debug.press_yes()
 
     def input_flow_eckhart(self) -> BRGeneratorType:
         num_screens = {
@@ -2244,21 +2243,23 @@ class InputFlowSlip39BasicResetRecovery(InputFlowBase):
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, 5, self.method)
 
-        br = yield  # success screen
-        assert br.code == B.Success
-        self.debug.press_yes()
-
 
 class InputFlowSlip39CustomBackup(InputFlowBase):
     def __init__(
-        self, client: Client | DebugSession, share_count: int, repeated: bool = False
+        self,
+        client: Client | DebugSession,
+        share_count: int,
+        repeated: bool = False,
+        backup_method: messages.BackupMethod = messages.BackupMethod.Display,
     ):
         super().__init__(client)
         self.mnemonics: list[str] = []
         self.share_count = share_count
         self.repeated = repeated
+        self.backup_method = backup_method
 
     def input_flow_bolt(self) -> BRGeneratorType:
+        assert self.backup_method is messages.BackupMethod.Display
         if self.repeated:
             yield
             self.debug.press_yes()
@@ -2275,12 +2276,9 @@ class InputFlowSlip39CustomBackup(InputFlowBase):
 
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, self.share_count)
-
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
 
     def input_flow_caesar(self) -> BRGeneratorType:
+        assert self.backup_method is messages.BackupMethod.Display
         if self.repeated:
             yield
             self.debug.press_yes()
@@ -2297,12 +2295,9 @@ class InputFlowSlip39CustomBackup(InputFlowBase):
 
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, self.share_count)
-
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
 
     def input_flow_delizia(self) -> BRGeneratorType:
+        assert self.backup_method is messages.BackupMethod.Display
         if self.repeated:
             yield
             self.debug.press_yes()
@@ -2319,59 +2314,75 @@ class InputFlowSlip39CustomBackup(InputFlowBase):
 
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(self.debug, self.share_count)
-
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
 
     def input_flow_eckhart(self) -> BRGeneratorType:
         if self.repeated:
             yield
             self.debug.press_yes()
 
-        if self.share_count > 1:
-            yield  # Checklist
-            self.debug.press_yes()
-        else:
-            yield  # Backup intro
-            self.debug.press_yes()
+        if self.backup_method is messages.BackupMethod.Display:
+            if self.share_count > 1:
+                yield  # Checklist
+                self.debug.press_yes()
+            else:
+                yield  # Backup intro
+                self.debug.press_yes()
 
-        yield  # Confirm show seeds
-        self.debug.press_yes()
+            yield  # Confirm show seeds
+            self.debug.press_yes()
+        elif self.backup_method is messages.BackupMethod.N4W1:
+            if self.share_count > 1:
+                assert (yield).name == "warning_shamir_backup"
+                self.debug.press_yes()
+        else:
+            raise RuntimeError
 
         # Mnemonic phrases
-        self.mnemonics = yield from load_N_shares(self.debug, self.share_count)
-
-        br = yield  # Confirm backup
-        assert br.code == B.Success
-        self.debug.press_yes()
+        self.mnemonics = yield from load_N_shares(
+            self.debug, self.share_count, self.backup_method
+        )
 
 
 def load_5_groups_5_shares(
     debug: DebugLink,
+    backup_method: messages.BackupMethod = messages.BackupMethod.Display,
 ) -> Generator[None, "messages.ButtonRequest", list[str]]:
     mnemonics: list[str] = []
 
     for _g in range(5):
         for _s in range(5):
-            # Phrase screen
-            mnemonic = yield from read_and_confirm_mnemonic(debug)
-            assert mnemonic is not None
+            if backup_method is messages.BackupMethod.Display:
+                # Phrase screen
+                mnemonic = yield from read_and_confirm_mnemonic(debug)
+                assert mnemonic is not None
+            elif backup_method is messages.BackupMethod.N4W1:
+                assert (yield).name == "backup_write"
+                mnemonic = n4w1_handle_write(debug).decode()
+            else:
+                raise RuntimeError
             mnemonics.append(mnemonic)
-            # Confirm continue to next
-            yield from swipe_if_necessary(debug, B.Success)
-            debug.press_yes()
+            if backup_method is messages.BackupMethod.Display:
+                # Confirm continue to next
+                yield from swipe_if_necessary(debug, B.Success)
+                debug.press_yes()
 
     return mnemonics
 
 
 class InputFlowSlip39AdvancedBackup(InputFlowBase):
-    def __init__(self, client: Client | DebugSession, click_info: bool):
+    def __init__(
+        self,
+        client: Client | DebugSession,
+        click_info: bool,
+        backup_method: messages.BackupMethod = messages.BackupMethod.Display,
+    ):
         super().__init__(client)
         self.mnemonics: list[str] = []
         self.click_info = click_info
+        self.backup_method = backup_method
 
     def input_flow_bolt(self) -> BRGeneratorType:
+        assert self.backup_method is messages.BackupMethod.Display
         assert (yield).name == "backup_intro"
         self.debug.press_yes()
         assert (yield).name == "slip39_checklist"
@@ -2412,6 +2423,7 @@ class InputFlowSlip39AdvancedBackup(InputFlowBase):
         self.debug.press_yes()
 
     def input_flow_caesar(self) -> BRGeneratorType:
+        assert self.backup_method is messages.BackupMethod.Display
         yield  # 1. Backup intro
         self.debug.press_yes()
         yield  # 2. Checklist
@@ -2437,13 +2449,16 @@ class InputFlowSlip39AdvancedBackup(InputFlowBase):
         self.debug.press_yes()
 
         # Mnemonic phrases - show & confirm shares for all groups
-        self.mnemonics = yield from load_5_groups_5_shares(self.debug)
+        self.mnemonics = yield from load_5_groups_5_shares(
+            self.debug, self.backup_method
+        )
 
         br = yield  # Confirm backup
         assert br.code == B.Success
         self.debug.press_yes()
 
     def input_flow_delizia(self) -> BRGeneratorType:
+        assert self.backup_method is messages.BackupMethod.Display
         assert (yield).name == "backup_intro"
         self.debug.swipe_up()
         assert (yield).name == "slip39_checklist"
@@ -2480,8 +2495,9 @@ class InputFlowSlip39AdvancedBackup(InputFlowBase):
         self.debug.press_yes()
 
     def input_flow_eckhart(self) -> BRGeneratorType:
-        assert (yield).name == "backup_intro"
-        self.debug.press_yes()
+        if self.backup_method is messages.BackupMethod.Display:
+            assert (yield).name == "backup_intro"
+            self.debug.press_yes()
         assert (yield).name == "slip39_checklist"
         self.debug.press_yes()
         assert (yield).name == "slip39_groups"
@@ -2505,11 +2521,14 @@ class InputFlowSlip39AdvancedBackup(InputFlowBase):
             if self.click_info:
                 click_info_button_delizia_eckhart(self.debug)
             self.debug.press_yes()
-        assert (yield).name == "backup_warning"
-        self.debug.press_yes()
+        if self.backup_method is messages.BackupMethod.Display:
+            assert (yield).name == "backup_warning"
+            self.debug.press_yes()
 
         # Mnemonic phrases - show & confirm shares for all groups
-        self.mnemonics = yield from load_5_groups_5_shares(self.debug)
+        self.mnemonics = yield from load_5_groups_5_shares(
+            self.debug, self.backup_method
+        )
 
         br = yield  # Confirm backup
         assert br.code == B.Success
@@ -2517,12 +2536,19 @@ class InputFlowSlip39AdvancedBackup(InputFlowBase):
 
 
 class InputFlowSlip39AdvancedResetRecovery(InputFlowBase):
-    def __init__(self, client: Client | DebugSession, click_info: bool):
+    def __init__(
+        self,
+        client: Client | DebugSession,
+        click_info: bool,
+        method: messages.BackupMethod,
+    ):
         super().__init__(client)
         self.mnemonics: list[str] = []
         self.click_info = click_info
+        self.method = method
 
     def input_flow_bolt(self) -> BRGeneratorType:
+        assert self.method is messages.BackupMethod.Display
         # 1. Confirm Reset
         # 2. Backup your seed
         # 3. Backup intro
@@ -2545,6 +2571,7 @@ class InputFlowSlip39AdvancedResetRecovery(InputFlowBase):
         self.debug.press_yes()
 
     def input_flow_caesar(self) -> BRGeneratorType:
+        assert self.method is messages.BackupMethod.Display
         yield  # Wallet backup
         self.debug.press_yes()
         yield  # Wallet creation
@@ -2581,6 +2608,7 @@ class InputFlowSlip39AdvancedResetRecovery(InputFlowBase):
         self.debug.press_yes()
 
     def input_flow_delizia(self) -> BRGeneratorType:
+        assert self.method is messages.BackupMethod.Display
         # 1. Confirm Reset
         # 2. Wallet Created
         # 3. Prompt Backup
@@ -2608,7 +2636,7 @@ class InputFlowSlip39AdvancedResetRecovery(InputFlowBase):
         # 2. Wallet Created
         # 3. Prompt Backup
         # 4. Backup intro
-        # 5. Confirm warning
+        # 5. Confirm warning (only for BackupMethod.Display)
         # 6. shares info
         # 7. Set & Confirm number of groups
         # 8. threshold info
@@ -2616,11 +2644,15 @@ class InputFlowSlip39AdvancedResetRecovery(InputFlowBase):
         # 10-19: for each of 5 groups:
         #   1. Set & Confirm number of shares
         #   2. Set & confirm share threshold value
-        # 20. Confirm show seeds
-        yield from click_through(self.debug, screens=20, code=B.ResetDevice)
+        # 20. Confirm show seeds (only for BackupMethod.Display)
+        screens = {
+            messages.BackupMethod.Display: 20,
+            messages.BackupMethod.N4W1: 18,
+        }[self.method]
+        yield from click_through(self.debug, screens=screens, code=B.ResetDevice)
 
         # Mnemonic phrases - show & confirm shares for all groups
-        self.mnemonics = yield from load_5_groups_5_shares(self.debug)
+        self.mnemonics = yield from load_5_groups_5_shares(self.debug, self.method)
 
         br = yield  # safety warning
         assert br.code == B.Success
@@ -2664,18 +2696,24 @@ class InputFlowBip39RecoveryDryRunInvalid(InputFlowBase):
 
 class InputFlowBip39Recovery(InputFlowBase):
     def __init__(
-        self, client: Client | DebugSession, mnemonic: list[str], pin: str | None = None
+        self,
+        client: Client | DebugSession,
+        mnemonic: list[str],
+        pin: str | None = None,
+        method: messages.BackupMethod = messages.BackupMethod.Display,
     ):
         super().__init__(client)
         self.mnemonic = mnemonic
         self.pin = pin
+        self.method = method
 
     def input_flow_common(self) -> BRGeneratorType:
         yield from self.REC.confirm_recovery()
         if self.pin is not None:
             yield from self.PIN.setup_new_pin(self.pin)
-        yield from self.REC.setup_bip39_recovery(len(self.mnemonic))
-        yield from self.REC.input_mnemonic(self.mnemonic)
+        if self.method is messages.BackupMethod.Display:
+            yield from self.REC.setup_bip39_recovery(len(self.mnemonic))
+        yield from self.REC.input_mnemonic(self.mnemonic, self.method)
         yield from self.REC.success_wallet_recovered()
 
 
@@ -2700,18 +2738,24 @@ class InputFlowSlip39AdvancedRecoveryDryRun(InputFlowBase):
 
 class InputFlowSlip39AdvancedRecovery(InputFlowBase):
     def __init__(
-        self, client: Client | DebugSession, shares: list[str], click_info: bool
+        self,
+        client: Client | DebugSession,
+        shares: list[str],
+        click_info: bool,
+        method: messages.BackupMethod = messages.BackupMethod.Display,
     ):
         super().__init__(client)
         self.shares = shares
         self.click_info = click_info
         self.word_count = len(shares[0].split(" "))
+        self.method = method
 
     def input_flow_common(self) -> BRGeneratorType:
         yield from self.REC.confirm_recovery()
-        yield from self.REC.setup_slip39_recovery(self.word_count)
+        if self.method is messages.BackupMethod.Display:
+            yield from self.REC.setup_slip39_recovery(self.word_count)
         yield from self.REC.input_all_slip39_shares(
-            self.shares, has_groups=True, click_info=self.click_info
+            self.shares, has_groups=True, click_info=self.click_info, method=self.method
         )
         yield from self.REC.success_wallet_recovered()
 

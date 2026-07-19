@@ -1,12 +1,11 @@
-use crate::ui::{
-    component::{base::ComponentExt, Component, Event, EventCtx, Pad, PageMsg, Paginate},
-    display::{self, Color},
-    geometry::{Axis, Insets, Rect},
-    shape::Renderer,
-};
+use core::cell::Cell;
 
 use super::{theme, ScrollBar, Swipe, SwipeDirection};
-use core::cell::Cell;
+use crate::ui::component::base::ComponentExt;
+use crate::ui::component::{Component, Event, EventCtx, Pad, PageMsg, Paginate};
+use crate::ui::display::{self, Color};
+use crate::ui::geometry::{Axis, Insets, Rect};
+use crate::ui::shape::Renderer;
 
 const SCROLLBAR_HEIGHT: i16 = 18;
 const SCROLLBAR_BORDER: i16 = 4;
@@ -160,8 +159,8 @@ where
 {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("SimplePage");
-        t.int("active_page", self.scrollbar.pager().current() as i64);
-        t.int("page_count", self.scrollbar.pager().total() as i64);
+        t.int("active_page", i64::from(self.scrollbar.pager().current()));
+        t.int("page_count", i64::from(self.scrollbar.pager().total()));
         t.child("content", &self.content);
     }
 }

@@ -22,11 +22,10 @@ async def request_word_count(recovery_type: RecoveryType) -> int:
     # May raise `RecoveryAborted`
     await homescreen_dialog(TR.buttons__continue, TR.recovery__num_of_words)
 
-    count = await interact(
-        trezorui_api.select_word_count(recovery_type=recovery_type),
-        "recovery_word_count",
-        ButtonRequestType.MnemonicWordCount,
-    )
+    with trezorui_api.select_word_count(recovery_type=recovery_type) as layout:
+        count = await interact(
+            layout, "recovery_word_count", ButtonRequestType.MnemonicWordCount
+        )
     # It can be returning a string (for example for __debug__ in tests)
     assert isinstance(count, (int, str))
     return int(count)
@@ -67,21 +66,16 @@ async def show_remaining_shares(
     raise NotImplementedError
 
 
-def show_group_share_success(
-    share_index: int, group_index: int
-) -> Awaitable[ui.UiResult]:
-    return interact(
-        trezorui_api.show_group_share_success(
-            lines=[
-                TR.recovery__you_have_entered,
-                TR.recovery__share_num_template.format(share_index + 1),
-                TR.words__from,
-                TR.recovery__group_num_template.format(group_index + 1),
-            ],
-        ),
-        "share_success",
-        ButtonRequestType.Other,
-    )
+async def show_group_share_success(share_index: int, group_index: int) -> ui.UiResult:
+    with trezorui_api.show_group_share_success(
+        lines=[
+            TR.recovery__you_have_entered,
+            TR.recovery__share_num_template.format(share_index + 1),
+            TR.words__from,
+            TR.recovery__group_num_template.format(group_index + 1),
+        ],
+    ) as layout:
+        return await interact(layout, "share_success", ButtonRequestType.Other)
 
 
 async def _confirm_abort(dry_run: bool = False) -> None:
@@ -129,30 +123,30 @@ async def continue_recovery(
     if subtext:
         text += f"\n\n{subtext}"
 
-    homepage = trezorui_api.continue_recovery_homepage(
+    with trezorui_api.continue_recovery_homepage(
         text=text,
         subtext=None,
         button=button_label,
         recovery_type=recovery_type,
         show_instructions=show_instructions,
         remaining_shares=None,
-    )
-    while True:
-        result = await interact(
-            homepage,
-            "recovery",
-            ButtonRequestType.RecoveryHomepage,
-            raise_on_cancel=None,
-        )
-        if result is trezorui_api.CONFIRMED:
-            return True
+    ) as homepage:
+        while True:
+            result = await interact(
+                homepage,
+                "recovery",
+                ButtonRequestType.RecoveryHomepage,
+                raise_on_cancel=None,
+            )
+            if result is trezorui_api.CONFIRMED:
+                return True
 
-        try:
-            await _confirm_abort(recovery_type != RecoveryType.NormalRecovery)
-        except ActionCancelled:
-            pass
-        else:
-            return False
+            try:
+                await _confirm_abort(recovery_type != RecoveryType.NormalRecovery)
+            except ActionCancelled:
+                pass
+            else:
+                return False
 
 
 async def show_invalid_mnemonic(word_count: int) -> None:

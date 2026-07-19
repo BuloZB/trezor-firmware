@@ -21,7 +21,7 @@ from itertools import product
 
 import pytest
 
-from trezorlib import device, ethereum, exceptions, messages, models
+from trezorlib import ethereum, exceptions, messages, models
 from trezorlib.debuglink import DebugSession as Session
 from trezorlib.debuglink import message_filters
 from trezorlib.exceptions import TrezorFailure
@@ -77,11 +77,6 @@ def test_signtx(session: Session, chunkify: bool, parameters: dict, result: dict
         else None
     )
 
-    if not parameters.get("safety_checks", True):
-        device.apply_settings(
-            session, safety_checks=messages.SafetyCheckLevel.PromptTemporarily
-        )
-
     _do_test_signtx(session, parameters, result, input_flow, chunkify=chunkify)
 
 
@@ -94,7 +89,6 @@ def _do_test_signtx(
 ):
     with session.test_ctx as client:
         if input_flow:
-            client.watch_layout()
             client.set_input_flow(input_flow)
         sig_v, sig_r, sig_s = ethereum.sign_tx(
             session,
@@ -531,14 +525,12 @@ def test_signtx_data_pagination(session: Session, scroll: bool, size: int):
     # test pagination
     flow = InputFlowEthereumSignTxData(session, scroll=scroll, cancel=False)
     with session.test_ctx as client:
-        client.watch_layout()
         client.set_input_flow(flow.get())
         _sign_tx_call()
 
     # test cancellation
     flow = InputFlowEthereumSignTxData(session, scroll=scroll, cancel=True)
     with client, pytest.raises(exceptions.Cancelled):
-        client.watch_layout()
         client.set_input_flow(flow.get())
         _sign_tx_call()
 
@@ -561,11 +553,6 @@ def test_signtx_staking(
     "ethereum/sign_tx_error.json",
 )
 def test_signtx_error(session: Session, parameters: dict, result: dict):
-    if not parameters.get("safety_checks", True):
-        device.apply_settings(
-            session, safety_checks=messages.SafetyCheckLevel.PromptTemporarily
-        )
-
     # result not needed
     with pytest.raises(TrezorFailure, match=r"DataError"):
         ethereum.sign_tx(

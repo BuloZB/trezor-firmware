@@ -2,14 +2,12 @@ use core::slice;
 
 use heapless::Vec;
 
-use super::{
-    ffi,
-    iter::IterBuf,
-    map::{Map, MapElem},
-    obj::Obj,
-    qstr::Qstr,
-    runtime::{catch_exception, raise_exception},
-};
+use super::ffi;
+use super::iter::IterBuf;
+use super::map::{Map, MapElem};
+use super::obj::Obj;
+use super::qstr::Qstr;
+use super::runtime::{catch_exception, raise_exception};
 use crate::error::{value_error, Error};
 
 /// Perform a call and convert errors into a raised MicroPython exception.
@@ -152,5 +150,16 @@ where
 pub fn modulo_format(format: Obj, args: &[Obj]) -> Result<Obj, Error> {
     catch_exception(|| unsafe {
         ffi::str_modulo_format(format, args.len(), args.as_ptr(), Obj::const_none())
+    })
+}
+
+/// Return `obj[offset : offset + len]`.
+pub fn get_slice(obj: Obj, offset: u16, len: u16) -> Result<Obj, Error> {
+    let start = Obj::small_int(offset);
+    let stop = Obj::small_int(offset.checked_add(len).ok_or(Error::OutOfRange)?);
+    let step = Obj::small_int(1);
+    catch_exception(|| unsafe {
+        let slice_obj = ffi::mp_obj_new_slice(start, stop, step);
+        ffi::mp_obj_subscr(obj, slice_obj, Obj::const_sentinel())
     })
 }

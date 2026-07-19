@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from storage.cache_common import InvalidSessionError
 from trezor import log, loop, protobuf, utils, workflow
-from trezor.enums import FailureType
+from trezor.enums import FailureType, MessageType
 from trezor.messages import Failure
 
 from .context import UnexpectedMessageException, with_context
@@ -70,11 +70,10 @@ async def handle_single_message(ctx: Context, msg: Message) -> bool:
         except Exception:
             msg_type = f"{msg.type} - unknown message type"
         if utils.USE_THP:
-            cid = utils.hexlify_if_bytes(ctx.channel_id)
             log.info(
                 __name__,
-                "(cid: %s) received message: %s",
-                cid,
+                "(cid: %04x) received message: %s",
+                ctx.channel_id,
                 msg_type,
                 iface=ctx.iface,
             )
@@ -179,7 +178,9 @@ async def handle_single_message(ctx: Context, msg: Message) -> bool:
     return msg.type in AVOID_RESTARTING_FOR
 
 
-AVOID_RESTARTING_FOR: Container[int] = ()
+# Don't restart MicroPython event loop, to lower device interaction latency.
+# Allows keeping T3W1 device menu open when `GetFeatures` is received (#6211).
+AVOID_RESTARTING_FOR: Container[int] = (MessageType.GetFeatures,)
 
 
 def failure(exc: BaseException) -> Failure:

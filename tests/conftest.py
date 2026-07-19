@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 import typing as t
 from dataclasses import asdict, dataclass
 from enum import IntEnum
@@ -30,6 +31,7 @@ from _pytest.reports import TestReport
 
 from trezorlib import client as client_module
 from trezorlib import debuglink, log, messages, models
+from trezorlib._internal.emulator import TropicModel
 from trezorlib.debuglink import TrezorTestContext
 from trezorlib.device import apply_settings
 from trezorlib.transport import enumerate_devices, get_transport
@@ -39,9 +41,17 @@ from trezorlib.transport.ble import BleTransport
 # so that we see details of failed asserts from this module
 pytest.register_assert_rewrite("tests.common")
 
-from . import translations, ui_tests
-from .device_handler import BackgroundDeviceHandler
-from .emulators import EmulatorWrapper
+from trezorlib.testing import translations
+from trezorlib.testing.device_handler import BackgroundDeviceHandler
+
+from . import ui_tests
+from .emulators import (
+    TROPIC_MODEL_CONFIGFILE,
+    EmulatorWrapper,
+    delete_profile,
+    get_logfile,
+    get_tropic_model_port,
+)
 
 if t.TYPE_CHECKING:
     from _pytest.config import Config
@@ -77,10 +87,57 @@ def _emulator_wrapper_main_args() -> list[str]:
         return ["-m", "main"]
 
 
+def _get_worker_id(request: pytest.FixtureRequest) -> int:
+    worker_id = xdist.get_xdist_worker_id(request)
+    if worker_id == "master":
+        return 0
+    assert worker_id.startswith("gw")
+    return 1 + int(worker_id[2:])
+
+
+@pytest.fixture(scope="session")
+def tropic_model_port(request: pytest.FixtureRequest) -> t.Iterator[int | None]:
+    """Fixture that starts Tropic01 model and returns the TCP port it's running on.
+    It returns None if the currently tested emulator does not need it."""
+    worker_id = _get_worker_id(request)
+
+    emulator_wrapper = EmulatorWrapper(
+        request.session.config.getoption("model") or "core"
+    )
+    if not emulator_wrapper.executable_is_tropic_capable():
+        LOG.debug(f"Not starting tropic model (worker {worker_id})")
+        yield None
+        return
+
+    logfile = get_logfile(f"trezor-tropic-model-{worker_id}.log")
+    port = get_tropic_model_port(worker_id)
+
+    with tempfile.TemporaryDirectory(
+        prefix="trezor-tropic-model-", delete=delete_profile()
+    ) as temp_dir:
+        LOG.debug(
+            f"Tropic model workdir: {temp_dir} (delete: {delete_profile()}), port: {port}, log: {logfile}"
+        )
+        with TropicModel(
+            profile_dir=temp_dir,
+            configfile=TROPIC_MODEL_CONFIGFILE,
+            port=port,
+            logfile=logfile,
+        ) as tropic_model:
+            tropic_model.start()
+            yield tropic_model.port
+
+
 @pytest.fixture
-def core_emulator(request: pytest.FixtureRequest) -> t.Iterator[Emulator]:
+def core_emulator(
+    tropic_model_port: int | None, request: pytest.FixtureRequest
+) -> t.Iterator[Emulator]:
     """Fixture returning default core emulator with possibility of screen recording."""
-    with EmulatorWrapper("core", main_args=_emulator_wrapper_main_args()) as emu:
+    with EmulatorWrapper(
+        "core",
+        main_args=_emulator_wrapper_main_args(),
+        tropic_model_port=tropic_model_port,
+    ) as emu:
         # Modifying emu.client to add screen recording (when --ui=test is used)
         _check_protocol(request, emu.client)
         with ui_tests.screen_recording(emu.client, request, lambda: emu.client) as _:
@@ -88,7 +145,9 @@ def core_emulator(request: pytest.FixtureRequest) -> t.Iterator[Emulator]:
 
 
 @pytest.fixture(scope="session")
-def emulator(request: pytest.FixtureRequest) -> t.Generator["Emulator", None, None]:
+def emulator(
+    tropic_model_port: int | None, request: pytest.FixtureRequest
+) -> t.Generator["Emulator", None, None]:
     """Fixture for getting emulator connection in case tests should operate it on their own.
 
     Is responsible for starting it at the start of the session and stopping
@@ -117,17 +176,13 @@ def emulator(request: pytest.FixtureRequest) -> t.Generator["Emulator", None, No
             "Legacy emulator is not supported until it can be run on arbitrary ports."
         )
 
-    worker_id = xdist.get_xdist_worker_id(request)
-    assert worker_id.startswith("gw")
-    worker_id = int(worker_id[2:])
-
     with EmulatorWrapper(
         model,
-        worker_id=worker_id,
+        worker_id=_get_worker_id(request),
         headless=True,
         auto_interact=not interact,
         main_args=_emulator_wrapper_main_args(),
-        launch_tropic_model=True,
+        tropic_model_port=tropic_model_port,
     ) as emu:
         yield emu
 
@@ -224,7 +279,7 @@ class ModelsFilter:
 
         if isinstance(marker_list[0], models.TrezorModel):
             # raw list of TrezorModels
-            return set(marker_list)  # type: ignore [incompatible with return type]
+            return set(marker_list)  # type: ignore [is not assignable to return type]
 
         if len(marker_list) == 1:
             # @pytest.mark.models("t2t1,t2b1") -> ("t2t1,t2b1",) -> "t2t1,t2b1"
@@ -331,6 +386,7 @@ def _prepared_test_ctx(
 
     @pytest.mark.experimental
     """
+    # Early exit, if the test cannot be run:
     models_filter = ModelsFilter(request.node)
     if _raw_test_ctx.model not in models_filter:
         pytest.skip(f"Skipping test for model {_raw_test_ctx.model.internal_name}")
@@ -341,6 +397,12 @@ def _prepared_test_ctx(
     is_btc_only = messages.Capability.Bitcoin_like not in _raw_test_ctx.capabilities
     if request.node.get_closest_marker("altcoin") and is_btc_only:
         pytest.skip("Skipping altcoin test")
+
+    if (
+        request.node.get_closest_marker("xfail_if_no_optiga")
+        and not _raw_test_ctx.has_optiga
+    ):
+        pytest.xfail("Optiga is not available on this device.")
 
     _check_protocol(request, _raw_test_ctx)
 
@@ -354,12 +416,15 @@ def _prepared_test_ctx(
 
     fail_on_gc_leak = not request.config.getoption("ignore_gc_leak")
 
+    # First, make sure the device is responsive:
     _raw_test_ctx.reset_debug_features()
     try:
         _raw_test_ctx.sync_responses()
     except Exception:
-        request.session.shouldstop = "Failed to communicate with Trezor"
-        pytest.fail("Failed to communicate with Trezor")
+        msg = "Failed to communicate with Trezor"
+        LOG.exception(msg)
+        request.session.shouldstop = msg
+        pytest.fail(msg)
 
     # Use DebugLink to wipe (since THP channel requires unlocked device)
     _raw_test_ctx.wipe_device()
@@ -460,7 +525,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: pytest.ExitCode) -
     if test_ui and _is_main_runner(session):
         session.exitstatus = ui_tests.sessionfinish(
             exitstatus,
-            test_ui,  # type: ignore
+            test_ui,
             bool(session.config.getoption("ui_check_missing")),
             bool(session.config.getoption("do_master_diff")),
         )
@@ -476,7 +541,7 @@ def pytest_terminal_summary(
     if ui_option:
         ui_tests.terminal_summary(
             terminalreporter.write_line,
-            ui_option,  # type: ignore
+            ui_option,
             bool(config.getoption("ui_check_missing")),
             exitstatus,
         )
@@ -569,11 +634,18 @@ def pytest_configure(config: "Config") -> None:
     verbosity = config.getoption("verbose")
     if verbosity:
         log.enable_debug_output(verbosity)
+        handler = logging.StreamHandler()
 
         verbose_log_file = config.getoption("verbose_log_file")
         if verbose_log_file:
             handler = logging.FileHandler(verbose_log_file)
             log.enable_debug_output(verbosity, handler)
+
+        # enable logging for test cases and fixtures
+        logger = logging.getLogger(__name__.rsplit(".", 1)[0])
+        handler.setFormatter(log.PrettyProtobufFormatter())
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
 
     idval_orig = IdMaker._idval_from_value
 
@@ -602,7 +674,7 @@ def pytest_runtest_makereport(item: pytest.Item, call) -> t.Generator:
     # The device_handler fixture uses this as 'request.node.rep_call.passed' attribute,
     # in order to raise error only if the test passed.
     outcome = yield
-    rep = outcome.get_result()
+    rep = outcome.get_result()  # type: ignore [Cannot access attribute]
     setattr(item, f"rep_{rep.when}", rep)
 
 
@@ -635,7 +707,7 @@ def device_handler(
 
     # if test finished, make sure all background tasks are done
     finalized_ok = device_handler.check_finalize()
-    if test_res and not finalized_ok:  # type: ignore [rep_call must exist]
+    if test_res and not finalized_ok:
         raise RuntimeError("Test did not check result of background task")
 
 
@@ -661,6 +733,6 @@ def backup_method(request, _raw_test_ctx: TrezorTestContext) -> messages.BackupM
     method: messages.BackupMethod = request.param
     if (capability := REQUIRED_CAPABILITY.get(method)) is not None:
         if capability not in _raw_test_ctx.capabilities:
-            pytest.skip(f"Missing {capability}")
+            pytest.skip(f"Missing {capability.name}")
 
     return method

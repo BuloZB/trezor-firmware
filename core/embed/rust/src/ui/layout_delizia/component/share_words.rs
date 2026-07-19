@@ -1,21 +1,17 @@
-use crate::{
-    strutil::TString,
-    translations::TR,
-    ui::{
-        component::{
-            base::AttachType, paginated::Paginate, text::TextStyle, Component, Event, EventCtx,
-            Never,
-        },
-        event::SwipeEvent,
-        geometry::{Alignment, Alignment2D, Direction, Insets, Offset, Rect},
-        shape::{self, Renderer},
-        util::Pager,
-    },
-};
-
 use heapless::Vec;
 
-use super::{super::component::swipe_content::SwipeAttachAnimation, theme};
+use super::super::component::swipe_content::SwipeAttachAnimation;
+use super::theme;
+use crate::strutil::TString;
+use crate::translations::TR;
+use crate::ui::component::base::AttachType;
+use crate::ui::component::paginated::Paginate;
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{Component, Event, EventCtx, Never};
+use crate::ui::event::SwipeEvent;
+use crate::ui::geometry::{Alignment, Alignment2D, Direction, Insets, Offset, Rect};
+use crate::ui::shape::{self, Renderer};
+use crate::ui::util::Pager;
 
 const MAX_WORDS: usize = 33; // super-shamir has 33 words, all other have less
 
@@ -217,7 +213,7 @@ impl<'a> Component for ShareWords<'a> {
             target.in_clip(self.area_word, &|target| {
                 let bounds = target.viewport().clip;
                 let full_offset = dir.as_offset(bounds.size());
-                let current_offset = full_offset * (self.progress as f32 / 1000.0);
+                let current_offset = full_offset * (f32::from(self.progress) / 1000.0);
 
                 target.with_origin(current_offset, &|target| {
                     self.render_word(self.page_index, target, target.viewport().clip)

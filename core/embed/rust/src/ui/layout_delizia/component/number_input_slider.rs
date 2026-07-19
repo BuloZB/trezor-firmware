@@ -1,14 +1,11 @@
 use super::theme;
-use crate::{
-    strutil::ShortString,
-    ui::{
-        component::{paginated::SinglePage, Component, Event, EventCtx},
-        constant::screen,
-        event::TouchEvent,
-        geometry::{Alignment, Alignment2D, Insets, Offset, Point, Rect},
-        shape::{self, Renderer},
-    },
-};
+use crate::strutil::ShortString;
+use crate::ui::component::paginated::SinglePage;
+use crate::ui::component::{Component, Event, EventCtx};
+use crate::ui::constant::screen;
+use crate::ui::event::TouchEvent;
+use crate::ui::geometry::{Alignment, Alignment2D, Insets, Offset, Point, Rect};
+use crate::ui::shape::{self, Renderer};
 
 pub enum NumberInputSliderDialogMsg {
     Changed(u16),
@@ -217,6 +214,6 @@ impl Component for NumberInputSlider {
 impl crate::trace::Trace for NumberInputSlider {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("NumberInputSlider");
-        t.int("value", self.value as i64);
+        t.int("value", i64::from(self.value));
     }
 }

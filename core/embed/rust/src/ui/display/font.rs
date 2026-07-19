@@ -1,16 +1,15 @@
+use core::num::Saturating;
+
 #[cfg(feature = "translations")]
 use spin::RwLockReadGuard;
-
-use crate::ui::{
-    constant,
-    geometry::Offset,
-    shape::{Bitmap, BitmapFormat},
-};
 
 #[cfg(feature = "translations")]
 use crate::translations::flash;
 #[cfg(feature = "translations")]
 use crate::translations::Translations;
+use crate::ui::constant;
+use crate::ui::geometry::Offset;
+use crate::ui::shape::{Bitmap, BitmapFormat};
 
 #[cfg(feature = "ui_font_kerning")]
 /// Two-level kerning lookup table.
@@ -90,8 +89,8 @@ impl<'a> Glyph<'a> {
     /// - 4: y-bearing
     /// - 5...: bitmap data, packed according to FONT_BPP (bits per pixel)
     pub fn load(data: &'a [u8]) -> Self {
-        let width = data[0] as i16;
-        let height = data[1] as i16;
+        let width = i16::from(data[0]);
+        let height = i16::from(data[1]);
 
         let size = calculate_glyph_size(data);
         // This should check for equality but due to a previous bug in font generator,
@@ -100,9 +99,9 @@ impl<'a> Glyph<'a> {
         Glyph {
             width,
             height,
-            adv: data[2] as i16,
-            bearing_x: data[3] as i16,
-            bearing_y: data[4] as i16,
+            adv: i16::from(data[2]),
+            bearing_x: i16::from(data[3]),
+            bearing_y: i16::from(data[4]),
             data: &data[5..],
         }
     }
@@ -225,8 +224,8 @@ impl GlyphData {
 }
 
 fn calculate_glyph_size(header: &[u8]) -> usize {
-    let width = header[0] as i16;
-    let height = header[1] as i16;
+    let width = i16::from(header[0]);
+    let height = i16::from(header[1]);
 
     let data_bytes = match constant::FONT_BPP {
         1 => (width * height + 7) / 8, // packed bits
@@ -242,7 +241,9 @@ fn calculate_glyph_size(header: &[u8]) -> usize {
 impl FontInfo {
     /// Supports UTF8 characters
     pub fn text_width(&'static self, text: &str) -> i16 {
-        let mut width = 0;
+        // Really long text makes width overflow into negative values.
+        // It's better to return i16::MAX in that case.
+        let mut width = Saturating(0);
         let mut prev_char: Option<char> = None;
 
         for c in text.chars() {
@@ -250,7 +251,7 @@ impl FontInfo {
             width += self.char_width(c);
             prev_char = Some(c);
         }
-        width
+        width.0
     }
 
     /// Width of the text that is visible.

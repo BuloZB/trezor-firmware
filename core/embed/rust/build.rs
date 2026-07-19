@@ -1,7 +1,7 @@
+use std::env;
 #[cfg(all(feature = "test", not(feature = "with_new_crates")))]
 use std::ffi::OsStr;
-use std::{env, path::PathBuf};
-
+use std::path::PathBuf;
 #[cfg(not(feature = "with_new_crates"))]
 use std::process::Command;
 
@@ -331,6 +331,8 @@ fn generate_micropython_bindings() {
         .allowlist_function("trezor_obj_get_ll_checked")
         .allowlist_function("trezor_obj_str_from_rom_text")
         // buffer
+        .allowlist_function("mp_obj_new_slice")
+        .allowlist_function("mp_obj_subscr")
         .allowlist_function("mp_get_buffer")
         .allowlist_var("MP_BUFFER_READ")
         .allowlist_var("MP_BUFFER_WRITE")
@@ -374,9 +376,13 @@ fn generate_micropython_bindings() {
         .allowlist_function("nlr_jump")
         .allowlist_function("mp_obj_new_exception")
         .allowlist_function("mp_obj_new_exception_args")
+        .allowlist_function("mp_obj_exception_print")
+        .allowlist_function("mp_obj_exception_attr")
+        .allowlist_function("mp_obj_exception_make_new")
         .allowlist_function("trezor_obj_call_protected")
         .allowlist_var("mp_type_AttributeError")
         .allowlist_var("mp_type_EOFError")
+        .allowlist_var("mp_type_Exception")
         .allowlist_var("mp_type_IndexError")
         .allowlist_var("mp_type_KeyError")
         .allowlist_var("mp_type_MemoryError")
@@ -648,6 +654,7 @@ fn generate_crypto_bindings() {
         .allowlist_function("hmac_sha256_Final")
         // sha256
         .allowlist_var("SHA256_DIGEST_LENGTH")
+        .allowlist_var("SHA256_BLOCK_LENGTH")
         .allowlist_type("SHA256_CTX")
         .no_copy("SHA256_CTX")
         .allowlist_function("sha256_Init")
@@ -655,6 +662,7 @@ fn generate_crypto_bindings() {
         .allowlist_function("sha256_Final")
         // sha512
         .allowlist_var("SHA512_DIGEST_LENGTH")
+        .allowlist_var("SHA512_BLOCK_LENGTH")
         .allowlist_type("SHA512_CTX")
         .no_copy("SHA512_CTX")
         .allowlist_function("sha512_Init")

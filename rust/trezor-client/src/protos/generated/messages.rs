@@ -149,10 +149,6 @@ pub enum MessageType {
     MessageType_GetNextU2FCounter = 80,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_NextU2FCounter)
     MessageType_NextU2FCounter = 81,
-    // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_Deprecated_PassphraseStateRequest)
-    MessageType_Deprecated_PassphraseStateRequest = 77,
-    // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_Deprecated_PassphraseStateAck)
-    MessageType_Deprecated_PassphraseStateAck = 78,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_FirmwareErase)
     MessageType_FirmwareErase = 6,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_FirmwareUpload)
@@ -299,6 +295,10 @@ pub enum MessageType {
     MessageType_EthereumDefinitionRequest = 471,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_EthereumDefinitionAck)
     MessageType_EthereumDefinitionAck = 472,
+    // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_EthereumSignAuth7702)
+    MessageType_EthereumSignAuth7702 = 473,
+    // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_EthereumAuth7702Signature)
+    MessageType_EthereumAuth7702Signature = 474,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_NEMGetAddress)
     MessageType_NEMGetAddress = 67,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_NEMAddress)
@@ -599,6 +599,8 @@ pub enum MessageType {
     MessageType_TronWithdrawUnfreeze = 2209,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_TronVoteWitnessContract)
     MessageType_TronVoteWitnessContract = 2210,
+    // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_TronWithdrawBalance)
+    MessageType_TronWithdrawBalance = 2213,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_BenchmarkListNames)
     MessageType_BenchmarkListNames = 9100,
     // @@protoc_insertion_point(enum_value:hw.trezor.messages.MessageType.MessageType_BenchmarkNames)
@@ -683,8 +685,6 @@ impl ::protobuf::Enum for MessageType {
             63 => ::std::option::Option::Some(MessageType::MessageType_SetU2FCounter),
             80 => ::std::option::Option::Some(MessageType::MessageType_GetNextU2FCounter),
             81 => ::std::option::Option::Some(MessageType::MessageType_NextU2FCounter),
-            77 => ::std::option::Option::Some(MessageType::MessageType_Deprecated_PassphraseStateRequest),
-            78 => ::std::option::Option::Some(MessageType::MessageType_Deprecated_PassphraseStateAck),
             6 => ::std::option::Option::Some(MessageType::MessageType_FirmwareErase),
             7 => ::std::option::Option::Some(MessageType::MessageType_FirmwareUpload),
             8 => ::std::option::Option::Some(MessageType::MessageType_FirmwareRequest),
@@ -758,6 +758,8 @@ impl ::protobuf::Enum for MessageType {
             470 => ::std::option::Option::Some(MessageType::MessageType_EthereumSignTypedHash),
             471 => ::std::option::Option::Some(MessageType::MessageType_EthereumDefinitionRequest),
             472 => ::std::option::Option::Some(MessageType::MessageType_EthereumDefinitionAck),
+            473 => ::std::option::Option::Some(MessageType::MessageType_EthereumSignAuth7702),
+            474 => ::std::option::Option::Some(MessageType::MessageType_EthereumAuth7702Signature),
             67 => ::std::option::Option::Some(MessageType::MessageType_NEMGetAddress),
             68 => ::std::option::Option::Some(MessageType::MessageType_NEMAddress),
             69 => ::std::option::Option::Some(MessageType::MessageType_NEMSignTx),
@@ -908,6 +910,7 @@ impl ::protobuf::Enum for MessageType {
             2208 => ::std::option::Option::Some(MessageType::MessageType_TronUnfreezeBalanceV2Contract),
             2209 => ::std::option::Option::Some(MessageType::MessageType_TronWithdrawUnfreeze),
             2210 => ::std::option::Option::Some(MessageType::MessageType_TronVoteWitnessContract),
+            2213 => ::std::option::Option::Some(MessageType::MessageType_TronWithdrawBalance),
             9100 => ::std::option::Option::Some(MessageType::MessageType_BenchmarkListNames),
             9101 => ::std::option::Option::Some(MessageType::MessageType_BenchmarkNames),
             9102 => ::std::option::Option::Some(MessageType::MessageType_BenchmarkRun),
@@ -981,8 +984,6 @@ impl ::protobuf::Enum for MessageType {
             "MessageType_SetU2FCounter" => ::std::option::Option::Some(MessageType::MessageType_SetU2FCounter),
             "MessageType_GetNextU2FCounter" => ::std::option::Option::Some(MessageType::MessageType_GetNextU2FCounter),
             "MessageType_NextU2FCounter" => ::std::option::Option::Some(MessageType::MessageType_NextU2FCounter),
-            "MessageType_Deprecated_PassphraseStateRequest" => ::std::option::Option::Some(MessageType::MessageType_Deprecated_PassphraseStateRequest),
-            "MessageType_Deprecated_PassphraseStateAck" => ::std::option::Option::Some(MessageType::MessageType_Deprecated_PassphraseStateAck),
             "MessageType_FirmwareErase" => ::std::option::Option::Some(MessageType::MessageType_FirmwareErase),
             "MessageType_FirmwareUpload" => ::std::option::Option::Some(MessageType::MessageType_FirmwareUpload),
             "MessageType_FirmwareRequest" => ::std::option::Option::Some(MessageType::MessageType_FirmwareRequest),
@@ -1056,6 +1057,8 @@ impl ::protobuf::Enum for MessageType {
             "MessageType_EthereumSignTypedHash" => ::std::option::Option::Some(MessageType::MessageType_EthereumSignTypedHash),
             "MessageType_EthereumDefinitionRequest" => ::std::option::Option::Some(MessageType::MessageType_EthereumDefinitionRequest),
             "MessageType_EthereumDefinitionAck" => ::std::option::Option::Some(MessageType::MessageType_EthereumDefinitionAck),
+            "MessageType_EthereumSignAuth7702" => ::std::option::Option::Some(MessageType::MessageType_EthereumSignAuth7702),
+            "MessageType_EthereumAuth7702Signature" => ::std::option::Option::Some(MessageType::MessageType_EthereumAuth7702Signature),
             "MessageType_NEMGetAddress" => ::std::option::Option::Some(MessageType::MessageType_NEMGetAddress),
             "MessageType_NEMAddress" => ::std::option::Option::Some(MessageType::MessageType_NEMAddress),
             "MessageType_NEMSignTx" => ::std::option::Option::Some(MessageType::MessageType_NEMSignTx),
@@ -1206,6 +1209,7 @@ impl ::protobuf::Enum for MessageType {
             "MessageType_TronUnfreezeBalanceV2Contract" => ::std::option::Option::Some(MessageType::MessageType_TronUnfreezeBalanceV2Contract),
             "MessageType_TronWithdrawUnfreeze" => ::std::option::Option::Some(MessageType::MessageType_TronWithdrawUnfreeze),
             "MessageType_TronVoteWitnessContract" => ::std::option::Option::Some(MessageType::MessageType_TronVoteWitnessContract),
+            "MessageType_TronWithdrawBalance" => ::std::option::Option::Some(MessageType::MessageType_TronWithdrawBalance),
             "MessageType_BenchmarkListNames" => ::std::option::Option::Some(MessageType::MessageType_BenchmarkListNames),
             "MessageType_BenchmarkNames" => ::std::option::Option::Some(MessageType::MessageType_BenchmarkNames),
             "MessageType_BenchmarkRun" => ::std::option::Option::Some(MessageType::MessageType_BenchmarkRun),
@@ -1278,8 +1282,6 @@ impl ::protobuf::Enum for MessageType {
         MessageType::MessageType_SetU2FCounter,
         MessageType::MessageType_GetNextU2FCounter,
         MessageType::MessageType_NextU2FCounter,
-        MessageType::MessageType_Deprecated_PassphraseStateRequest,
-        MessageType::MessageType_Deprecated_PassphraseStateAck,
         MessageType::MessageType_FirmwareErase,
         MessageType::MessageType_FirmwareUpload,
         MessageType::MessageType_FirmwareRequest,
@@ -1353,6 +1355,8 @@ impl ::protobuf::Enum for MessageType {
         MessageType::MessageType_EthereumSignTypedHash,
         MessageType::MessageType_EthereumDefinitionRequest,
         MessageType::MessageType_EthereumDefinitionAck,
+        MessageType::MessageType_EthereumSignAuth7702,
+        MessageType::MessageType_EthereumAuth7702Signature,
         MessageType::MessageType_NEMGetAddress,
         MessageType::MessageType_NEMAddress,
         MessageType::MessageType_NEMSignTx,
@@ -1503,6 +1507,7 @@ impl ::protobuf::Enum for MessageType {
         MessageType::MessageType_TronUnfreezeBalanceV2Contract,
         MessageType::MessageType_TronWithdrawUnfreeze,
         MessageType::MessageType_TronVoteWitnessContract,
+        MessageType::MessageType_TronWithdrawBalance,
         MessageType::MessageType_BenchmarkListNames,
         MessageType::MessageType_BenchmarkNames,
         MessageType::MessageType_BenchmarkRun,
@@ -1581,81 +1586,81 @@ impl ::protobuf::EnumFull for MessageType {
             MessageType::MessageType_SetU2FCounter => 58,
             MessageType::MessageType_GetNextU2FCounter => 59,
             MessageType::MessageType_NextU2FCounter => 60,
-            MessageType::MessageType_Deprecated_PassphraseStateRequest => 61,
-            MessageType::MessageType_Deprecated_PassphraseStateAck => 62,
-            MessageType::MessageType_FirmwareErase => 63,
-            MessageType::MessageType_FirmwareUpload => 64,
-            MessageType::MessageType_FirmwareRequest => 65,
-            MessageType::MessageType_ProdTestT1 => 66,
-            MessageType::MessageType_BleUnpair => 67,
-            MessageType::MessageType_GetPublicKey => 68,
-            MessageType::MessageType_PublicKey => 69,
-            MessageType::MessageType_SignTx => 70,
-            MessageType::MessageType_TxRequest => 71,
-            MessageType::MessageType_TxAck => 72,
-            MessageType::MessageType_GetAddress => 73,
-            MessageType::MessageType_Address => 74,
-            MessageType::MessageType_SignMessage => 75,
-            MessageType::MessageType_VerifyMessage => 76,
-            MessageType::MessageType_MessageSignature => 77,
-            MessageType::MessageType_GetOwnershipId => 78,
-            MessageType::MessageType_OwnershipId => 79,
-            MessageType::MessageType_GetOwnershipProof => 80,
-            MessageType::MessageType_OwnershipProof => 81,
-            MessageType::MessageType_AuthorizeCoinJoin => 82,
-            MessageType::MessageType_CipherKeyValue => 83,
-            MessageType::MessageType_CipheredKeyValue => 84,
-            MessageType::MessageType_SignIdentity => 85,
-            MessageType::MessageType_SignedIdentity => 86,
-            MessageType::MessageType_GetECDHSessionKey => 87,
-            MessageType::MessageType_ECDHSessionKey => 88,
-            MessageType::MessageType_PaymentNotification => 89,
-            MessageType::MessageType_DebugLinkDecision => 90,
-            MessageType::MessageType_DebugLinkGetState => 91,
-            MessageType::MessageType_DebugLinkState => 92,
-            MessageType::MessageType_DebugLinkStop => 93,
-            MessageType::MessageType_DebugLinkLog => 94,
-            MessageType::MessageType_DebugLinkMemoryRead => 95,
-            MessageType::MessageType_DebugLinkMemory => 96,
-            MessageType::MessageType_DebugLinkMemoryWrite => 97,
-            MessageType::MessageType_DebugLinkFlashErase => 98,
-            MessageType::MessageType_DebugLinkLayout => 99,
-            MessageType::MessageType_DebugLinkReseedRandom => 100,
-            MessageType::MessageType_DebugLinkRecordScreen => 101,
-            MessageType::MessageType_DebugLinkEraseSdCard => 102,
-            MessageType::MessageType_DebugLinkWatchLayout => 103,
-            MessageType::MessageType_DebugLinkResetDebugEvents => 104,
-            MessageType::MessageType_DebugLinkOptigaSetSecMax => 105,
-            MessageType::MessageType_DebugLinkGetGcInfo => 106,
-            MessageType::MessageType_DebugLinkGcInfo => 107,
-            MessageType::MessageType_DebugLinkGetPairingInfo => 108,
-            MessageType::MessageType_DebugLinkPairingInfo => 109,
-            MessageType::MessageType_DebugLinkSetLogFilter => 110,
-            MessageType::MessageType_DebugLinkN4W1Connected => 111,
-            MessageType::MessageType_DebugLinkN4W1Write => 112,
-            MessageType::MessageType_DebugLinkN4W1Read => 113,
-            MessageType::MessageType_DebugLinkN4W1Response => 114,
-            MessageType::MessageType_DebugLinkSetBatteryState => 115,
-            MessageType::MessageType_EthereumGetPublicKey => 116,
-            MessageType::MessageType_EthereumPublicKey => 117,
-            MessageType::MessageType_EthereumGetAddress => 118,
-            MessageType::MessageType_EthereumAddress => 119,
-            MessageType::MessageType_EthereumSignTx => 120,
-            MessageType::MessageType_EthereumSignTxEIP1559 => 121,
-            MessageType::MessageType_EthereumTxRequest => 122,
-            MessageType::MessageType_EthereumTxAck => 123,
-            MessageType::MessageType_EthereumSignMessage => 124,
-            MessageType::MessageType_EthereumVerifyMessage => 125,
-            MessageType::MessageType_EthereumMessageSignature => 126,
-            MessageType::MessageType_EthereumSignTypedData => 127,
-            MessageType::MessageType_EthereumTypedDataStructRequest => 128,
-            MessageType::MessageType_EthereumTypedDataStructAck => 129,
-            MessageType::MessageType_EthereumTypedDataValueRequest => 130,
-            MessageType::MessageType_EthereumTypedDataValueAck => 131,
-            MessageType::MessageType_EthereumTypedDataSignature => 132,
-            MessageType::MessageType_EthereumSignTypedHash => 133,
-            MessageType::MessageType_EthereumDefinitionRequest => 134,
-            MessageType::MessageType_EthereumDefinitionAck => 135,
+            MessageType::MessageType_FirmwareErase => 61,
+            MessageType::MessageType_FirmwareUpload => 62,
+            MessageType::MessageType_FirmwareRequest => 63,
+            MessageType::MessageType_ProdTestT1 => 64,
+            MessageType::MessageType_BleUnpair => 65,
+            MessageType::MessageType_GetPublicKey => 66,
+            MessageType::MessageType_PublicKey => 67,
+            MessageType::MessageType_SignTx => 68,
+            MessageType::MessageType_TxRequest => 69,
+            MessageType::MessageType_TxAck => 70,
+            MessageType::MessageType_GetAddress => 71,
+            MessageType::MessageType_Address => 72,
+            MessageType::MessageType_SignMessage => 73,
+            MessageType::MessageType_VerifyMessage => 74,
+            MessageType::MessageType_MessageSignature => 75,
+            MessageType::MessageType_GetOwnershipId => 76,
+            MessageType::MessageType_OwnershipId => 77,
+            MessageType::MessageType_GetOwnershipProof => 78,
+            MessageType::MessageType_OwnershipProof => 79,
+            MessageType::MessageType_AuthorizeCoinJoin => 80,
+            MessageType::MessageType_CipherKeyValue => 81,
+            MessageType::MessageType_CipheredKeyValue => 82,
+            MessageType::MessageType_SignIdentity => 83,
+            MessageType::MessageType_SignedIdentity => 84,
+            MessageType::MessageType_GetECDHSessionKey => 85,
+            MessageType::MessageType_ECDHSessionKey => 86,
+            MessageType::MessageType_PaymentNotification => 87,
+            MessageType::MessageType_DebugLinkDecision => 88,
+            MessageType::MessageType_DebugLinkGetState => 89,
+            MessageType::MessageType_DebugLinkState => 90,
+            MessageType::MessageType_DebugLinkStop => 91,
+            MessageType::MessageType_DebugLinkLog => 92,
+            MessageType::MessageType_DebugLinkMemoryRead => 93,
+            MessageType::MessageType_DebugLinkMemory => 94,
+            MessageType::MessageType_DebugLinkMemoryWrite => 95,
+            MessageType::MessageType_DebugLinkFlashErase => 96,
+            MessageType::MessageType_DebugLinkLayout => 97,
+            MessageType::MessageType_DebugLinkReseedRandom => 98,
+            MessageType::MessageType_DebugLinkRecordScreen => 99,
+            MessageType::MessageType_DebugLinkEraseSdCard => 100,
+            MessageType::MessageType_DebugLinkWatchLayout => 101,
+            MessageType::MessageType_DebugLinkResetDebugEvents => 102,
+            MessageType::MessageType_DebugLinkOptigaSetSecMax => 103,
+            MessageType::MessageType_DebugLinkGetGcInfo => 104,
+            MessageType::MessageType_DebugLinkGcInfo => 105,
+            MessageType::MessageType_DebugLinkGetPairingInfo => 106,
+            MessageType::MessageType_DebugLinkPairingInfo => 107,
+            MessageType::MessageType_DebugLinkSetLogFilter => 108,
+            MessageType::MessageType_DebugLinkN4W1Connected => 109,
+            MessageType::MessageType_DebugLinkN4W1Write => 110,
+            MessageType::MessageType_DebugLinkN4W1Read => 111,
+            MessageType::MessageType_DebugLinkN4W1Response => 112,
+            MessageType::MessageType_DebugLinkSetBatteryState => 113,
+            MessageType::MessageType_EthereumGetPublicKey => 114,
+            MessageType::MessageType_EthereumPublicKey => 115,
+            MessageType::MessageType_EthereumGetAddress => 116,
+            MessageType::MessageType_EthereumAddress => 117,
+            MessageType::MessageType_EthereumSignTx => 118,
+            MessageType::MessageType_EthereumSignTxEIP1559 => 119,
+            MessageType::MessageType_EthereumTxRequest => 120,
+            MessageType::MessageType_EthereumTxAck => 121,
+            MessageType::MessageType_EthereumSignMessage => 122,
+            MessageType::MessageType_EthereumVerifyMessage => 123,
+            MessageType::MessageType_EthereumMessageSignature => 124,
+            MessageType::MessageType_EthereumSignTypedData => 125,
+            MessageType::MessageType_EthereumTypedDataStructRequest => 126,
+            MessageType::MessageType_EthereumTypedDataStructAck => 127,
+            MessageType::MessageType_EthereumTypedDataValueRequest => 128,
+            MessageType::MessageType_EthereumTypedDataValueAck => 129,
+            MessageType::MessageType_EthereumTypedDataSignature => 130,
+            MessageType::MessageType_EthereumSignTypedHash => 131,
+            MessageType::MessageType_EthereumDefinitionRequest => 132,
+            MessageType::MessageType_EthereumDefinitionAck => 133,
+            MessageType::MessageType_EthereumSignAuth7702 => 134,
+            MessageType::MessageType_EthereumAuth7702Signature => 135,
             MessageType::MessageType_NEMGetAddress => 136,
             MessageType::MessageType_NEMAddress => 137,
             MessageType::MessageType_NEMSignTx => 138,
@@ -1806,12 +1811,13 @@ impl ::protobuf::EnumFull for MessageType {
             MessageType::MessageType_TronUnfreezeBalanceV2Contract => 283,
             MessageType::MessageType_TronWithdrawUnfreeze => 284,
             MessageType::MessageType_TronVoteWitnessContract => 285,
-            MessageType::MessageType_BenchmarkListNames => 286,
-            MessageType::MessageType_BenchmarkNames => 287,
-            MessageType::MessageType_BenchmarkRun => 288,
-            MessageType::MessageType_BenchmarkResult => 289,
-            MessageType::MessageType_TelemetryGet => 290,
-            MessageType::MessageType_Telemetry => 291,
+            MessageType::MessageType_TronWithdrawBalance => 286,
+            MessageType::MessageType_BenchmarkListNames => 287,
+            MessageType::MessageType_BenchmarkNames => 288,
+            MessageType::MessageType_BenchmarkRun => 289,
+            MessageType::MessageType_BenchmarkResult => 290,
+            MessageType::MessageType_TelemetryGet => 291,
+            MessageType::MessageType_Telemetry => 292,
         };
         Self::enum_descriptor().value_by_index(index)
     }
@@ -1830,7 +1836,7 @@ impl MessageType {
 }
 
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x0emessages.proto\x12\x12hw.trezor.messages\x1a\roptions.proto*\xdef\
+    \n\x0emessages.proto\x12\x12hw.trezor.messages\x1a\roptions.proto*\x85g\
     \n\x0bMessageType\x12(\n\x16MessageType_Initialize\x10\0\x1a\x0c\xb0\xb5\
     \x18\x01\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12\x1e\n\x10MessageType_Ping\
     \x10\x01\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12%\n\x13MessageType_S\
@@ -1904,193 +1910,193 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x80\xa6\x1d\x01\x98\xb5\x18\x01\x12#\n\x19MessageType_SetU2FCounter\x10\
     ?\x1a\x04\x90\xb5\x18\x01\x12'\n\x1dMessageType_GetNextU2FCounter\x10P\
     \x1a\x04\x90\xb5\x18\x01\x12$\n\x1aMessageType_NextU2FCounter\x10Q\x1a\
-    \x04\x98\xb5\x18\x01\x125\n-MessageType_Deprecated_PassphraseStateReques\
-    t\x10M\x1a\x02\x08\x01\x121\n)MessageType_Deprecated_PassphraseStateAck\
-    \x10N\x1a\x02\x08\x01\x12+\n\x19MessageType_FirmwareErase\x10\x06\x1a\
-    \x0c\xb8\xb5\x18\x01\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12,\n\x1aMessageTy\
-    pe_FirmwareUpload\x10\x07\x1a\x0c\xb8\xb5\x18\x01\x80\xa6\x1d\x01\x90\
-    \xb5\x18\x01\x12-\n\x1bMessageType_FirmwareRequest\x10\x08\x1a\x0c\xb8\
-    \xb5\x18\x01\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12(\n\x16MessageType_ProdT\
-    estT1\x10\x20\x1a\x0c\xb8\xb5\x18\x01\x80\xa6\x1d\x01\x90\xb5\x18\x01\
-    \x12$\n\x15MessageType_BleUnpair\x10\xc1>\x1a\x08\x80\xa6\x1d\x01\x90\
-    \xb5\x18\x01\x12&\n\x18MessageType_GetPublicKey\x10\x0b\x1a\x08\x80\xa6\
-    \x1d\x01\x90\xb5\x18\x01\x12#\n\x15MessageType_PublicKey\x10\x0c\x1a\x08\
-    \x80\xa6\x1d\x01\x98\xb5\x18\x01\x12\x20\n\x12MessageType_SignTx\x10\x0f\
-    \x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12#\n\x15MessageType_TxRequest\
-    \x10\x15\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12\x1f\n\x11MessageTyp\
-    e_TxAck\x10\x16\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12$\n\x16Messag\
-    eType_GetAddress\x10\x1d\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12!\n\
-    \x13MessageType_Address\x10\x1e\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\
-    \x12%\n\x17MessageType_SignMessage\x10&\x1a\x08\x80\xa6\x1d\x01\x90\xb5\
-    \x18\x01\x12'\n\x19MessageType_VerifyMessage\x10'\x1a\x08\x80\xa6\x1d\
-    \x01\x90\xb5\x18\x01\x12*\n\x1cMessageType_MessageSignature\x10(\x1a\x08\
-    \x80\xa6\x1d\x01\x98\xb5\x18\x01\x12(\n\x1aMessageType_GetOwnershipId\
-    \x10+\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12%\n\x17MessageType_Owne\
-    rshipId\x10,\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12+\n\x1dMessageTy\
-    pe_GetOwnershipProof\x101\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12(\n\
-    \x1aMessageType_OwnershipProof\x102\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\
-    \x01\x12+\n\x1dMessageType_AuthorizeCoinJoin\x103\x1a\x08\x80\xa6\x1d\
-    \x01\x90\xb5\x18\x01\x12(\n\x1aMessageType_CipherKeyValue\x10\x17\x1a\
-    \x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12*\n\x1cMessageType_CipheredKeyVa\
-    lue\x100\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12&\n\x18MessageType_S\
-    ignIdentity\x105\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12(\n\x1aMessa\
-    geType_SignedIdentity\x106\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12+\
-    \n\x1dMessageType_GetECDHSessionKey\x10=\x1a\x08\x80\xa6\x1d\x01\x90\xb5\
-    \x18\x01\x12(\n\x1aMessageType_ECDHSessionKey\x10>\x1a\x08\x80\xa6\x1d\
-    \x01\x98\xb5\x18\x01\x12-\n\x1fMessageType_PaymentNotification\x104\x1a\
-    \x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x123\n\x1dMessageType_DebugLinkDeci\
-    sion\x10d\x1a\x10\xc0\xb5\x18\x01\xb0\xb5\x18\x01\x80\xa6\x1d\x01\xa0\
-    \xb5\x18\x01\x12/\n\x1dMessageType_DebugLinkGetState\x10e\x1a\x0c\xb0\
-    \xb5\x18\x01\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12(\n\x1aMessageType_Debug\
-    LinkState\x10f\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\x12'\n\x19Message\
-    Type_DebugLinkStop\x10g\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12&\n\
-    \x18MessageType_DebugLinkLog\x10h\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\
-    \x01\x12-\n\x1fMessageType_DebugLinkMemoryRead\x10n\x1a\x08\x80\xa6\x1d\
-    \x01\xa0\xb5\x18\x01\x12)\n\x1bMessageType_DebugLinkMemory\x10o\x1a\x08\
-    \x80\xa6\x1d\x01\xa8\xb5\x18\x01\x12.\n\x20MessageType_DebugLinkMemoryWr\
-    ite\x10p\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12-\n\x1fMessageType_D\
-    ebugLinkFlashErase\x10q\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12*\n\
-    \x1bMessageType_DebugLinkLayout\x10\xa9F\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\
-    \x18\x01\x120\n!MessageType_DebugLinkReseedRandom\x10\xaaF\x1a\x08\x80\
-    \xa6\x1d\x01\xa0\xb5\x18\x01\x120\n!MessageType_DebugLinkRecordScreen\
-    \x10\xabF\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12/\n\x20MessageType_\
-    DebugLinkEraseSdCard\x10\xadF\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\
-    \x12/\n\x20MessageType_DebugLinkWatchLayout\x10\xaeF\x1a\x08\x80\xa6\x1d\
-    \x01\xa0\xb5\x18\x01\x124\n%MessageType_DebugLinkResetDebugEvents\x10\
-    \xafF\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x123\n$MessageType_DebugLi\
-    nkOptigaSetSecMax\x10\xb0F\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12-\
-    \n\x1eMessageType_DebugLinkGetGcInfo\x10\xb1F\x1a\x08\x80\xa6\x1d\x01\
-    \xa0\xb5\x18\x01\x12*\n\x1bMessageType_DebugLinkGcInfo\x10\xb2F\x1a\x08\
-    \x80\xa6\x1d\x01\xa8\xb5\x18\x01\x122\n#MessageType_DebugLinkGetPairingI\
-    nfo\x10\xb3F\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12/\n\x20MessageTy\
-    pe_DebugLinkPairingInfo\x10\xb4F\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\
-    \x120\n!MessageType_DebugLinkSetLogFilter\x10\xb5F\x1a\x08\x80\xa6\x1d\
-    \x01\xa0\xb5\x18\x01\x121\n\"MessageType_DebugLinkN4W1Connected\x10\xb6F\
-    \x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12-\n\x1eMessageType_DebugLink\
-    N4W1Write\x10\xb7F\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\x12,\n\x1dMes\
-    sageType_DebugLinkN4W1Read\x10\xb8F\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\
-    \x01\x120\n!MessageType_DebugLinkN4W1Response\x10\xb9F\x1a\x08\x80\xa6\
-    \x1d\x01\xa0\xb5\x18\x01\x123\n$MessageType_DebugLinkSetBatteryState\x10\
-    \xbaF\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12+\n\x20MessageType_Ethe\
-    reumGetPublicKey\x10\xc2\x03\x1a\x04\x90\xb5\x18\x01\x12(\n\x1dMessageTy\
-    pe_EthereumPublicKey\x10\xc3\x03\x1a\x04\x98\xb5\x18\x01\x12(\n\x1eMessa\
-    geType_EthereumGetAddress\x108\x1a\x04\x90\xb5\x18\x01\x12%\n\x1bMessage\
-    Type_EthereumAddress\x109\x1a\x04\x98\xb5\x18\x01\x12$\n\x1aMessageType_\
-    EthereumSignTx\x10:\x1a\x04\x90\xb5\x18\x01\x12,\n!MessageType_EthereumS\
-    ignTxEIP1559\x10\xc4\x03\x1a\x04\x90\xb5\x18\x01\x12'\n\x1dMessageType_E\
-    thereumTxRequest\x10;\x1a\x04\x98\xb5\x18\x01\x12#\n\x19MessageType_Ethe\
-    reumTxAck\x10<\x1a\x04\x90\xb5\x18\x01\x12)\n\x1fMessageType_EthereumSig\
-    nMessage\x10@\x1a\x04\x90\xb5\x18\x01\x12+\n!MessageType_EthereumVerifyM\
-    essage\x10A\x1a\x04\x90\xb5\x18\x01\x12.\n$MessageType_EthereumMessageSi\
-    gnature\x10B\x1a\x04\x98\xb5\x18\x01\x12,\n!MessageType_EthereumSignType\
-    dData\x10\xd0\x03\x1a\x04\x90\xb5\x18\x01\x125\n*MessageType_EthereumTyp\
-    edDataStructRequest\x10\xd1\x03\x1a\x04\x98\xb5\x18\x01\x121\n&MessageTy\
-    pe_EthereumTypedDataStructAck\x10\xd2\x03\x1a\x04\x90\xb5\x18\x01\x124\n\
-    )MessageType_EthereumTypedDataValueRequest\x10\xd3\x03\x1a\x04\x98\xb5\
-    \x18\x01\x120\n%MessageType_EthereumTypedDataValueAck\x10\xd4\x03\x1a\
-    \x04\x90\xb5\x18\x01\x121\n&MessageType_EthereumTypedDataSignature\x10\
-    \xd5\x03\x1a\x04\x98\xb5\x18\x01\x12,\n!MessageType_EthereumSignTypedHas\
-    h\x10\xd6\x03\x1a\x04\x90\xb5\x18\x01\x120\n%MessageType_EthereumDefinit\
-    ionRequest\x10\xd7\x03\x1a\x04\x98\xb5\x18\x01\x12,\n!MessageType_Ethere\
-    umDefinitionAck\x10\xd8\x03\x1a\x04\x90\xb5\x18\x01\x12#\n\x19MessageTyp\
-    e_NEMGetAddress\x10C\x1a\x04\x90\xb5\x18\x01\x12\x20\n\x16MessageType_NE\
-    MAddress\x10D\x1a\x04\x98\xb5\x18\x01\x12\x1f\n\x15MessageType_NEMSignTx\
-    \x10E\x1a\x04\x90\xb5\x18\x01\x12!\n\x17MessageType_NEMSignedTx\x10F\x1a\
-    \x04\x98\xb5\x18\x01\x12'\n\x1dMessageType_NEMDecryptMessage\x10K\x1a\
-    \x04\x90\xb5\x18\x01\x12)\n\x1fMessageType_NEMDecryptedMessage\x10L\x1a\
-    \x04\x98\xb5\x18\x01\x12&\n\x1bMessageType_TezosGetAddress\x10\x96\x01\
-    \x1a\x04\x90\xb5\x18\x01\x12#\n\x18MessageType_TezosAddress\x10\x97\x01\
-    \x1a\x04\x98\xb5\x18\x01\x12\"\n\x17MessageType_TezosSignTx\x10\x98\x01\
-    \x1a\x04\x90\xb5\x18\x01\x12$\n\x19MessageType_TezosSignedTx\x10\x99\x01\
-    \x1a\x04\x98\xb5\x18\x01\x12(\n\x1dMessageType_TezosGetPublicKey\x10\x9a\
-    \x01\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType_TezosPublicKey\x10\
-    \x9b\x01\x1a\x04\x98\xb5\x18\x01\x12$\n\x19MessageType_StellarSignTx\x10\
-    \xca\x01\x1a\x04\x90\xb5\x18\x01\x12)\n\x1eMessageType_StellarTxOpReques\
-    t\x10\xcb\x01\x1a\x04\x98\xb5\x18\x01\x12(\n\x1dMessageType_StellarGetAd\
-    dress\x10\xcf\x01\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType_StellarA\
-    ddress\x10\xd0\x01\x1a\x04\x98\xb5\x18\x01\x12-\n\"MessageType_StellarCr\
-    eateAccountOp\x10\xd2\x01\x1a\x04\x90\xb5\x18\x01\x12'\n\x1cMessageType_\
-    StellarPaymentOp\x10\xd3\x01\x1a\x04\x90\xb5\x18\x01\x128\n-MessageType_\
-    StellarPathPaymentStrictReceiveOp\x10\xd4\x01\x1a\x04\x90\xb5\x18\x01\
-    \x12/\n$MessageType_StellarManageSellOfferOp\x10\xd5\x01\x1a\x04\x90\xb5\
-    \x18\x01\x126\n+MessageType_StellarCreatePassiveSellOfferOp\x10\xd6\x01\
-    \x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessageType_StellarSetOptionsOp\x10\
-    \xd7\x01\x1a\x04\x90\xb5\x18\x01\x12+\n\x20MessageType_StellarChangeTrus\
-    tOp\x10\xd8\x01\x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessageType_StellarAll\
-    owTrustOp\x10\xd9\x01\x1a\x04\x90\xb5\x18\x01\x12,\n!MessageType_Stellar\
-    AccountMergeOp\x10\xda\x01\x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessageType\
-    _StellarManageDataOp\x10\xdc\x01\x1a\x04\x90\xb5\x18\x01\x12,\n!MessageT\
-    ype_StellarBumpSequenceOp\x10\xdd\x01\x1a\x04\x90\xb5\x18\x01\x12.\n#Mes\
-    sageType_StellarManageBuyOfferOp\x10\xde\x01\x1a\x04\x90\xb5\x18\x01\x12\
-    5\n*MessageType_StellarPathPaymentStrictSendOp\x10\xdf\x01\x1a\x04\x90\
-    \xb5\x18\x01\x125\n*MessageType_StellarClaimClaimableBalanceOp\x10\xe1\
-    \x01\x1a\x04\x90\xb5\x18\x01\x12&\n\x1bMessageType_StellarSignedTx\x10\
-    \xe6\x01\x1a\x04\x98\xb5\x18\x01\x12*\n\x1fMessageType_CardanoGetPublicK\
-    ey\x10\xb1\x02\x1a\x04\x90\xb5\x18\x01\x12'\n\x1cMessageType_CardanoPubl\
-    icKey\x10\xb2\x02\x1a\x04\x98\xb5\x18\x01\x12(\n\x1dMessageType_CardanoG\
-    etAddress\x10\xb3\x02\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType_Card\
-    anoAddress\x10\xb4\x02\x1a\x04\x98\xb5\x18\x01\x12'\n\x1cMessageType_Car\
-    danoTxItemAck\x10\xb9\x02\x1a\x04\x98\xb5\x18\x01\x127\n,MessageType_Car\
-    danoTxAuxiliaryDataSupplement\x10\xba\x02\x1a\x04\x98\xb5\x18\x01\x12.\n\
-    #MessageType_CardanoTxWitnessRequest\x10\xbb\x02\x1a\x04\x90\xb5\x18\x01\
-    \x12/\n$MessageType_CardanoTxWitnessResponse\x10\xbc\x02\x1a\x04\x98\xb5\
-    \x18\x01\x12'\n\x1cMessageType_CardanoTxHostAck\x10\xbd\x02\x1a\x04\x90\
-    \xb5\x18\x01\x12(\n\x1dMessageType_CardanoTxBodyHash\x10\xbe\x02\x1a\x04\
-    \x98\xb5\x18\x01\x12,\n!MessageType_CardanoSignTxFinished\x10\xbf\x02\
-    \x1a\x04\x98\xb5\x18\x01\x12(\n\x1dMessageType_CardanoSignTxInit\x10\xc0\
-    \x02\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType_CardanoTxInput\x10\
-    \xc1\x02\x1a\x04\x90\xb5\x18\x01\x12&\n\x1bMessageType_CardanoTxOutput\
-    \x10\xc2\x02\x1a\x04\x90\xb5\x18\x01\x12(\n\x1dMessageType_CardanoAssetG\
-    roup\x10\xc3\x02\x1a\x04\x90\xb5\x18\x01\x12#\n\x18MessageType_CardanoTo\
-    ken\x10\xc4\x02\x1a\x04\x90\xb5\x18\x01\x12+\n\x20MessageType_CardanoTxC\
-    ertificate\x10\xc5\x02\x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessageType_Car\
-    danoTxWithdrawal\x10\xc6\x02\x1a\x04\x90\xb5\x18\x01\x12-\n\"MessageType\
-    _CardanoTxAuxiliaryData\x10\xc7\x02\x1a\x04\x90\xb5\x18\x01\x12'\n\x1cMe\
-    ssageType_CardanoPoolOwner\x10\xc8\x02\x1a\x04\x90\xb5\x18\x01\x121\n&Me\
-    ssageType_CardanoPoolRelayParameters\x10\xc9\x02\x1a\x04\x90\xb5\x18\x01\
-    \x121\n&MessageType_CardanoGetNativeScriptHash\x10\xca\x02\x1a\x04\x90\
-    \xb5\x18\x01\x12.\n#MessageType_CardanoNativeScriptHash\x10\xcb\x02\x1a\
-    \x04\x98\xb5\x18\x01\x12$\n\x19MessageType_CardanoTxMint\x10\xcc\x02\x1a\
-    \x04\x90\xb5\x18\x01\x12/\n$MessageType_CardanoTxCollateralInput\x10\xcd\
-    \x02\x1a\x04\x90\xb5\x18\x01\x12.\n#MessageType_CardanoTxRequiredSigner\
-    \x10\xce\x02\x1a\x04\x90\xb5\x18\x01\x120\n%MessageType_CardanoTxInlineD\
-    atumChunk\x10\xcf\x02\x1a\x04\x90\xb5\x18\x01\x124\n)MessageType_Cardano\
-    TxReferenceScriptChunk\x10\xd0\x02\x1a\x04\x90\xb5\x18\x01\x12.\n#Messag\
-    eType_CardanoTxReferenceInput\x10\xd1\x02\x1a\x04\x90\xb5\x18\x01\x12-\n\
-    \"MessageType_CardanoSignMessageInit\x10\xd2\x02\x1a\x04\x90\xb5\x18\x01\
-    \x120\n%MessageType_CardanoMessageDataRequest\x10\xd3\x02\x1a\x04\x98\
-    \xb5\x18\x01\x121\n&MessageType_CardanoMessageDataResponse\x10\xd4\x02\
-    \x1a\x04\x90\xb5\x18\x01\x12.\n#MessageType_CardanoMessageSignature\x10\
-    \xd5\x02\x1a\x04\x98\xb5\x18\x01\x12'\n\x1cMessageType_RippleGetAddress\
-    \x10\x90\x03\x1a\x04\x90\xb5\x18\x01\x12$\n\x19MessageType_RippleAddress\
-    \x10\x91\x03\x1a\x04\x98\xb5\x18\x01\x12#\n\x18MessageType_RippleSignTx\
-    \x10\x92\x03\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType_RippleSignedT\
-    x\x10\x93\x03\x1a\x04\x98\xb5\x18\x01\x123\n(MessageType_MoneroTransacti\
-    onInitRequest\x10\xf5\x03\x1a\x04\x98\xb5\x18\x01\x12/\n$MessageType_Mon\
-    eroTransactionInitAck\x10\xf6\x03\x1a\x04\x98\xb5\x18\x01\x127\n,Message\
-    Type_MoneroTransactionSetInputRequest\x10\xf7\x03\x1a\x04\x98\xb5\x18\
-    \x01\x123\n(MessageType_MoneroTransactionSetInputAck\x10\xf8\x03\x1a\x04\
-    \x98\xb5\x18\x01\x128\n-MessageType_MoneroTransactionInputViniRequest\
-    \x10\xfb\x03\x1a\x04\x98\xb5\x18\x01\x124\n)MessageType_MoneroTransactio\
-    nInputViniAck\x10\xfc\x03\x1a\x04\x98\xb5\x18\x01\x12;\n0MessageType_Mon\
-    eroTransactionAllInputsSetRequest\x10\xfd\x03\x1a\x04\x98\xb5\x18\x01\
+    \x04\x98\xb5\x18\x01\x12+\n\x19MessageType_FirmwareErase\x10\x06\x1a\x0c\
+    \xb8\xb5\x18\x01\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12,\n\x1aMessageType_F\
+    irmwareUpload\x10\x07\x1a\x0c\xb8\xb5\x18\x01\x80\xa6\x1d\x01\x90\xb5\
+    \x18\x01\x12-\n\x1bMessageType_FirmwareRequest\x10\x08\x1a\x0c\xb8\xb5\
+    \x18\x01\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12(\n\x16MessageType_ProdTestT\
+    1\x10\x20\x1a\x0c\xb8\xb5\x18\x01\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12$\n\
+    \x15MessageType_BleUnpair\x10\xc1>\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\
+    \x01\x12&\n\x18MessageType_GetPublicKey\x10\x0b\x1a\x08\x80\xa6\x1d\x01\
+    \x90\xb5\x18\x01\x12#\n\x15MessageType_PublicKey\x10\x0c\x1a\x08\x80\xa6\
+    \x1d\x01\x98\xb5\x18\x01\x12\x20\n\x12MessageType_SignTx\x10\x0f\x1a\x08\
+    \x80\xa6\x1d\x01\x90\xb5\x18\x01\x12#\n\x15MessageType_TxRequest\x10\x15\
+    \x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12\x1f\n\x11MessageType_TxAck\
+    \x10\x16\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12$\n\x16MessageType_G\
+    etAddress\x10\x1d\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12!\n\x13Mess\
+    ageType_Address\x10\x1e\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12%\n\
+    \x17MessageType_SignMessage\x10&\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\
+    \x12'\n\x19MessageType_VerifyMessage\x10'\x1a\x08\x80\xa6\x1d\x01\x90\
+    \xb5\x18\x01\x12*\n\x1cMessageType_MessageSignature\x10(\x1a\x08\x80\xa6\
+    \x1d\x01\x98\xb5\x18\x01\x12(\n\x1aMessageType_GetOwnershipId\x10+\x1a\
+    \x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12%\n\x17MessageType_OwnershipId\
+    \x10,\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12+\n\x1dMessageType_GetO\
+    wnershipProof\x101\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12(\n\x1aMes\
+    sageType_OwnershipProof\x102\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12\
+    +\n\x1dMessageType_AuthorizeCoinJoin\x103\x1a\x08\x80\xa6\x1d\x01\x90\
+    \xb5\x18\x01\x12(\n\x1aMessageType_CipherKeyValue\x10\x17\x1a\x08\x80\
+    \xa6\x1d\x01\x90\xb5\x18\x01\x12*\n\x1cMessageType_CipheredKeyValue\x100\
+    \x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12&\n\x18MessageType_SignIdent\
+    ity\x105\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12(\n\x1aMessageType_S\
+    ignedIdentity\x106\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x12+\n\x1dMes\
+    sageType_GetECDHSessionKey\x10=\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\
+    \x12(\n\x1aMessageType_ECDHSessionKey\x10>\x1a\x08\x80\xa6\x1d\x01\x98\
+    \xb5\x18\x01\x12-\n\x1fMessageType_PaymentNotification\x104\x1a\x08\x80\
+    \xa6\x1d\x01\x90\xb5\x18\x01\x123\n\x1dMessageType_DebugLinkDecision\x10\
+    d\x1a\x10\xc0\xb5\x18\x01\xb0\xb5\x18\x01\x80\xa6\x1d\x01\xa0\xb5\x18\
+    \x01\x12/\n\x1dMessageType_DebugLinkGetState\x10e\x1a\x0c\xb0\xb5\x18\
+    \x01\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12(\n\x1aMessageType_DebugLinkStat\
+    e\x10f\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\x12'\n\x19MessageType_Deb\
+    ugLinkStop\x10g\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12&\n\x18Messag\
+    eType_DebugLinkLog\x10h\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\x12-\n\
+    \x1fMessageType_DebugLinkMemoryRead\x10n\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\
+    \x18\x01\x12)\n\x1bMessageType_DebugLinkMemory\x10o\x1a\x08\x80\xa6\x1d\
+    \x01\xa8\xb5\x18\x01\x12.\n\x20MessageType_DebugLinkMemoryWrite\x10p\x1a\
+    \x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12-\n\x1fMessageType_DebugLinkFlas\
+    hErase\x10q\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12*\n\x1bMessageTyp\
+    e_DebugLinkLayout\x10\xa9F\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\x120\
+    \n!MessageType_DebugLinkReseedRandom\x10\xaaF\x1a\x08\x80\xa6\x1d\x01\
+    \xa0\xb5\x18\x01\x120\n!MessageType_DebugLinkRecordScreen\x10\xabF\x1a\
+    \x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12/\n\x20MessageType_DebugLinkEras\
+    eSdCard\x10\xadF\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12/\n\x20Messa\
+    geType_DebugLinkWatchLayout\x10\xaeF\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\
+    \x01\x124\n%MessageType_DebugLinkResetDebugEvents\x10\xafF\x1a\x08\x80\
+    \xa6\x1d\x01\xa0\xb5\x18\x01\x123\n$MessageType_DebugLinkOptigaSetSecMax\
+    \x10\xb0F\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12-\n\x1eMessageType_\
+    DebugLinkGetGcInfo\x10\xb1F\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12*\
+    \n\x1bMessageType_DebugLinkGcInfo\x10\xb2F\x1a\x08\x80\xa6\x1d\x01\xa8\
+    \xb5\x18\x01\x122\n#MessageType_DebugLinkGetPairingInfo\x10\xb3F\x1a\x08\
+    \x80\xa6\x1d\x01\xa0\xb5\x18\x01\x12/\n\x20MessageType_DebugLinkPairingI\
+    nfo\x10\xb4F\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\x120\n!MessageType_\
+    DebugLinkSetLogFilter\x10\xb5F\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\x01\
+    \x121\n\"MessageType_DebugLinkN4W1Connected\x10\xb6F\x1a\x08\x80\xa6\x1d\
+    \x01\xa0\xb5\x18\x01\x12-\n\x1eMessageType_DebugLinkN4W1Write\x10\xb7F\
+    \x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\x12,\n\x1dMessageType_DebugLink\
+    N4W1Read\x10\xb8F\x1a\x08\x80\xa6\x1d\x01\xa8\xb5\x18\x01\x120\n!Message\
+    Type_DebugLinkN4W1Response\x10\xb9F\x1a\x08\x80\xa6\x1d\x01\xa0\xb5\x18\
+    \x01\x123\n$MessageType_DebugLinkSetBatteryState\x10\xbaF\x1a\x08\x80\
+    \xa6\x1d\x01\xa0\xb5\x18\x01\x12+\n\x20MessageType_EthereumGetPublicKey\
+    \x10\xc2\x03\x1a\x04\x90\xb5\x18\x01\x12(\n\x1dMessageType_EthereumPubli\
+    cKey\x10\xc3\x03\x1a\x04\x98\xb5\x18\x01\x12(\n\x1eMessageType_EthereumG\
+    etAddress\x108\x1a\x04\x90\xb5\x18\x01\x12%\n\x1bMessageType_EthereumAdd\
+    ress\x109\x1a\x04\x98\xb5\x18\x01\x12$\n\x1aMessageType_EthereumSignTx\
+    \x10:\x1a\x04\x90\xb5\x18\x01\x12,\n!MessageType_EthereumSignTxEIP1559\
+    \x10\xc4\x03\x1a\x04\x90\xb5\x18\x01\x12'\n\x1dMessageType_EthereumTxReq\
+    uest\x10;\x1a\x04\x98\xb5\x18\x01\x12#\n\x19MessageType_EthereumTxAck\
+    \x10<\x1a\x04\x90\xb5\x18\x01\x12)\n\x1fMessageType_EthereumSignMessage\
+    \x10@\x1a\x04\x90\xb5\x18\x01\x12+\n!MessageType_EthereumVerifyMessage\
+    \x10A\x1a\x04\x90\xb5\x18\x01\x12.\n$MessageType_EthereumMessageSignatur\
+    e\x10B\x1a\x04\x98\xb5\x18\x01\x12,\n!MessageType_EthereumSignTypedData\
+    \x10\xd0\x03\x1a\x04\x90\xb5\x18\x01\x125\n*MessageType_EthereumTypedDat\
+    aStructRequest\x10\xd1\x03\x1a\x04\x98\xb5\x18\x01\x121\n&MessageType_Et\
+    hereumTypedDataStructAck\x10\xd2\x03\x1a\x04\x90\xb5\x18\x01\x124\n)Mess\
+    ageType_EthereumTypedDataValueRequest\x10\xd3\x03\x1a\x04\x98\xb5\x18\
+    \x01\x120\n%MessageType_EthereumTypedDataValueAck\x10\xd4\x03\x1a\x04\
+    \x90\xb5\x18\x01\x121\n&MessageType_EthereumTypedDataSignature\x10\xd5\
+    \x03\x1a\x04\x98\xb5\x18\x01\x12,\n!MessageType_EthereumSignTypedHash\
+    \x10\xd6\x03\x1a\x04\x90\xb5\x18\x01\x120\n%MessageType_EthereumDefiniti\
+    onRequest\x10\xd7\x03\x1a\x04\x98\xb5\x18\x01\x12,\n!MessageType_Ethereu\
+    mDefinitionAck\x10\xd8\x03\x1a\x04\x90\xb5\x18\x01\x12+\n\x20MessageType\
+    _EthereumSignAuth7702\x10\xd9\x03\x1a\x04\x90\xb5\x18\x01\x120\n%Message\
+    Type_EthereumAuth7702Signature\x10\xda\x03\x1a\x04\x98\xb5\x18\x01\x12#\
+    \n\x19MessageType_NEMGetAddress\x10C\x1a\x04\x90\xb5\x18\x01\x12\x20\n\
+    \x16MessageType_NEMAddress\x10D\x1a\x04\x98\xb5\x18\x01\x12\x1f\n\x15Mes\
+    sageType_NEMSignTx\x10E\x1a\x04\x90\xb5\x18\x01\x12!\n\x17MessageType_NE\
+    MSignedTx\x10F\x1a\x04\x98\xb5\x18\x01\x12'\n\x1dMessageType_NEMDecryptM\
+    essage\x10K\x1a\x04\x90\xb5\x18\x01\x12)\n\x1fMessageType_NEMDecryptedMe\
+    ssage\x10L\x1a\x04\x98\xb5\x18\x01\x12&\n\x1bMessageType_TezosGetAddress\
+    \x10\x96\x01\x1a\x04\x90\xb5\x18\x01\x12#\n\x18MessageType_TezosAddress\
+    \x10\x97\x01\x1a\x04\x98\xb5\x18\x01\x12\"\n\x17MessageType_TezosSignTx\
+    \x10\x98\x01\x1a\x04\x90\xb5\x18\x01\x12$\n\x19MessageType_TezosSignedTx\
+    \x10\x99\x01\x1a\x04\x98\xb5\x18\x01\x12(\n\x1dMessageType_TezosGetPubli\
+    cKey\x10\x9a\x01\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType_TezosPubl\
+    icKey\x10\x9b\x01\x1a\x04\x98\xb5\x18\x01\x12$\n\x19MessageType_StellarS\
+    ignTx\x10\xca\x01\x1a\x04\x90\xb5\x18\x01\x12)\n\x1eMessageType_StellarT\
+    xOpRequest\x10\xcb\x01\x1a\x04\x98\xb5\x18\x01\x12(\n\x1dMessageType_Ste\
+    llarGetAddress\x10\xcf\x01\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType\
+    _StellarAddress\x10\xd0\x01\x1a\x04\x98\xb5\x18\x01\x12-\n\"MessageType_\
+    StellarCreateAccountOp\x10\xd2\x01\x1a\x04\x90\xb5\x18\x01\x12'\n\x1cMes\
+    sageType_StellarPaymentOp\x10\xd3\x01\x1a\x04\x90\xb5\x18\x01\x128\n-Mes\
+    sageType_StellarPathPaymentStrictReceiveOp\x10\xd4\x01\x1a\x04\x90\xb5\
+    \x18\x01\x12/\n$MessageType_StellarManageSellOfferOp\x10\xd5\x01\x1a\x04\
+    \x90\xb5\x18\x01\x126\n+MessageType_StellarCreatePassiveSellOfferOp\x10\
+    \xd6\x01\x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessageType_StellarSetOptions\
+    Op\x10\xd7\x01\x1a\x04\x90\xb5\x18\x01\x12+\n\x20MessageType_StellarChan\
+    geTrustOp\x10\xd8\x01\x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessageType_Stel\
+    larAllowTrustOp\x10\xd9\x01\x1a\x04\x90\xb5\x18\x01\x12,\n!MessageType_S\
+    tellarAccountMergeOp\x10\xda\x01\x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessa\
+    geType_StellarManageDataOp\x10\xdc\x01\x1a\x04\x90\xb5\x18\x01\x12,\n!Me\
+    ssageType_StellarBumpSequenceOp\x10\xdd\x01\x1a\x04\x90\xb5\x18\x01\x12.\
+    \n#MessageType_StellarManageBuyOfferOp\x10\xde\x01\x1a\x04\x90\xb5\x18\
+    \x01\x125\n*MessageType_StellarPathPaymentStrictSendOp\x10\xdf\x01\x1a\
+    \x04\x90\xb5\x18\x01\x125\n*MessageType_StellarClaimClaimableBalanceOp\
+    \x10\xe1\x01\x1a\x04\x90\xb5\x18\x01\x12&\n\x1bMessageType_StellarSigned\
+    Tx\x10\xe6\x01\x1a\x04\x98\xb5\x18\x01\x12*\n\x1fMessageType_CardanoGetP\
+    ublicKey\x10\xb1\x02\x1a\x04\x90\xb5\x18\x01\x12'\n\x1cMessageType_Carda\
+    noPublicKey\x10\xb2\x02\x1a\x04\x98\xb5\x18\x01\x12(\n\x1dMessageType_Ca\
+    rdanoGetAddress\x10\xb3\x02\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageTyp\
+    e_CardanoAddress\x10\xb4\x02\x1a\x04\x98\xb5\x18\x01\x12'\n\x1cMessageTy\
+    pe_CardanoTxItemAck\x10\xb9\x02\x1a\x04\x98\xb5\x18\x01\x127\n,MessageTy\
+    pe_CardanoTxAuxiliaryDataSupplement\x10\xba\x02\x1a\x04\x98\xb5\x18\x01\
+    \x12.\n#MessageType_CardanoTxWitnessRequest\x10\xbb\x02\x1a\x04\x90\xb5\
+    \x18\x01\x12/\n$MessageType_CardanoTxWitnessResponse\x10\xbc\x02\x1a\x04\
+    \x98\xb5\x18\x01\x12'\n\x1cMessageType_CardanoTxHostAck\x10\xbd\x02\x1a\
+    \x04\x90\xb5\x18\x01\x12(\n\x1dMessageType_CardanoTxBodyHash\x10\xbe\x02\
+    \x1a\x04\x98\xb5\x18\x01\x12,\n!MessageType_CardanoSignTxFinished\x10\
+    \xbf\x02\x1a\x04\x98\xb5\x18\x01\x12(\n\x1dMessageType_CardanoSignTxInit\
+    \x10\xc0\x02\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType_CardanoTxInpu\
+    t\x10\xc1\x02\x1a\x04\x90\xb5\x18\x01\x12&\n\x1bMessageType_CardanoTxOut\
+    put\x10\xc2\x02\x1a\x04\x90\xb5\x18\x01\x12(\n\x1dMessageType_CardanoAss\
+    etGroup\x10\xc3\x02\x1a\x04\x90\xb5\x18\x01\x12#\n\x18MessageType_Cardan\
+    oToken\x10\xc4\x02\x1a\x04\x90\xb5\x18\x01\x12+\n\x20MessageType_Cardano\
+    TxCertificate\x10\xc5\x02\x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessageType_\
+    CardanoTxWithdrawal\x10\xc6\x02\x1a\x04\x90\xb5\x18\x01\x12-\n\"MessageT\
+    ype_CardanoTxAuxiliaryData\x10\xc7\x02\x1a\x04\x90\xb5\x18\x01\x12'\n\
+    \x1cMessageType_CardanoPoolOwner\x10\xc8\x02\x1a\x04\x90\xb5\x18\x01\x12\
+    1\n&MessageType_CardanoPoolRelayParameters\x10\xc9\x02\x1a\x04\x90\xb5\
+    \x18\x01\x121\n&MessageType_CardanoGetNativeScriptHash\x10\xca\x02\x1a\
+    \x04\x90\xb5\x18\x01\x12.\n#MessageType_CardanoNativeScriptHash\x10\xcb\
+    \x02\x1a\x04\x98\xb5\x18\x01\x12$\n\x19MessageType_CardanoTxMint\x10\xcc\
+    \x02\x1a\x04\x90\xb5\x18\x01\x12/\n$MessageType_CardanoTxCollateralInput\
+    \x10\xcd\x02\x1a\x04\x90\xb5\x18\x01\x12.\n#MessageType_CardanoTxRequire\
+    dSigner\x10\xce\x02\x1a\x04\x90\xb5\x18\x01\x120\n%MessageType_CardanoTx\
+    InlineDatumChunk\x10\xcf\x02\x1a\x04\x90\xb5\x18\x01\x124\n)MessageType_\
+    CardanoTxReferenceScriptChunk\x10\xd0\x02\x1a\x04\x90\xb5\x18\x01\x12.\n\
+    #MessageType_CardanoTxReferenceInput\x10\xd1\x02\x1a\x04\x90\xb5\x18\x01\
+    \x12-\n\"MessageType_CardanoSignMessageInit\x10\xd2\x02\x1a\x04\x90\xb5\
+    \x18\x01\x120\n%MessageType_CardanoMessageDataRequest\x10\xd3\x02\x1a\
+    \x04\x98\xb5\x18\x01\x121\n&MessageType_CardanoMessageDataResponse\x10\
+    \xd4\x02\x1a\x04\x90\xb5\x18\x01\x12.\n#MessageType_CardanoMessageSignat\
+    ure\x10\xd5\x02\x1a\x04\x98\xb5\x18\x01\x12'\n\x1cMessageType_RippleGetA\
+    ddress\x10\x90\x03\x1a\x04\x90\xb5\x18\x01\x12$\n\x19MessageType_RippleA\
+    ddress\x10\x91\x03\x1a\x04\x98\xb5\x18\x01\x12#\n\x18MessageType_RippleS\
+    ignTx\x10\x92\x03\x1a\x04\x90\xb5\x18\x01\x12%\n\x1aMessageType_RippleSi\
+    gnedTx\x10\x93\x03\x1a\x04\x98\xb5\x18\x01\x123\n(MessageType_MoneroTran\
+    sactionInitRequest\x10\xf5\x03\x1a\x04\x90\xb5\x18\x01\x12/\n$MessageTyp\
+    e_MoneroTransactionInitAck\x10\xf6\x03\x1a\x04\x98\xb5\x18\x01\x127\n,Me\
+    ssageType_MoneroTransactionSetInputRequest\x10\xf7\x03\x1a\x04\x90\xb5\
+    \x18\x01\x123\n(MessageType_MoneroTransactionSetInputAck\x10\xf8\x03\x1a\
+    \x04\x98\xb5\x18\x01\x128\n-MessageType_MoneroTransactionInputViniReques\
+    t\x10\xfb\x03\x1a\x04\x90\xb5\x18\x01\x124\n)MessageType_MoneroTransacti\
+    onInputViniAck\x10\xfc\x03\x1a\x04\x98\xb5\x18\x01\x12;\n0MessageType_Mo\
+    neroTransactionAllInputsSetRequest\x10\xfd\x03\x1a\x04\x90\xb5\x18\x01\
     \x127\n,MessageType_MoneroTransactionAllInputsSetAck\x10\xfe\x03\x1a\x04\
     \x98\xb5\x18\x01\x128\n-MessageType_MoneroTransactionSetOutputRequest\
-    \x10\xff\x03\x1a\x04\x98\xb5\x18\x01\x124\n)MessageType_MoneroTransactio\
+    \x10\xff\x03\x1a\x04\x90\xb5\x18\x01\x124\n)MessageType_MoneroTransactio\
     nSetOutputAck\x10\x80\x04\x1a\x04\x98\xb5\x18\x01\x128\n-MessageType_Mon\
-    eroTransactionAllOutSetRequest\x10\x81\x04\x1a\x04\x98\xb5\x18\x01\x124\
+    eroTransactionAllOutSetRequest\x10\x81\x04\x1a\x04\x90\xb5\x18\x01\x124\
     \n)MessageType_MoneroTransactionAllOutSetAck\x10\x82\x04\x1a\x04\x98\xb5\
     \x18\x01\x128\n-MessageType_MoneroTransactionSignInputRequest\x10\x83\
-    \x04\x1a\x04\x98\xb5\x18\x01\x124\n)MessageType_MoneroTransactionSignInp\
+    \x04\x1a\x04\x90\xb5\x18\x01\x124\n)MessageType_MoneroTransactionSignInp\
     utAck\x10\x84\x04\x1a\x04\x98\xb5\x18\x01\x124\n)MessageType_MoneroTrans\
-    actionFinalRequest\x10\x85\x04\x1a\x04\x98\xb5\x18\x01\x120\n%MessageTyp\
+    actionFinalRequest\x10\x85\x04\x1a\x04\x90\xb5\x18\x01\x120\n%MessageTyp\
     e_MoneroTransactionFinalAck\x10\x86\x04\x1a\x04\x98\xb5\x18\x01\x126\n+M\
-    essageType_MoneroKeyImageExportInitRequest\x10\x92\x04\x1a\x04\x98\xb5\
+    essageType_MoneroKeyImageExportInitRequest\x10\x92\x04\x1a\x04\x90\xb5\
     \x18\x01\x122\n'MessageType_MoneroKeyImageExportInitAck\x10\x93\x04\x1a\
     \x04\x98\xb5\x18\x01\x124\n)MessageType_MoneroKeyImageSyncStepRequest\
-    \x10\x94\x04\x1a\x04\x98\xb5\x18\x01\x120\n%MessageType_MoneroKeyImageSy\
+    \x10\x94\x04\x1a\x04\x90\xb5\x18\x01\x120\n%MessageType_MoneroKeyImageSy\
     ncStepAck\x10\x95\x04\x1a\x04\x98\xb5\x18\x01\x125\n*MessageType_MoneroK\
-    eyImageSyncFinalRequest\x10\x96\x04\x1a\x04\x98\xb5\x18\x01\x121\n&Messa\
+    eyImageSyncFinalRequest\x10\x96\x04\x1a\x04\x90\xb5\x18\x01\x121\n&Messa\
     geType_MoneroKeyImageSyncFinalAck\x10\x97\x04\x1a\x04\x98\xb5\x18\x01\
     \x12'\n\x1cMessageType_MoneroGetAddress\x10\x9c\x04\x1a\x04\x90\xb5\x18\
     \x01\x12$\n\x19MessageType_MoneroAddress\x10\x9d\x04\x1a\x04\x98\xb5\x18\
@@ -2159,19 +2165,20 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     4\n)MessageType_TronUnfreezeBalanceV2Contract\x10\xa0\x11\x1a\x04\x90\
     \xb5\x18\x01\x12+\n\x20MessageType_TronWithdrawUnfreeze\x10\xa1\x11\x1a\
     \x04\x90\xb5\x18\x01\x12.\n#MessageType_TronVoteWitnessContract\x10\xa2\
-    \x11\x1a\x04\x90\xb5\x18\x01\x12)\n\x1eMessageType_BenchmarkListNames\
-    \x10\x8cG\x1a\x04\x80\xa6\x1d\x01\x12%\n\x1aMessageType_BenchmarkNames\
-    \x10\x8dG\x1a\x04\x80\xa6\x1d\x01\x12#\n\x18MessageType_BenchmarkRun\x10\
-    \x8eG\x1a\x04\x80\xa6\x1d\x01\x12&\n\x1bMessageType_BenchmarkResult\x10\
-    \x8fG\x1a\x04\x80\xa6\x1d\x01\x12'\n\x18MessageType_TelemetryGet\x10\xcc\
-    \x08\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12$\n\x15MessageType_Telem\
-    etry\x10\xcd\x08\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x1a\x08\xc8\xf3\
-    \x18\x01\xd0\xf3\x18\x01\"\x04\x08Z\x10\\\"\x04\x08G\x10J\"\x04\x08r\x10\
-    z\"\x05\x08{\x10\x95\x01\"\x06\x08\xdb\x01\x10\xdb\x01\"\x06\x08\xe0\x01\
-    \x10\xe0\x01\"\x06\x08\xac\x02\x10\xb0\x02\"\x06\x08\xb5\x02\x10\xb8\x02\
-    \"\x06\x08\xbc\x05\x10\xc5\x05\"\x06\x08\xe9\x07\x10\xf7\x07\"\x06\x08\
-    \xfa\x07\x10\xcb\x08B8\n#com.satoshilabs.trezor.lib.protobufB\rTrezorMes\
-    sage\x80\xa6\x1d\x01\
+    \x11\x1a\x04\x90\xb5\x18\x01\x12*\n\x1fMessageType_TronWithdrawBalance\
+    \x10\xa5\x11\x1a\x04\x90\xb5\x18\x01\x12)\n\x1eMessageType_BenchmarkList\
+    Names\x10\x8cG\x1a\x04\x80\xa6\x1d\x01\x12%\n\x1aMessageType_BenchmarkNa\
+    mes\x10\x8dG\x1a\x04\x80\xa6\x1d\x01\x12#\n\x18MessageType_BenchmarkRun\
+    \x10\x8eG\x1a\x04\x80\xa6\x1d\x01\x12&\n\x1bMessageType_BenchmarkResult\
+    \x10\x8fG\x1a\x04\x80\xa6\x1d\x01\x12'\n\x18MessageType_TelemetryGet\x10\
+    \xcc\x08\x1a\x08\x80\xa6\x1d\x01\x90\xb5\x18\x01\x12$\n\x15MessageType_T\
+    elemetry\x10\xcd\x08\x1a\x08\x80\xa6\x1d\x01\x98\xb5\x18\x01\x1a\x08\xc8\
+    \xf3\x18\x01\xd0\xf3\x18\x01\"\x04\x08Z\x10\\\"\x04\x08M\x10N\"\x04\x08G\
+    \x10J\"\x04\x08r\x10z\"\x05\x08{\x10\x95\x01\"\x06\x08\xdb\x01\x10\xdb\
+    \x01\"\x06\x08\xe0\x01\x10\xe0\x01\"\x06\x08\xac\x02\x10\xb0\x02\"\x06\
+    \x08\xb5\x02\x10\xb8\x02\"\x06\x08\xbc\x05\x10\xc5\x05\"\x06\x08\xe9\x07\
+    \x10\xf7\x07\"\x06\x08\xfa\x07\x10\xcb\x08B8\n#com.satoshilabs.trezor.li\
+    b.protobufB\rTrezorMessage\x80\xa6\x1d\x01\
 ";
 
 /// `FileDescriptorProto` object which was a source for this generated file

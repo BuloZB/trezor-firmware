@@ -60,8 +60,6 @@ trezor_message_impl! {
     SetU2FCounter => MessageType_SetU2FCounter,
     GetNextU2FCounter => MessageType_GetNextU2FCounter,
     NextU2FCounter => MessageType_NextU2FCounter,
-    Deprecated_PassphraseStateRequest => MessageType_Deprecated_PassphraseStateRequest,
-    Deprecated_PassphraseStateAck => MessageType_Deprecated_PassphraseStateAck,
     FirmwareErase => MessageType_FirmwareErase,
     FirmwareUpload => MessageType_FirmwareUpload,
     FirmwareRequest => MessageType_FirmwareRequest,
@@ -199,6 +197,8 @@ trezor_message_impl! {
     EthereumSignTypedHash => MessageType_EthereumSignTypedHash,
     EthereumDefinitionRequest => MessageType_EthereumDefinitionRequest,
     EthereumDefinitionAck => MessageType_EthereumDefinitionAck,
+    EthereumSignAuth7702 => MessageType_EthereumSignAuth7702,
+    EthereumAuth7702Signature => MessageType_EthereumAuth7702Signature,
 }
 
 #[cfg(feature = "evolu")]
@@ -338,6 +338,7 @@ trezor_message_impl! {
     TronUnfreezeBalanceV2Contract => MessageType_TronUnfreezeBalanceV2Contract,
     TronWithdrawUnfreeze => MessageType_TronWithdrawUnfreeze,
     TronVoteWitnessContract => MessageType_TronVoteWitnessContract,
+    TronWithdrawBalance => MessageType_TronWithdrawBalance,
 }
 
 #[cfg(feature = "webauthn")]

@@ -4,6 +4,7 @@ pub mod macros;
 
 pub mod buffer;
 pub mod dict;
+pub mod exception;
 pub mod ffi;
 pub mod func;
 pub mod gc;
@@ -19,7 +20,7 @@ pub mod simple_type;
 pub mod typ;
 pub mod util;
 
-#[cfg(feature = "debug")]
+#[cfg(feature = "dbg_console")]
 pub mod logging;
 
 #[cfg(test)]

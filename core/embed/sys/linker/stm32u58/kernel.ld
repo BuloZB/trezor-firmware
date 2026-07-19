@@ -33,6 +33,13 @@ SECTIONS {
     . = ALIGN(CODE_ALIGNMENT);
   } >FLASH AT>FLASH
 
+  /* Secure monitor binary, embedded at the start of the firmware region by
+     the kernel build when the model uses the secmon layout. Empty (no-op) for
+     models without a secure monitor. */
+  .flash : ALIGN(CODE_ALIGNMENT) {
+    KEEP(*(.secmon));
+  } >FLASH AT>FLASH
+
   .flash : ALIGN(CODE_ALIGNMENT) {
     _kernel_flash_start = .;
     KEEP(*(.vector_table));

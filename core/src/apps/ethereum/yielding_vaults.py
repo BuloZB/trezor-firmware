@@ -10,6 +10,29 @@ from trezor.messages import EthereumTokenInfo
 
 from .tokens import UNKNOWN_TOKEN
 
+# Ethereum address bytes (20-byte)
+_TEST_SH_USDC_VAULT_ADDRESS = (
+    b"\xa5\x11\xd6\x18\xcd\x0f\x9d\x7c\xad\x79\x10\x09\xd7\xc5\xe3\xb1\x9c\x95\x68\xda"
+)
+_SH_USDC_VAULT_ADDRESS = (
+    b"\xde\x6c\x23\xe5\x61\xf3\xe5\x58\x46\x20\x7e\xc4\x5a\x91\xb7\x77\xe0\xf7\xc8\x89"
+)
+_SH_USDT_VAULT_ADDRESS = (
+    b"\xe4\xdb\x1c\x5a\x1b\x70\x9c\xe4\xd2\xad\xa6\x98\x5d\x9d\x50\x6e\x58\xf7\x38\x29"
+)
+_SH_ETH_VAULT_ADDRESS = (
+    b"\x70\x4c\xfb\x08\x96\x90\x48\xa8\xdf\xf2\x98\xb2\x14\xf9\x59\x79\x1d\x8d\xa5\x09"
+)
+_USDC_ADDRESS = (
+    b"\xa0\xb8\x69\x91\xc6\x21\x8b\x36\xc1\xd1\x9d\x4a\x2e\x9e\xb0\xce\x36\x06\xeb\x48"
+)
+_USDT_ADDRESS = (
+    b"\xda\xc1\x7f\x95\x8d\x2e\xe5\x23\xa2\x20\x62\x06\x99\x45\x97\xc1\x3d\x83\x1e\xc7"
+)
+_WETH_ADDRESS = (
+    b"\xc0\x2a\xaa\x39\xb2\x23\xfe\x8d\x0a\x0e\x5c\x4f\x27\xea\xd9\x08\x3c\x75\x6c\xc2"
+)
+
 
 class EthereumVaultInfo:
     def __init__(
@@ -30,62 +53,82 @@ class EthereumVaultInfo:
 KNOWN_VAULTS = (
     # Test vault: https://etherscan.io/address/0xa511d618cD0F9d7cAD791009d7c5E3b19c9568da
     EthereumVaultInfo(
-        address=b"\xa5\x11\xd6\x18\xcd\x0f\x9d\x7c\xad\x79\x10\x09\xd7\xc5\xe3\xb1\x9c\x95\x68\xda",
+        address=_TEST_SH_USDC_VAULT_ADDRESS,
         chain_id=1,
         name="Test Steakhouse USDC Prime Vault",
         asset_token=EthereumTokenInfo(
             symbol="USDC",
             decimals=6,
-            address=b"\xa0\xb8\x69\x91\xc6\x21\x8b\x36\xc1\xd1\x9d\x4a\x2e\x9e\xb0\xce\x36\x06\xeb\x48",
+            address=_USDC_ADDRESS,
             chain_id=1,
             name="USD Coin",
         ),
         vault_token=EthereumTokenInfo(
             symbol="tstSHUSDCp",
             decimals=18,
-            address=b"\xa5\x11\xd6\x18\xcd\x0f\x9d\x7c\xad\x79\x10\x09\xd7\xc5\xe3\xb1\x9c\x95\x68\xda",
+            address=_TEST_SH_USDC_VAULT_ADDRESS,
             chain_id=1,
             name="Test Steakhouse USDC Prime Vault",
         ),
     ),
     # https://etherscan.io/address/0xde6c23E561F3e55846207EC45A91b777e0F7C889
     EthereumVaultInfo(
-        address=b"\xde\x6c\x23\xe5\x61\xf3\xe5\x58\x46\x20\x7e\xc4\x5a\x91\xb7\x77\xe0\xf7\xc8\x89",
+        address=_SH_USDC_VAULT_ADDRESS,
         chain_id=1,
         name="Trezor Steakhouse USDC Prime Vault",
         asset_token=EthereumTokenInfo(
             symbol="USDC",
             decimals=6,
-            address=b"\xa0\xb8\x69\x91\xc6\x21\x8b\x36\xc1\xd1\x9d\x4a\x2e\x9e\xb0\xce\x36\x06\xeb\x48",
+            address=_USDC_ADDRESS,
             chain_id=1,
             name="USD Coin",
         ),
         vault_token=EthereumTokenInfo(
             symbol="trSHUSDCp",
             decimals=18,
-            address=b"\xde\x6c\x23\xe5\x61\xf3\xe5\x58\x46\x20\x7e\xc4\x5a\x91\xb7\x77\xe0\xf7\xc8\x89",
+            address=_SH_USDC_VAULT_ADDRESS,
             chain_id=1,
             name="Trezor Steakhouse USDC Prime Vault",
         ),
     ),
     # https://etherscan.io/address/0xE4DB1c5A1B709CE4d2adA6985D9D506e58F73829
     EthereumVaultInfo(
-        address=b"\xe4\xdb\x1c\x5a\x1b\x70\x9c\xe4\xd2\xad\xa6\x98\x5d\x9d\x50\x6e\x58\xf7\x38\x29",
+        address=_SH_USDT_VAULT_ADDRESS,
         chain_id=1,
         name="Trezor Steakhouse USDT Prime Vault",
         asset_token=EthereumTokenInfo(
             symbol="USDT",
             decimals=6,
-            address=b"\xda\xc1\x7f\x95\x8d\x2e\xe5\x23\xa2\x20\x62\x06\x99\x45\x97\xc1\x3d\x83\x1e\xc7",
+            address=_USDT_ADDRESS,
             chain_id=1,
             name="Tether USD",
         ),
         vault_token=EthereumTokenInfo(
             symbol="trSHUSDTp",
             decimals=18,
-            address=b"\xe4\xdb\x1c\x5a\x1b\x70\x9c\xe4\xd2\xad\xa6\x98\x5d\x9d\x50\x6e\x58\xf7\x38\x29",
+            address=_SH_USDT_VAULT_ADDRESS,
             chain_id=1,
             name="Trezor Steakhouse USDT Prime Vault",
+        ),
+    ),
+    # https://etherscan.io/address/0x704cFb08969048a8DFf298B214F959791d8Da509
+    EthereumVaultInfo(
+        address=_SH_ETH_VAULT_ADDRESS,
+        chain_id=1,
+        name="Trezor Steakhouse ETH Prime Vault",
+        asset_token=EthereumTokenInfo(
+            symbol="WETH",
+            decimals=18,
+            address=_WETH_ADDRESS,
+            chain_id=1,
+            name="Wrapped Ether",
+        ),
+        vault_token=EthereumTokenInfo(
+            symbol="trSHETHp",
+            decimals=18,
+            address=_SH_ETH_VAULT_ADDRESS,
+            chain_id=1,
+            name="Trezor Steakhouse ETH Prime Vault",
         ),
     ),
 )

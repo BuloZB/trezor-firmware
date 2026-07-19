@@ -9,8 +9,7 @@ from trezorlib.debuglink import DebugSession as Session
 from trezorlib.debuglink import TrezorTestContext as Client
 from trezorlib.messages import EvoluDelegatedIdentityKey, ThpCredentialResponse
 from trezorlib.thp import curve25519
-
-from ...common import compact_size
+from trezorlib.tools import compact_size
 
 TEST_randomness = os.urandom(32)
 TEST_host_static_private_key = curve25519.get_private_key(TEST_randomness)

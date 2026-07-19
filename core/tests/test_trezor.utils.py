@@ -51,6 +51,26 @@ class TestUtils(unittest.TestCase):
             utils.truncate_utf8("\u1234\u5678", 7), "\u1234\u5678"
         )  # b'\xe1\x88\xb4\xe5\x99\xb8
 
+        # test ASCII
+        self.assertEqual(utils.truncate_utf8("123", 4), "123")
+        self.assertEqual(utils.truncate_utf8("123", 3), "123")
+        self.assertEqual(utils.truncate_utf8("123", 2), "12")
+        self.assertEqual(utils.truncate_utf8("123", 1), "1")
+        self.assertEqual(utils.truncate_utf8("123", 0), "")
+
+        # test non-ASCII
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 10), "➀➁➂")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 9), "➀➁➂")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 8), "➀➁")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 7), "➀➁")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 6), "➀➁")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 5), "➀")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 4), "➀")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 3), "➀")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 2), "")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 1), "")
+        self.assertEqual(utils.truncate_utf8("➀➁➂", 0), "")
+
     def test_firmware_hash(self):
         if utils.INTERNAL_MODEL in (  # pylint: disable=internal-model-tuple-comparison
             "D002",
@@ -80,6 +100,22 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(data, bytearray([0, 1, 2, 0, 0, 0, 0, 7, 8, 9]))
         utils.memzero(data)
         self.assertEqual(data, bytearray(10))
+
+    def test_consteq(self):
+        self.assertTrue(utils.consteq(b"", b""))
+        self.assertFalse(utils.consteq(b"", b"\x42"))
+        self.assertFalse(utils.consteq(b"\x42", b""))
+        self.assertFalse(utils.consteq(b"hell", b"hello"))
+        self.assertFalse(utils.consteq(b"hello", b"ello"))
+        long1 = b"x" * 999 + b"y"
+        long2 = b"x" * 1000
+        self.assertFalse(utils.consteq(bytearray(long1), long2))
+        self.assertFalse(utils.consteq(long1, bytearray(long2)))
+        self.assertTrue(utils.consteq(long1, bytearray(long1)))
+        self.assertTrue(utils.consteq(bytearray(long1), long1))
+        self.assertFalse(utils.consteq(b"", long1))
+        self.assertTrue(utils.consteq(memoryview(b"hello"), b"hello"))
+        self.assertTrue(utils.consteq(b"hello", memoryview(b"hello")))
 
 
 if __name__ == "__main__":

@@ -1,60 +1,50 @@
 use core::cmp::Ordering;
 
-use crate::{
-    error::Error,
-    io::BinaryData,
-    micropython::{buffer::StrBuffer, gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
-    storage,
-    strutil::TString,
-    time::Duration,
-    translations::TR,
-    ui::{
-        component::{
-            text::{
-                op::OpTextLayout,
-                paragraphs::{
-                    Checklist, Paragraph, ParagraphSource, ParagraphVecShort, Paragraphs, VecExt,
-                },
-                TextStyle,
-            },
-            ComponentExt as _, Empty, FormattedText, Timeout,
-        },
-        flow::FlowMsg,
-        geometry::{Alignment, LinearPlacement, Offset},
-        layout::{
-            obj::{LayoutMaybeTrace, LayoutObj, RootComponent},
-            util::{ConfirmValueParams, ContentType, PropsList, RecoveryType, StrOrBytes},
-        },
-        notification::Notification,
-        ui_firmware::{
-            FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS,
-            MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
-        },
-        ModelUI,
-    },
-    util::interpolate,
+use super::component::Button;
+use super::firmware::{
+    ActionBar, Bip39Input, ConfirmHomescreen, DeviceMenuScreen, DurationInput, Header, HeaderMsg,
+    Hint, Homescreen, LabelInput, MnemonicKeyboard, PinKeyboard, ProgressScreen,
+    SelectWordCountScreen, SelectWordScreen, SetBrightnessScreen, ShortMenuVec, Slip39Input,
+    StringKeyboard, TextScreen, TextScreenMsg, ValueInputScreen, VerticalMenu, VerticalMenuScreen,
+    VerticalMenuScreenMsg,
 };
-
+use super::theme::firmware::{button_actionbar_danger, button_confirm};
+use super::theme::gradient::Gradient;
+use super::theme::{self};
+use super::{flow, fonts, UIEckhart};
+use crate::error::Error;
+use crate::io::BinaryData;
+use crate::micropython::buffer::StrBuffer;
+use crate::micropython::gc::Gc;
+use crate::micropython::iter::IterBuf;
+use crate::micropython::list::List;
+use crate::micropython::obj::Obj;
+use crate::micropython::util;
+use crate::storage;
+use crate::strutil::TString;
+use crate::time::Duration;
+use crate::translations::TR;
+use crate::ui::component::text::op::OpTextLayout;
+use crate::ui::component::text::paragraphs::{
+    Checklist, Paragraph, ParagraphSource, ParagraphVecShort, Paragraphs, VecExt,
+};
+use crate::ui::component::text::TextStyle;
 #[cfg(feature = "ble")]
 use crate::ui::component::{BLEHandler, BLEHandlerMode};
-
-use super::{
-    component::Button,
-    firmware::{
-        ActionBar, Bip39Input, ConfirmHomescreen, DeviceMenuScreen, DurationInput, Header,
-        HeaderMsg, Hint, Homescreen, LabelInput, MnemonicKeyboard, PinKeyboard, ProgressScreen,
-        SelectWordCountScreen, SelectWordScreen, SetBrightnessScreen, ShortMenuVec, Slip39Input,
-        StringKeyboard, TextScreen, TextScreenMsg, ValueInputScreen, VerticalMenu,
-        VerticalMenuScreen, VerticalMenuScreenMsg,
-    },
-    flow, fonts,
-    theme::{
-        self,
-        firmware::{button_actionbar_danger, button_confirm},
-        gradient::Gradient,
-    },
-    UIEckhart,
+use crate::ui::component::{ComponentExt as _, Empty, FormattedText, Timeout};
+use crate::ui::flow::FlowMsg;
+use crate::ui::geometry::{Alignment, LinearPlacement, Offset};
+use crate::ui::layout::obj::{LayoutMaybeTrace, LayoutObj, RootComponent};
+use crate::ui::layout::util::{
+    ConfirmValueParams, ContentType, PropsList, RecoveryType, StrOrBytes,
 };
+use crate::ui::notification::Notification;
+use crate::ui::ui_firmware::{
+    FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS, MAX_PAIRED_DEVICES,
+    MAX_WORD_QUIZ_ITEMS,
+};
+use crate::ui::ModelUI;
+use crate::util::interpolate;
 
 impl FirmwareUI for UIEckhart {
     fn confirm_action(
@@ -1016,7 +1006,7 @@ impl FirmwareUI for UIEckhart {
         button: TString<'static>,
         description: TString<'static>,
         allow_cancel: bool,
-        _time_ms: u32,
+        time_ms: u32,
     ) -> Result<Gc<LayoutObj>, Error> {
         let content = Paragraphs::new(Paragraph::new(&theme::firmware::TEXT_REGULAR, description))
             .with_placement(LinearPlacement::vertical());
@@ -1027,7 +1017,11 @@ impl FirmwareUI for UIEckhart {
                 Button::with_text(button),
             )
         } else {
-            ActionBar::new_single(Button::with_text(button))
+            let button = Button::with_text(button);
+            match time_ms {
+                0 => ActionBar::new_single(button),
+                _ => ActionBar::new_timeout(button, Duration::from_millis(time_ms)),
+            }
         };
         let screen = TextScreen::new(content)
             .with_header(
@@ -1082,6 +1076,7 @@ impl FirmwareUI for UIEckhart {
 
     fn show_device_menu(
         init_submenu_idx: Option<u8>,
+        init_submenu_offset: i16,
         backup_failed: bool,
         backup_needed: bool,
         ble_enabled: bool,
@@ -1104,6 +1099,7 @@ impl FirmwareUI for UIEckhart {
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let layout = RootComponent::new(DeviceMenuScreen::new(
             init_submenu_idx,
+            init_submenu_offset,
             backup_failed,
             backup_needed,
             ble_enabled,
@@ -1533,15 +1529,6 @@ impl FirmwareUI for UIEckhart {
             .with_header(header)
             .with_action_bar(action_bar);
         let layout = LayoutObj::new(screen)?;
-        Ok(layout)
-    }
-
-    fn show_wait_text(text: TString<'static>) -> Result<impl LayoutMaybeTrace, Error> {
-        let paragraphs = Paragraph::new(&theme::TEXT_REGULAR, text)
-            .into_paragraphs()
-            .with_placement(LinearPlacement::vertical());
-        let screen = TextScreen::new(paragraphs);
-        let layout = RootComponent::new(screen);
         Ok(layout)
     }
 

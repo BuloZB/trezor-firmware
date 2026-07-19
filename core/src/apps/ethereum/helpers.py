@@ -7,14 +7,19 @@ from . import networks
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes
-    from typing import Awaitable, Callable, Iterable
+    from typing import Awaitable, Callable, Sequence
 
     from trezor.messages import EthereumFieldType, EthereumTokenInfo
     from trezor.ui.layouts import StrPropertyType
+    from trezor.utils import HashWriter
 
     from .networks import EthereumNetworkInfo
 
     ConfirmDataFn = Callable[[AnyBytes], Awaitable[None]]
+
+    # Fetch the next calldata chunk from host.
+    # `data_left: int` argument is provided.
+    DataChunkLoader = Callable[[int], Awaitable[AnyBytes]]
 
 
 RSKIP60_NETWORKS = (30, 31)
@@ -27,21 +32,21 @@ def address_from_bytes(
     Converts address in bytes to a checksummed string as defined
     in https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
     """
-    from trezor.crypto.hashlib import sha3_256
-
     if network.chain_id in RSKIP60_NETWORKS:
         # rskip60 is a different way to calculate checksum
         prefix = str(network.chain_id) + "0x"
     else:
         prefix = ""
 
-    address_hex = hexlify(address_bytes).decode()
-    digest = sha3_256((prefix + address_hex).encode(), keccak=True).digest()
+    address_hex = hexlify(address_bytes)
+    writer = keccak256(prefix.encode())
+    writer.extend(address_hex)
+    digest = writer.get_digest()
 
     def _maybe_upper(i: int) -> str:
         """Uppercase i-th letter only if the corresponding nibble has high bit set."""
         digest_byte = digest[i // 2]
-        hex_letter = address_hex[i]
+        hex_letter = chr(address_hex[i])
         if i % 2 == 0:
             # even letter -> high nibble
             bit = 0x80
@@ -136,7 +141,7 @@ def decode_typed_data(data: AnyBytes, type_name: str) -> str:
 
 def get_fee_items_regular(
     gas_price: int, gas_limit: int, network: EthereumNetworkInfo
-) -> Iterable[StrPropertyType]:
+) -> Sequence[StrPropertyType]:
     # regular
     gas_limit_str = TR.ethereum__units_template.format(gas_limit)
     gas_price_str = format_ethereum_amount(
@@ -154,7 +159,7 @@ def get_fee_items_eip1559(
     max_priority_fee: int,
     gas_limit: int,
     network: EthereumNetworkInfo,
-) -> Iterable[StrPropertyType]:
+) -> Sequence[StrPropertyType]:
     # EIP-1559
     gas_limit_str = TR.ethereum__units_template.format(gas_limit)
     max_gas_fee_str = format_ethereum_amount(
@@ -303,3 +308,10 @@ def get_data_confirmer(total_len: int) -> ConfirmDataFn:
                     return
 
     return confirm_fn
+
+
+def keccak256(data: AnyBytes | None = None) -> HashWriter:
+    from trezor.crypto.hashlib import sha3_256
+    from trezor.utils import HashWriter
+
+    return HashWriter(sha3_256(data=data, keccak=True))

@@ -14,6 +14,9 @@
 # You should have received a copy of the License along with this library.
 # If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
 
+import time
+import typing as t
+
 import pytest
 
 from trezorlib import device, messages
@@ -21,7 +24,9 @@ from trezorlib.debuglink import DebugSession as Session
 from trezorlib.exceptions import TrezorFailure
 from trezorlib.messages import SdProtectOperationType as Op
 
-from .. import translations as TR
+B = messages.ButtonRequestType
+
+from trezorlib.testing import translations as TR
 
 PIN = "1234"
 
@@ -77,7 +82,6 @@ def test_sd_protect_unlock(session: Session):
         debug.press_yes()
 
     with session.test_ctx as client:
-        client.watch_layout()
         client.set_input_flow(input_flow_enable_sd_protect)
         device.sd_protect(session, Op.ENABLE)
 
@@ -103,7 +107,6 @@ def test_sd_protect_unlock(session: Session):
         debug.press_yes()
 
     with session.test_ctx as client:
-        client.watch_layout()
         client.set_input_flow(input_flow_change_pin)
         device.change_pin(session)
 
@@ -126,8 +129,125 @@ def test_sd_protect_unlock(session: Session):
         debug.press_no()  # close
 
     with session.test_ctx as client, pytest.raises(TrezorFailure) as e:
-        client.watch_layout()
         client.set_input_flow(input_flow_change_pin_format)
         device.change_pin(session)
 
     assert e.value.code == messages.FailureType.ProcessError
+
+
+def session_lock(session: Session) -> None:
+    session.lock()
+
+
+def auto_lock(session: Session) -> None:
+    time.sleep(10.5)
+    session.refresh_features()
+
+
+def press_lock(session: Session) -> None:
+    buttons = session.debug.screen_buttons
+    center = (buttons._width() // 2, buttons._height() // 2)
+    session.debug.click(center, hold_ms=3500)
+    session.refresh_features()
+
+
+@pytest.mark.sd_card
+@pytest.mark.setup_client(pin=PIN)
+@pytest.mark.parametrize(
+    "lock_func",
+    [pytest.param(fn, id=fn.__name__) for fn in (session_lock, auto_lock, press_lock)],
+)
+def test_sd_protect_lock(session: Session, lock_func: "t.Callable[[Session], None]"):
+    layout = session.debug.read_layout
+
+    assert "Lockscreen" in layout().all_components()
+    assert session.features.pin_protection is True
+    assert session.features.sd_protection is None
+    assert session.features.unlocked is False
+
+    with session.test_ctx as client:
+        # unlock and enable SD protection
+        client.use_pin_sequence([PIN] * 2)
+        client.set_expected_responses(
+            [
+                messages.ButtonRequest(code=B.PinEntry),
+                messages.ButtonRequest(code=B.Other),
+                messages.ButtonRequest(code=B.PinEntry),
+                messages.ButtonRequest(code=B.Success),
+                messages.Success,
+                messages.Features,
+            ]
+        )
+        device.sd_protect(session, Op.ENABLE)
+
+    if lock_func is auto_lock:
+        device.apply_settings(session, auto_lock_delay_ms=10 * 1000)
+
+    assert session.features.pin_protection is True
+    assert session.features.sd_protection is True
+    assert session.features.unlocked is True
+    lock_func(session)
+    assert "Lockscreen" in layout().all_components()
+    assert session.features.pin_protection is True
+    assert session.features.sd_protection is None
+    assert session.features.unlocked is False
+
+    with session.test_ctx as client:
+        # unlock and remove PIN
+        client.use_pin_sequence([PIN] * 2)
+        client.set_expected_responses(
+            [
+                messages.ButtonRequest(code=B.PinEntry),
+                messages.ButtonRequest(code=B.Other),
+                messages.ButtonRequest(code=B.PinEntry),
+                messages.ButtonRequest(code=B.Success),
+                messages.Success,
+                messages.Features,
+            ]
+        )
+        device.change_pin(session, remove=True)
+
+    assert session.features.pin_protection is False
+    assert session.features.sd_protection is True
+    assert session.features.unlocked is True
+    lock_func(session)
+    assert "Lockscreen" in layout().all_components()
+    assert session.features.pin_protection is False
+    assert session.features.sd_protection is None
+    assert session.features.unlocked is False
+
+    with session.test_ctx as client:
+        # setup PIN again
+        client.use_pin_sequence([PIN] * 2)
+        client.set_expected_responses(
+            [
+                messages.ButtonRequest(code=B.Other),
+                messages.ButtonRequest(code=B.PinEntry),
+                messages.ButtonRequest(code=B.PinEntry),
+                messages.ButtonRequest(code=B.Success),
+                messages.Success,
+                messages.Features,
+            ]
+        )
+        device.change_pin(session)
+
+    assert session.features.pin_protection is True
+    assert session.features.sd_protection is True
+    assert session.features.unlocked is True
+    lock_func(session)
+    assert "Lockscreen" in layout().all_components()
+    assert session.features.pin_protection is True
+    assert session.features.sd_protection is None
+    assert session.features.unlocked is False
+
+    with session.test_ctx as client:
+        # unlock again
+        client.use_pin_sequence([PIN])
+        client.set_expected_responses(
+            [
+                messages.ButtonRequest(code=B.PinEntry),
+                messages.Success,
+                messages.Features,
+            ]
+        )
+        session.ensure_unlocked()

@@ -1,20 +1,16 @@
 use core::mem;
 
-use crate::{
-    error::Error,
-    maybe_trace::MaybeTrace,
-    strutil::TString,
-    translations::TR,
-    ui::{
-        component::{base::Never, Bar, Component, Empty, Event, EventCtx, Label, Split},
-        geometry::{Insets, Offset, Rect},
-        shape,
-        shape::Renderer,
-        util::animation_disabled,
-    },
-};
-
 use super::{constant, theme, Frame, Header};
+use crate::error::Error;
+use crate::maybe_trace::MaybeTrace;
+use crate::strutil::TString;
+use crate::translations::TR;
+use crate::ui::component::base::Never;
+use crate::ui::component::{Bar, Component, Empty, Event, EventCtx, Label, Split};
+use crate::ui::geometry::{Insets, Offset, Rect};
+use crate::ui::shape;
+use crate::ui::shape::Renderer;
+use crate::ui::util::animation_disabled;
 
 const RECTANGLE_HEIGHT: i16 = 56;
 const LABEL_TOP: i16 = 135;
@@ -115,8 +111,8 @@ where
 
         let start = (self.value as i16 - 100) % 1000;
         let end = (self.value as i16 + 100) % 1000;
-        let start = 360.0 * start as f32 / 1000.0;
-        let end = 360.0 * end as f32 / 1000.0;
+        let start = 360.0 * f32::from(start) / 1000.0;
+        let end = 360.0 * f32::from(end) / 1000.0;
 
         shape::Circle::new(center, LOADER_OUTER)
             .with_bg(inactive_color)

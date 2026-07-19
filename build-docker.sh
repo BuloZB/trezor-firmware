@@ -60,6 +60,7 @@ function help_and_die() {
   echo "Option --prodtest is deprecated. Use "--targets prodtest" to build prodtest."
   echo "Set PRODUCTION=0 to run non-production builds."
   echo "Set VENDOR_HEADER=vendorheader_prodtest_unsigned.bin to use the specified vendor header for prodtest."
+  echo "USE REPRODUCIBLE_XTASK_BUILD_OPTS to pass additional parameters for xtask build."
   exit 0
 }
 
@@ -129,6 +130,12 @@ fi
 
 VARIANTS=("${variants[@]}")
 
+# A single override suffix cannot safely represent both variants at once.
+if [ -n "${DIRSUFFIX_OVERRIDE:-}" ] && [ "$OPT_BUILD_NORMAL" -eq 1 ] && [ "$OPT_BUILD_BITCOINONLY" -eq 1 ]; then
+  echo "DIRSUFFIX_OVERRIDE requires selecting exactly one variant (--skip-normal or --skip-bitcoinonly)."
+  exit 1
+fi
+
 TAG="$1"
 COMMIT_HASH="$(git rev-parse "$TAG")"
 PRODUCTION=${PRODUCTION:-1}
@@ -151,8 +158,7 @@ fi
 tag_clean="${TAG//[^a-zA-Z0-9]/_}"
 SNAPSHOT_NAME="${CONTAINER_NAME}__${tag_clean}"
 
-mkdir -p build/core build/legacy
-mkdir -p build/core-bitcoinonly build/legacy-bitcoinonly
+mkdir -p build
 
 # if not initializing, does the image exist?
 if [ $INIT -eq 0 ] && ! $DOCKER image inspect $SNAPSHOT_NAME > /dev/null; then
@@ -260,6 +266,7 @@ for TREZOR_MODEL in ${MODELS[@]}; do
 
     DIRSUFFIX=${BITCOIN_ONLY/1/-bitcoinonly}
     DIRSUFFIX=${DIRSUFFIX/0/}
+    DIRSUFFIX=${DIRSUFFIX_OVERRIDE:-$DIRSUFFIX}
     DIRSUFFIX="-${TREZOR_MODEL}${DIRSUFFIX}"
 
     MAKE_TARGETS=""
@@ -282,12 +289,14 @@ for TREZOR_MODEL in ${MODELS[@]}; do
           uv run ../python/tools/firmware-fingerprint.py \
                       -o build-xtask/artifacts/$TREZOR_MODEL/\$item.bin.fingerprint \
                       build-xtask/artifacts/$TREZOR_MODEL/\$item.bin \
-                      || echo "No fingerprint for build-xtask/artifacts/TREZOR_MODEL/\$item.bin"
+                      || echo "No fingerprint for build-xtask/artifacts/$TREZOR_MODEL/\$item.bin"
         fi
-        if [ -f build-xtask/artifacts/$TREZOR_MODEL/\$item.bin ]; then
+        if [ -f build-xtask/artifacts/$TREZOR_MODEL/\$item.elf ]; then
           # copy only the artifacts to the build output directory
           mkdir /build/\$item/
+          gzip build-xtask/artifacts/$TREZOR_MODEL/\$item.elf
           cp -v build-xtask/artifacts/$TREZOR_MODEL/\$item* /build/\$item/
+          cp -v build-xtask/artifacts/pub/\$item-$TREZOR_MODEL-*.bin /build/\$item/ || true  # n/a for kernel
         fi
       done
       chown -R $USER:$GROUP /build
@@ -307,6 +316,7 @@ EOF
       --env TREZOR_MODEL="$TREZOR_MODEL" \
       --env PRODUCTION="$PRODUCTION" \
       --env VENDOR_HEADER="$VENDOR_HEADER" \
+      --env XTASK_BUILD_OPTS="$REPRODUCIBLE_XTASK_BUILD_OPTS" \
       --init \
       "$SNAPSHOT_NAME" \
       /nix/var/nix/profiles/default/bin/nix-shell --run "bash /local/build/$SCRIPT_NAME"
@@ -484,13 +494,14 @@ echo "Fingerprints:"
 # Display core and legacy fingerprints (if built)
 for VARIANT in core legacy; do
   for MODEL in ${MODELS[@]}; do
-    for DIRSUFFIX in "" "-bitcoinonly"; do
+    for DIRSUFFIX in "" "-bitcoinonly" $DIRSUFFIX_OVERRIDE; do
       BUILD_DIR=build/${VARIANT}-${MODEL}${DIRSUFFIX}
       for file in $BUILD_DIR/*/*.fingerprint; do
         if [ -f "$file" ]; then
           origfile="${file%.fingerprint}"
           fingerprint=$(tr -d '\n' < $file)
-          echo "$fingerprint $origfile"
+          chunkified_fingerprint=$(echo "$fingerprint" | sed 's/.\{4\}/& /g')
+          echo -e "\033[1m$chunkified_fingerprint\033[0m $origfile"
         fi
       done
     done

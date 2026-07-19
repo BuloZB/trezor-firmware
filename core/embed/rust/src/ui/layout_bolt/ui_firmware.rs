@@ -1,49 +1,41 @@
 use core::cmp::Ordering;
 
-use crate::{
-    error::{value_error, Error},
-    io::BinaryData,
-    micropython::{buffer::StrBuffer, gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
-    storage,
-    strutil::TString,
-    translations::TR,
-    ui::{
-        component::{
-            image::BlendedImage,
-            text::{
-                op::OpTextLayout,
-                paragraphs::{
-                    Checklist, Paragraph, ParagraphSource, ParagraphVecLong, ParagraphVecShort,
-                    Paragraphs, VecExt,
-                },
-                TextStyle,
-            },
-            Border, ComponentExt, Empty, FormattedText, Jpeg, Label, Never, Timeout,
-        },
-        geometry,
-        layout::{
-            obj::{LayoutMaybeTrace, LayoutObj, RootComponent},
-            util::{ConfirmValueParams, PropsList, RecoveryType},
-        },
-        notification::Notification,
-        ui_firmware::{
-            FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS,
-            MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
-        },
-        ModelUI,
-    },
+use super::component::{
+    check_homescreen_format, AddressDetails, Bip39Input, Button, ButtonMsg, ButtonPage,
+    ButtonStyleSheet, CancelConfirmMsg, CoinJoinProgress, Dialog, FidoConfirm, Frame, Homescreen,
+    IconDialog, Lockscreen, MnemonicKeyboard, NumberInputDialog, PassphraseKeyboard, PinKeyboard,
+    Progress, SelectWordCount, SelectWordCountLayout, SetBrightnessDialog, ShareWords, SimplePage,
+    Slip39Input,
 };
-
-use super::{
-    component::{
-        check_homescreen_format, AddressDetails, Bip39Input, Button, ButtonMsg, ButtonPage,
-        ButtonStyleSheet, CancelConfirmMsg, CoinJoinProgress, Dialog, FidoConfirm, Frame,
-        Homescreen, IconDialog, Lockscreen, MnemonicKeyboard, NumberInputDialog,
-        PassphraseKeyboard, PinKeyboard, Progress, SelectWordCount, SelectWordCountLayout,
-        SetBrightnessDialog, ShareWords, SimplePage, Slip39Input,
-    },
-    fonts, theme, UIBolt,
+use super::{fonts, theme, UIBolt};
+use crate::error::{value_error, Error};
+use crate::io::BinaryData;
+use crate::micropython::buffer::StrBuffer;
+use crate::micropython::gc::Gc;
+use crate::micropython::iter::IterBuf;
+use crate::micropython::list::List;
+use crate::micropython::obj::Obj;
+use crate::micropython::util;
+use crate::storage;
+use crate::strutil::TString;
+use crate::translations::TR;
+use crate::ui::component::image::BlendedImage;
+use crate::ui::component::text::op::OpTextLayout;
+use crate::ui::component::text::paragraphs::{
+    Checklist, Paragraph, ParagraphSource, ParagraphVecLong, ParagraphVecShort, Paragraphs, VecExt,
 };
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{
+    Border, ComponentExt, Empty, FormattedText, Jpeg, Label, Never, Timeout,
+};
+use crate::ui::layout::obj::{LayoutMaybeTrace, LayoutObj, RootComponent};
+use crate::ui::layout::util::{ConfirmValueParams, PropsList, RecoveryType};
+use crate::ui::notification::Notification;
+use crate::ui::ui_firmware::{
+    FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS, MAX_PAIRED_DEVICES,
+    MAX_WORD_QUIZ_ITEMS,
+};
+use crate::ui::{geometry, ModelUI};
 
 impl FirmwareUI for UIBolt {
     fn confirm_action(
@@ -915,6 +907,7 @@ impl FirmwareUI for UIBolt {
 
     fn show_device_menu(
         _init_submenu_idx: Option<u8>,
+        _init_submenu_offset: i16,
         _backup_failed: bool,
         _backup_needed: bool,
         _ble_enabled: bool,
@@ -1264,12 +1257,6 @@ impl FirmwareUI for UIBolt {
         )
     }
 
-    fn show_wait_text(text: TString<'static>) -> Result<impl LayoutMaybeTrace, Error> {
-        Ok(RootComponent::new(
-            Paragraph::new(&theme::TEXT_NORMAL, text).into_paragraphs(),
-        ))
-    }
-
     fn show_warning(
         title: Option<TString<'static>>,
         button: TString<'static>,
@@ -1497,15 +1484,12 @@ impl ConfirmValue {
 mod tests {
     use serde_json;
 
-    use crate::{
-        trace::tests::trace,
-        ui::{
-            component::{text::op::OpTextLayout, Component},
-            geometry::Rect,
-        },
-    };
-
-    use super::{super::constant, *};
+    use super::super::constant;
+    use super::*;
+    use crate::trace::tests::trace;
+    use crate::ui::component::text::op::OpTextLayout;
+    use crate::ui::component::Component;
+    use crate::ui::geometry::Rect;
 
     const SCREEN: Rect = constant::screen().inset(theme::borders());
 

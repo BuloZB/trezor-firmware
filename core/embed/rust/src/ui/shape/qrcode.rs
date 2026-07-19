@@ -1,15 +1,10 @@
-use crate::ui::{
-    display::Color,
-    geometry::{Offset, Rect},
-};
-
 use qrcodegen::QrCode;
-
-use super::{
-    utils::line_points, Bitmap, BitmapFormat, Canvas, DrawingCache, Renderer, Shape, ShapeClone,
-};
-
 use without_alloc::alloc::LocalAllocLeakExt;
+
+use super::utils::line_points;
+use super::{Bitmap, BitmapFormat, Canvas, DrawingCache, Renderer, Shape, ShapeClone};
+use crate::ui::display::Color;
+use crate::ui::geometry::{Offset, Rect};
 
 const MAX_QRCODE_BYTES: usize = 400;
 
@@ -44,7 +39,7 @@ impl QrImage {
         // Copy content of QR code to the qrmodules buffer
         for y in 0..result.qr_size {
             for x in 0..result.qr_size {
-                result.set_module(x, y, qrcode.get_module(x as i32, y as i32));
+                result.set_module(x, y, qrcode.get_module(i32::from(x), i32::from(y)));
             }
         }
 

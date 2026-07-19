@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![deny(clippy::all)]
+#![deny(clippy::cast_lossless)]
 #![allow(clippy::new_without_default)]
 #![allow(clippy::ptr_offset_with_cast)] // workaround https://github.com/rust-lang/rust-bindgen/issues/3053
 #![deny(unsafe_op_in_unsafe_fn)]
@@ -36,6 +37,8 @@ mod protobuf;
 #[cfg(feature = "storage")]
 mod storage;
 mod strutil;
+#[cfg(feature = "thp")]
+mod thp;
 mod time;
 #[cfg(feature = "ui_debug")]
 mod trace;
@@ -108,6 +111,12 @@ pub fn main() -> i32 {
         }
         rust_tests_c_setup();
     }
+
+    match std::env::var("RUST_LOG") {
+        Ok(s) if s != "0" => crate::util::logger::init_rust_logging(0),
+        _ => eprintln!("Set RUST_LOG=1 to enable logs."),
+    }
+
     // Call the Rust test harness main function
     // The function panics if any test fails.
     // Asserting that it returns () to ensure that if a future Rust version

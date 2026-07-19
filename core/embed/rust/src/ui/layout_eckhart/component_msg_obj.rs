@@ -1,26 +1,22 @@
 use num_traits::ToPrimitive;
 
+use super::firmware::{
+    AllowedTextContent, ConfirmHomescreen, ConfirmHomescreenMsg, DeviceMenuScreen, Homescreen,
+    HomescreenMsg, MnemonicInput, MnemonicKeyboard, MnemonicKeyboardMsg, PinKeyboard,
+    PinKeyboardMsg, ProgressScreen, SelectWordCountMsg, SelectWordCountScreen, SelectWordMsg,
+    SelectWordScreen, SetBrightnessScreen, StringInput, StringKeyboard, StringKeyboardMsg,
+    TextScreen, TextScreenMsg, ValueInput, ValueInputScreen, ValueInputScreenMsg,
+};
+use crate::error::Error;
+use crate::micropython::obj::Obj;
+use crate::micropython::util::new_tuple;
 #[cfg(not(feature = "clippy"))]
 use crate::ui::component::{
     text::paragraphs::{ParagraphSource, Paragraphs},
     Component, Timeout,
 };
-use crate::{
-    error::Error,
-    micropython::{obj::Obj, util::new_tuple},
-    ui::layout::{
-        obj::ComponentMsgObj,
-        result::{CANCELLED, CONFIRMED, INFO},
-    },
-};
-
-use super::firmware::{
-    AllowedTextContent, ConfirmHomescreen, ConfirmHomescreenMsg, DeviceMenuMsg, DeviceMenuScreen,
-    Homescreen, HomescreenMsg, MnemonicInput, MnemonicKeyboard, MnemonicKeyboardMsg, PinKeyboard,
-    PinKeyboardMsg, ProgressScreen, SelectWordCountMsg, SelectWordCountScreen, SelectWordMsg,
-    SelectWordScreen, SetBrightnessScreen, StringInput, StringKeyboard, StringKeyboardMsg,
-    TextScreen, TextScreenMsg, ValueInput, ValueInputScreen, ValueInputScreenMsg,
-};
+use crate::ui::layout::obj::ComponentMsgObj;
+use crate::ui::layout::result::{CANCELLED, CONFIRMED, INFO};
 
 impl ComponentMsgObj for PinKeyboard<'_> {
     fn msg_try_into_obj(&self, msg: Self::Msg) -> Result<Obj, Error> {
@@ -157,16 +153,22 @@ impl ComponentMsgObj for SetBrightnessScreen {
 
 impl ComponentMsgObj for DeviceMenuScreen {
     fn msg_try_into_obj(&self, msg: Self::Msg) -> Result<Obj, Error> {
-        if matches!(msg, DeviceMenuMsg::Close) {
-            return Ok(CANCELLED.as_obj());
-        }
-        let action_obj = msg.to_u8().into();
-        let result: Option<u8> = match msg {
-            DeviceMenuMsg::UnpairDevice | DeviceMenuMsg::RefreshMenu => self.result_arg,
-            _ => None,
+        let action_obj = msg.id_to_obj();
+        let result_obj = msg.args_to_obj();
+        let next_menu_id = self.next_menu_id(msg);
+        let vertical_offset: u16 = match self.current_state() {
+            // If the same menu will be displayed, reuse current menu offset.
+            Some((current_menu_id, vertical_offset)) if current_menu_id == next_menu_id => {
+                // Only non-negative offsets are used.
+                vertical_offset.try_into().unwrap_or(0)
+            }
+            _ => 0, // Otherwise, don't reapply current menu offset.
         };
-        let result_obj = result.into();
-        let parent_idx_obj = DeviceMenuScreen::parent(msg).to_u8().into();
-        new_tuple(&[action_obj, result_obj, parent_idx_obj])
+        new_tuple(&[
+            action_obj,
+            result_obj,
+            next_menu_id.to_u8().try_into()?,
+            vertical_offset.into(),
+        ])
     }
 }

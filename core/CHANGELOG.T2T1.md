@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.12.1] (17th June 2026)
+
+### Added
+- Added support for `AccountDelete` transaction in Ripple.  [#6370]
+- Support for Solana off-chain message signing (OCMS) v0.  [#6759]
+
+### Changed
+- Solana System Program's Transfer instruction now allows multisig.  [#6843]
+
+### Fixed
+- Hide written characters in passphrase keyboard.  [#6342]
+- Improved Tron TRX transfer flow.  [#6520]
+- Improve Stellar confirmations flows.  [#6709]
+
 ## [2.12.0] (21st May 2026)
 
 ### Added
@@ -107,7 +121,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Don't allocate tracebacks in optimized builds.  [#5526]
 - Allow backup check only when the backup exists.  [#5763]
 
-## [2.9.1] (17th Sep 2025)
+## [2.9.1] (17th September 2025)
 
 ### Added
 - Cardano: Add support for signing arbitrary messages.  [#3509]
@@ -179,7 +193,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix wrong RSOD color on some older Model T devices.  [#4491]
 - Fixed a bug resulting in restarting the recovery flow when inputting 33-word mnemonic.  [#4537]
 
-## [2.8.7] (22th January 2025)
+## [2.8.7] (22nd January 2025)
 
 ### Added
 - Add benchmark application.  [#4101]
@@ -232,23 +246,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Improve precision of PIN timeout countdown.  [#4000]
 
-### Changed
-
 ### Fixed
 - Added a progress indicator for the formatting operation.  [#3035]
 - Solana: added support for deprecated AToken Create `rent_sysvar` argument.  [#3976]
 
 ## [2.8.0] (9th July 2024)
 
-### Added
-
 ### Changed
 - Reworked PIN processing.
 
 ### Removed
 - CoSi functionality.  [#3442]
-
-### Fixed
 
 
 ## [2.7.2] (14th June 2024)
@@ -321,8 +329,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
 ## [2.6.2] (internal release)
-
-### Added
 
 
 ## [2.6.1] (internal release)
@@ -638,8 +644,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Automatic breaking text on whitespace.  [#1384]
 - Introduced limit of 32 characters for device label.  [#1399]
 
-### Deprecated
-
 ### Removed
 - PIVX support
 - dropped debug-only `DebugLinkShowText` functionality
@@ -648,22 +652,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Path warning is not shown on `GetAddress(show_display=False)` call.  [#1206]
 - Settings are also erased from RAM when device is wiped.  [#1322]
 
-### Security
-
 ## 2.3.4 [7th October 2020]
 
 ### Added
 - Support for the upcoming Monero hard fork.  [#1246]
-
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
 
 
 ## 2.3.3 [2nd September 2020]
@@ -678,8 +670,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Remove pre-fill bar from text rendering functions.  [#1173]
 - Display coin name when signing or verifying messages.  [#1159]
 - Allow spending coins from Bitcoin paths if the coin has implemented strong replay protection via `SIGHASH_FORKID`.  [#1188]
-
-### Deprecated
 
 ### Removed
 - Remove ETP, GIN, PTC, ZEL support.
@@ -1309,14 +1299,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [#6279]: https://github.com/trezor/trezor-firmware/pull/6279
 [#6281]: https://github.com/trezor/trezor-firmware/pull/6281
 [#6321]: https://github.com/trezor/trezor-firmware/pull/6321
+[#6342]: https://github.com/trezor/trezor-firmware/pull/6342
 [#6349]: https://github.com/trezor/trezor-firmware/pull/6349
 [#6358]: https://github.com/trezor/trezor-firmware/pull/6358
+[#6370]: https://github.com/trezor/trezor-firmware/pull/6370
 [#6394]: https://github.com/trezor/trezor-firmware/pull/6394
 [#6435]: https://github.com/trezor/trezor-firmware/pull/6435
 [#6448]: https://github.com/trezor/trezor-firmware/pull/6448
 [#6483]: https://github.com/trezor/trezor-firmware/pull/6483
 [#6501]: https://github.com/trezor/trezor-firmware/pull/6501
 [#6506]: https://github.com/trezor/trezor-firmware/pull/6506
+[#6520]: https://github.com/trezor/trezor-firmware/pull/6520
 [#6524]: https://github.com/trezor/trezor-firmware/pull/6524
 [#6551]: https://github.com/trezor/trezor-firmware/pull/6551
 [#6567]: https://github.com/trezor/trezor-firmware/pull/6567
@@ -1325,6 +1318,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [#6601]: https://github.com/trezor/trezor-firmware/pull/6601
 [#6620]: https://github.com/trezor/trezor-firmware/pull/6620
 [#6707]: https://github.com/trezor/trezor-firmware/pull/6707
+[#6709]: https://github.com/trezor/trezor-firmware/pull/6709
 [#6710]: https://github.com/trezor/trezor-firmware/pull/6710
+[#6759]: https://github.com/trezor/trezor-firmware/pull/6759
 [#6780]: https://github.com/trezor/trezor-firmware/pull/6780
 [#6807]: https://github.com/trezor/trezor-firmware/pull/6807
+[#6843]: https://github.com/trezor/trezor-firmware/pull/6843
+[#6900]: https://github.com/trezor/trezor-firmware/pull/6900

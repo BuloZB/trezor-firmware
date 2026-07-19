@@ -1,13 +1,10 @@
-use crate::ui::{
-    component::{Component, Event, EventCtx, Never, Pad, Paginate},
-    geometry::{Offset, Point, Rect},
-    shape::{self, Renderer},
-    util::Pager,
-};
+use heapless::Vec;
 
 use super::super::theme;
-
-use heapless::Vec;
+use crate::ui::component::{Component, Event, EventCtx, Never, Pad, Paginate};
+use crate::ui::geometry::{Offset, Point, Rect};
+use crate::ui::shape::{self, Renderer};
+use crate::ui::util::Pager;
 
 /// Scrollbar to be painted horizontally at the top right of the screen.
 pub struct ScrollBar {
@@ -236,7 +233,7 @@ impl Paginate for ScrollBar {
 impl crate::trace::Trace for ScrollBar {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("ScrollBar");
-        t.int("scrollbar_page_count", self.pager.total() as i64);
-        t.int("scrollbar_active_page", self.pager.current() as i64);
+        t.int("scrollbar_page_count", i64::from(self.pager.total()));
+        t.int("scrollbar_active_page", i64::from(self.pager.current()));
     }
 }

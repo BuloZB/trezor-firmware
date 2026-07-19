@@ -86,9 +86,8 @@ enum MessageType {
     MessageType_GetNextU2FCounter = 80 [(wire_in) = true];
     MessageType_NextU2FCounter = 81 [(wire_out) = true];
 
-    // Deprecated messages, kept for protobuf compatibility.
-    MessageType_Deprecated_PassphraseStateRequest = 77 [deprecated = true];
-    MessageType_Deprecated_PassphraseStateAck = 78 [deprecated = true];
+    // Deprecated passphrase-related messages (used <2.3.0)
+    reserved 77 to 78;
 
     // Bootloader
     MessageType_FirmwareErase = 6 [(bitcoin_only) = true, (wire_in) = true, (wire_bootloader) = true];
@@ -177,6 +176,8 @@ enum MessageType {
     MessageType_EthereumSignTypedHash = 470 [(wire_in) = true];
     MessageType_EthereumDefinitionRequest = 471 [(wire_out) = true];
     MessageType_EthereumDefinitionAck = 472 [(wire_in) = true];
+    MessageType_EthereumSignAuth7702 = 473 [(wire_in) = true];
+    MessageType_EthereumAuth7702Signature = 474 [(wire_out) = true];
 
     // NEM
     MessageType_NEMGetAddress = 67 [(wire_in) = true];
@@ -278,27 +279,27 @@ enum MessageType {
     MessageType_RippleSignedTx = 403 [(wire_out) = true];
 
     // Monero
-    MessageType_MoneroTransactionInitRequest = 501 [(wire_out) = true];
+    MessageType_MoneroTransactionInitRequest = 501 [(wire_in) = true];
     MessageType_MoneroTransactionInitAck = 502 [(wire_out) = true];
-    MessageType_MoneroTransactionSetInputRequest = 503 [(wire_out) = true];
+    MessageType_MoneroTransactionSetInputRequest = 503 [(wire_in) = true];
     MessageType_MoneroTransactionSetInputAck = 504 [(wire_out) = true];
-    MessageType_MoneroTransactionInputViniRequest = 507 [(wire_out) = true];
+    MessageType_MoneroTransactionInputViniRequest = 507 [(wire_in) = true];
     MessageType_MoneroTransactionInputViniAck = 508 [(wire_out) = true];
-    MessageType_MoneroTransactionAllInputsSetRequest = 509 [(wire_out) = true];
+    MessageType_MoneroTransactionAllInputsSetRequest = 509 [(wire_in) = true];
     MessageType_MoneroTransactionAllInputsSetAck = 510 [(wire_out) = true];
-    MessageType_MoneroTransactionSetOutputRequest = 511 [(wire_out) = true];
+    MessageType_MoneroTransactionSetOutputRequest = 511 [(wire_in) = true];
     MessageType_MoneroTransactionSetOutputAck = 512 [(wire_out) = true];
-    MessageType_MoneroTransactionAllOutSetRequest = 513 [(wire_out) = true];
+    MessageType_MoneroTransactionAllOutSetRequest = 513 [(wire_in) = true];
     MessageType_MoneroTransactionAllOutSetAck = 514 [(wire_out) = true];
-    MessageType_MoneroTransactionSignInputRequest = 515 [(wire_out) = true];
+    MessageType_MoneroTransactionSignInputRequest = 515 [(wire_in) = true];
     MessageType_MoneroTransactionSignInputAck = 516 [(wire_out) = true];
-    MessageType_MoneroTransactionFinalRequest = 517 [(wire_out) = true];
+    MessageType_MoneroTransactionFinalRequest = 517 [(wire_in) = true];
     MessageType_MoneroTransactionFinalAck = 518 [(wire_out) = true];
-    MessageType_MoneroKeyImageExportInitRequest = 530 [(wire_out) = true];
+    MessageType_MoneroKeyImageExportInitRequest = 530 [(wire_in) = true];
     MessageType_MoneroKeyImageExportInitAck = 531 [(wire_out) = true];
-    MessageType_MoneroKeyImageSyncStepRequest = 532 [(wire_out) = true];
+    MessageType_MoneroKeyImageSyncStepRequest = 532 [(wire_in) = true];
     MessageType_MoneroKeyImageSyncStepAck = 533 [(wire_out) = true];
-    MessageType_MoneroKeyImageSyncFinalRequest = 534 [(wire_out) = true];
+    MessageType_MoneroKeyImageSyncFinalRequest = 534 [(wire_in) = true];
     MessageType_MoneroKeyImageSyncFinalAck = 535 [(wire_out) = true];
     MessageType_MoneroGetAddress = 540 [(wire_in) = true];
     MessageType_MoneroAddress = 541 [(wire_out) = true];
@@ -379,6 +380,8 @@ enum MessageType {
     MessageType_TronUnfreezeBalanceV2Contract = 2208 [(wire_in) = true];
     MessageType_TronWithdrawUnfreeze = 2209 [(wire_in) = true];
     MessageType_TronVoteWitnessContract = 2210 [(wire_in) = true];
+    // 2 indexes reserved for (un)delegation. PR in review.
+    MessageType_TronWithdrawBalance = 2213 [(wire_in) = true];
 
     // Benchmark
     MessageType_BenchmarkListNames = 9100 [(bitcoin_only) = true];

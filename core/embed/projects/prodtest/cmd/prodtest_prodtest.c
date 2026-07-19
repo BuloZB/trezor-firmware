@@ -23,6 +23,9 @@
 
 #include <rtl/cli.h>
 #include <sec/fwutils.h>
+#include <sys/systick.h>
+
+#include "prodtest_error_codes.h"
 
 #ifdef USE_BLE
 #include "prodtest_ble.h"
@@ -64,7 +67,8 @@ static void prodtest_prodtest_wipe(cli_t* cli) {
 #if defined(USE_BLE) && !defined(TREZOR_EMULATOR)
   cli_trace(cli, "Erasing BLE bonds...");
   if (!prodtest_ble_erase_bonds(cli)) {
-    cli_error(cli, CLI_ERROR, "Failed to erase BLE bonds.");
+    cli_error(cli, PRODTEST_ERR_PRODTEST_WIPE_BLE_BONDS_ERASE,
+              "Failed to erase BLE bonds.");
     return;
   }
 #endif
@@ -113,6 +117,15 @@ static void prodtest_mem_read(cli_t* cli) {
   cli_ok_hexdata(cli, mem_buffer, mem_buffer_len);
 }
 
+static void prodtest_uptime(cli_t* cli) {
+  if (cli_arg_count(cli) > 0) {
+    cli_error_arg_count(cli);
+    return;
+  }
+
+  cli_ok(cli, "%u", systick_ms());
+}
+
 // clang-format off
 
 PRODTEST_CLI_CMD(
@@ -154,5 +167,12 @@ PRODTEST_CLI_CMD(
   .name = "prodtest-mem-read",
   .func = prodtest_mem_read,
   .info = "Read data from RAM buffer",
+  .args = ""
+);
+
+PRODTEST_CLI_CMD(
+  .name = "prodtest-uptime",
+  .func = prodtest_uptime,
+  .info = "Get the device uptime in milliseconds",
   .args = ""
 );

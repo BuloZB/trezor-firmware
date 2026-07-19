@@ -101,11 +101,6 @@ impl<'a, T, R: TrezorMessage> fmt::Debug for PassphraseRequest<'a, T, R> {
 }
 
 impl<'a, T, R: TrezorMessage> PassphraseRequest<'a, T, R> {
-    /// Check whether the use is supposed to enter the passphrase on the device or not.
-    pub fn on_device(&self) -> bool {
-        self.message._on_device()
-    }
-
     /// Ack the request with a passphrase and get the next message from the device.
     pub fn ack_passphrase(self, passphrase: String) -> Result<TrezorResponse<'a, T, R>> {
         let mut req = protos::PassphraseAck::new();
@@ -221,10 +216,7 @@ pub fn handle_interaction<T, R: TrezorMessage>(resp: TrezorResponse<'_, T, R>) -
         TrezorResponse::Failure(_) => resp.ok(), // assering ok() returns the failure error
         TrezorResponse::ButtonRequest(req) => handle_interaction(req.ack()?),
         TrezorResponse::PinMatrixRequest(_) => Err(Error::UnsupportedNetwork),
-        TrezorResponse::PassphraseRequest(req) => handle_interaction({
-            let on_device = req.on_device();
-            req.ack(!on_device)?
-        }),
+        TrezorResponse::PassphraseRequest(req) => handle_interaction(req.ack(true)?),
     }
 }
 

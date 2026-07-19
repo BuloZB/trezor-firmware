@@ -2,7 +2,8 @@
     "include": [
         "src",
         "tools",
-        "site_scons"
+        "site_scons",
+        "*.py"
     ],
     "exclude": [
         "src/apps/monero",
@@ -13,6 +14,6 @@
     ],
     "stubPath": "mocks/generated",
     "typeCheckingMode": "basic",
-    "pythonVersion": "3.10",
+    "pythonVersion": "3.12",
     "reportMissingModuleSource": false
 }

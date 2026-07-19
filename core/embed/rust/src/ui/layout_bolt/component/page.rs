@@ -1,24 +1,20 @@
-use crate::{
-    error::Error,
-    strutil::TString,
-    time::Instant,
-    translations::TR,
-    ui::{
-        component::{paginated::PageMsg, Component, ComponentExt, Event, EventCtx, Pad, Paginate},
-        constant,
-        display::{self, Color},
-        geometry::{Insets, Rect},
-        shape::Renderer,
-        util::{animation_disabled, Pager},
-    },
-};
+use core::cell::Cell;
 
 use super::{
     theme, Button, ButtonContent, ButtonMsg, ButtonStyleSheet, Loader, LoaderMsg, ScrollBar, Swipe,
     SwipeDirection,
 };
-
-use core::cell::Cell;
+use crate::error::Error;
+use crate::strutil::TString;
+use crate::time::Instant;
+use crate::translations::TR;
+use crate::ui::component::paginated::PageMsg;
+use crate::ui::component::{Component, ComponentExt, Event, EventCtx, Pad, Paginate};
+use crate::ui::constant;
+use crate::ui::display::{self, Color};
+use crate::ui::geometry::{Insets, Rect};
+use crate::ui::shape::Renderer;
+use crate::ui::util::{animation_disabled, Pager};
 
 /// Allows pagination of inner component. Shows scroll bar, confirm & cancel
 /// buttons. Optionally handles hold-to-confirm with loader.
@@ -412,8 +408,8 @@ where
 {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("ButtonPage");
-        t.int("active_page", self.scrollbar.pager().current() as i64);
-        t.int("page_count", self.scrollbar.pager().total() as i64);
+        t.int("active_page", i64::from(self.scrollbar.pager().current()));
+        t.int("page_count", i64::from(self.scrollbar.pager().total()));
         t.bool("hold", self.loader.is_some());
         t.child("content", &self.content);
     }
@@ -466,16 +462,12 @@ impl PageLayout {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        trace::tests::trace,
-        ui::{
-            component::text::paragraphs::{Paragraph, Paragraphs},
-            event::TouchEvent,
-            geometry::Point,
-        },
-    };
-
-    use super::{super::super::constant, *};
+    use super::super::super::constant;
+    use super::*;
+    use crate::trace::tests::trace;
+    use crate::ui::component::text::paragraphs::{Paragraph, Paragraphs};
+    use crate::ui::event::TouchEvent;
+    use crate::ui::geometry::Point;
 
     const SCREEN: Rect = constant::screen().inset(theme::borders());
 

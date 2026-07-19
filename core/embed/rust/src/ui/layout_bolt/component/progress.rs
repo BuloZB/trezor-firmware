@@ -1,25 +1,16 @@
 use core::mem;
 
-use super::{
-    super::cshape::{render_loader, LoaderRange},
-    theme,
-};
-use crate::{
-    strutil::TString,
-    ui::{
-        component::{
-            base::ComponentExt,
-            text::paragraphs::{Paragraph, Paragraphs},
-            Child, Component, Event, EventCtx, Label, Never, Pad,
-        },
-        display::LOADER_MAX,
-        geometry::{Insets, Offset, Rect},
-        shape::Renderer,
-        util::animation_disabled,
-    },
-};
-
+use super::super::cshape::{render_loader, LoaderRange};
 use super::super::{constant, fonts};
+use super::theme;
+use crate::strutil::TString;
+use crate::ui::component::base::ComponentExt;
+use crate::ui::component::text::paragraphs::{Paragraph, Paragraphs};
+use crate::ui::component::{Child, Component, Event, EventCtx, Label, Never, Pad};
+use crate::ui::display::LOADER_MAX;
+use crate::ui::geometry::{Insets, Offset, Rect};
+use crate::ui::shape::Renderer;
+use crate::ui::util::animation_disabled;
 
 pub struct Progress {
     title: Child<Label<'static>>,
@@ -105,11 +96,11 @@ impl Component for Progress {
         let range = if self.indeterminate {
             let start = (self.value as i16 - 100) % 1000;
             let end = (self.value as i16 + 100) % 1000;
-            let start = 360.0 * start as f32 / 1000.0;
-            let end = 360.0 * end as f32 / 1000.0;
+            let start = 360.0 * f32::from(start) / 1000.0;
+            let end = 360.0 * f32::from(end) / 1000.0;
             LoaderRange::FromTo(start, end)
         } else {
-            let end = 360.0 * self.value as f32 / 1000.0;
+            let end = 360.0 * f32::from(self.value) / 1000.0;
             if self.value >= LOADER_MAX {
                 LoaderRange::Full
             } else {

@@ -100,13 +100,6 @@ class TestStrings(unittest.TestCase):
             strings.format_plural("Hello", 1, "share")
 
     def test_format_duration_ms(self):
-        unit_plurals = {
-            "millisecond": "millisecond|milliseconds",
-            "second": "second|seconds",
-            "minute": "minute|minutes",
-            "hour": "hour|hours",
-        }
-
         VECTORS = [
             (0, "0 milliseconds"),
             (1, "1 millisecond"),
@@ -121,11 +114,14 @@ class TestStrings(unittest.TestCase):
             (60 * 60 * 1000, "1 hour"),
             (119 * 60 * 1000, "1 hour"),
             (3 * 60 * 60 * 1000, "3 hours"),
-            (48 * 60 * 60 * 1000, "48 hours"),
+            (23 * 60 * 60 * 1000, "23 hours"),
+            (24 * 60 * 60 * 1000, "1 day"),
+            (47 * 60 * 60 * 1000, "1 day"),
+            (48 * 60 * 60 * 1000, "2 days"),
         ]
 
         for v in VECTORS:
-            self.assertEqual(strings.format_duration_ms(v[0], unit_plurals), v[1])
+            self.assertEqual(strings.format_duration_ms(v[0]), v[1])
 
     def test_format_timestamp(self):
         VECTORS = [
@@ -221,27 +217,6 @@ class TestStrings(unittest.TestCase):
             self.assertEqual(strings.format_timestamp(v[0]), v[1])
 
         strings.format_timestamp(1616057224)
-
-    def test_trim_str(self):
-        # test ASCII
-        self.assertEqual(strings.trim_str("123", 4), "123")
-        self.assertEqual(strings.trim_str("123", 3), "123")
-        self.assertEqual(strings.trim_str("123", 2), "12")
-        self.assertEqual(strings.trim_str("123", 1), "1")
-        self.assertEqual(strings.trim_str("123", 0), "")
-
-        # test non-ASCII
-        self.assertEqual(strings.trim_str("➀➁➂", 10), "➀➁➂")
-        self.assertEqual(strings.trim_str("➀➁➂", 9), "➀➁➂")
-        self.assertEqual(strings.trim_str("➀➁➂", 8), "➀➁")
-        self.assertEqual(strings.trim_str("➀➁➂", 7), "➀➁")
-        self.assertEqual(strings.trim_str("➀➁➂", 6), "➀➁")
-        self.assertEqual(strings.trim_str("➀➁➂", 5), "➀")
-        self.assertEqual(strings.trim_str("➀➁➂", 4), "➀")
-        self.assertEqual(strings.trim_str("➀➁➂", 3), "➀")
-        self.assertEqual(strings.trim_str("➀➁➂", 2), "")
-        self.assertEqual(strings.trim_str("➀➁➂", 1), "")
-        self.assertEqual(strings.trim_str("➀➁➂", 0), "")
 
 
 if __name__ == "__main__":

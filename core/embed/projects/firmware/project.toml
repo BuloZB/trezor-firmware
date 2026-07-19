@@ -1,0 +1,50 @@
+uses = [
+    "backlight",
+    "backup_ram",
+    "ble",
+    "boot_ucb",
+    "button",
+    "consumption_mask",
+    "display",
+    "display_mono",
+    "display_rgb565",
+    "display_rgba8888",
+    "dma2d",
+    "framebuffer",
+    "haptic",
+    "hash_processor",
+    "iwdg",
+    "layout_bolt",
+    "layout_caesar",
+    "layout_delizia",
+    "layout_eckhart",
+    "lockable_bootloader",
+    "mcu_attestation",
+    "nrf",
+    "optiga",
+    "power_manager",
+    "rgb_led",
+    "sd_card",
+    "secmon_layout",
+    "secret",
+    "secure_aes",
+    "serial_number",
+    "suspend",
+    "tamper",
+    "telemetry",
+    "thp",
+    "touch",
+    "touch_wakeup",
+    "tropic",
+
+    # Legacy coin support
+    "decred",
+    "eos",
+    "nem",
+]
+
+elf_sections = [".vendorheader", ".header", ".flash", ".data"]
+
+# STM32F4: firmware spans two non-contiguous flash banks (bank2 starts at 0x08100000)
+split_pad_to         = "0x08100000"
+split_part2_sections = [".flash2"]

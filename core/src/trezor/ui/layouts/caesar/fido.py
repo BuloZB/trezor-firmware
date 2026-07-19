@@ -13,13 +13,13 @@ async def confirm_fido(
     accounts: list[str | None],
 ) -> int:
     """Webauthn confirmation for one or more credentials."""
-    confirm = trezorui_api.confirm_fido(
+    with trezorui_api.confirm_fido(
         title=header,
         app_name=app_name,
         icon_name=None,
         accounts=accounts,
-    )
-    result = await interact(confirm, "confirm_fido", ButtonRequestType.Other)
+    ) as confirm:
+        result = await interact(confirm, "confirm_fido", ButtonRequestType.Other)
 
     if isinstance(result, int):
         return result
@@ -35,14 +35,14 @@ async def confirm_fido(
 async def confirm_fido_reset() -> bool:
     from trezor import TR
 
-    confirm = trezorui_api.confirm_action(
+    with trezorui_api.confirm_action(
         title=TR.fido__title_reset,
         description=TR.fido__wanna_erase_credentials,
         action=None,
         verb_cancel="",
         verb=TR.buttons__confirm,
-    )
-    return (await ui.Layout(confirm).get_result()) is trezorui_api.CONFIRMED
+    ) as confirm:
+        return (await ui.Layout(confirm).get_result()) is trezorui_api.CONFIRMED
 
 
 async def credential_warning(br_name: str, content: str) -> None:

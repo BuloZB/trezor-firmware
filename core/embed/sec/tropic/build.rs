@@ -1,6 +1,6 @@
-use xbuild::{CLibrary, Result, bail_unsupported};
-
 use std::path::PathBuf;
+
+use xbuild::{CLibrary, Result, bail_unsupported};
 
 pub fn def_module(lib: &mut CLibrary) -> Result<()> {
     lib.add_include("tropic/inc");
@@ -14,16 +14,16 @@ pub fn def_module(lib: &mut CLibrary) -> Result<()> {
 
         lib.add_sources_in_dir(&tropic_dir, ["hal/posix/tcp/libtropic_port_posix_tcp.c"]);
 
-        lib.add_define("ABAB", Some("1"));
+        lib.add_define("LT_SILICON_REV_ABAB", Some("1"));
     } else if cfg!(feature = "mcu_stm32u5") {
         lib.add_sources(["tropic/stm32/tropic01.c"]);
 
-        lib.add_define("ACAB", Some("1"));
+        lib.add_define("LT_SILICON_REV_ACAB", Some("1"));
     } else {
         bail_unsupported!();
     }
 
-    lib.add_sources(["tropic/tropic.c"]);
+    lib.add_sources(["tropic/tropic.c", "tropic/config/tropic_configs.c"]);
 
     lib.add_sources_in_dir(
         &tropic_dir,
@@ -56,6 +56,8 @@ pub fn def_module(lib: &mut CLibrary) -> Result<()> {
     lib.add_defines([
         ("LT_USE_TREZOR_CRYPTO", Some("1")),
         ("LT_HELPERS", Some("1")),
+        ("LT_L1_READ_RETRY_DELAY_MS", Some("1")),
+        ("LT_L1_READ_MAX_TRIES", Some("1250")),
     ]);
 
     Ok(())

@@ -370,6 +370,8 @@ class EthereumERC7730FieldFormatterType(IntEnum):
     FORMATTER_AMOUNT = 1
     FORMATTER_TOKEN_AMOUNT = 2
     FORMATTER_UNIT = 3
+    FORMATTER_RAW = 4
+    FORMATTER_DATE = 5
 
 
 class EthereumERC7730ContainerPath(IntEnum):
@@ -485,6 +487,7 @@ class TronResourceCode(IntEnum):
 class TronRawContractType(IntEnum):
     TransferContract = 1
     VoteWitnessContract = 4
+    WithdrawBalanceContract = 13
     TriggerSmartContract = 31
     FreezeBalanceV2Contract = 54
     UnfreezeBalanceV2Contract = 55
@@ -553,8 +556,6 @@ class MessageType(IntEnum):
     SetU2FCounter = 63
     GetNextU2FCounter = 80
     NextU2FCounter = 81
-    Deprecated_PassphraseStateRequest = 77
-    Deprecated_PassphraseStateAck = 78
     FirmwareErase = 6
     FirmwareUpload = 7
     FirmwareRequest = 8
@@ -628,6 +629,8 @@ class MessageType(IntEnum):
     EthereumSignTypedHash = 470
     EthereumDefinitionRequest = 471
     EthereumDefinitionAck = 472
+    EthereumSignAuth7702 = 473
+    EthereumAuth7702Signature = 474
     NEMGetAddress = 67
     NEMAddress = 68
     NEMSignTx = 69
@@ -778,6 +781,7 @@ class MessageType(IntEnum):
     TronUnfreezeBalanceV2Contract = 2208
     TronWithdrawUnfreeze = 2209
     TronVoteWitnessContract = 2210
+    TronWithdrawBalance = 2213
     BenchmarkListNames = 9100
     BenchmarkNames = 9101
     BenchmarkRun = 9102
@@ -920,23 +924,12 @@ class PinMatrixAck(protobuf.MessageType):
 
 class PassphraseRequest(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 41
-    FIELDS = {
-        1: protobuf.Field("_on_device", "bool", repeated=False, required=False, default=None),
-    }
-
-    def __init__(
-        self,
-        *,
-        _on_device: Optional["bool"] = None,
-    ) -> None:
-        self._on_device = _on_device
 
 
 class PassphraseAck(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 42
     FIELDS = {
         1: protobuf.Field("passphrase", "string", repeated=False, required=False, default=None),
-        2: protobuf.Field("_state", "bytes", repeated=False, required=False, default=None),
         3: protobuf.Field("on_device", "bool", repeated=False, required=False, default=None),
     }
 
@@ -944,30 +937,10 @@ class PassphraseAck(protobuf.MessageType):
         self,
         *,
         passphrase: Optional["str"] = None,
-        _state: Optional["bytes"] = None,
         on_device: Optional["bool"] = None,
     ) -> None:
         self.passphrase = passphrase
-        self._state = _state
         self.on_device = on_device
-
-
-class Deprecated_PassphraseStateRequest(protobuf.MessageType):
-    MESSAGE_WIRE_TYPE = 77
-    FIELDS = {
-        1: protobuf.Field("state", "bytes", repeated=False, required=False, default=None),
-    }
-
-    def __init__(
-        self,
-        *,
-        state: Optional["bytes"] = None,
-    ) -> None:
-        self.state = state
-
-
-class Deprecated_PassphraseStateAck(protobuf.MessageType):
-    MESSAGE_WIRE_TYPE = 78
 
 
 class HDNodeType(protobuf.MessageType):
@@ -4814,6 +4787,7 @@ class EthereumERC7730Path(protobuf.MessageType):
     FIELDS = {
         1: protobuf.Field("path", "sint32", repeated=True, required=False, default=None),
         2: protobuf.Field("container_path", "EthereumERC7730ContainerPath", repeated=False, required=False, default=None),
+        3: protobuf.Field("const_value", "string", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -4821,9 +4795,11 @@ class EthereumERC7730Path(protobuf.MessageType):
         *,
         path: Optional[Sequence["int"]] = None,
         container_path: Optional["EthereumERC7730ContainerPath"] = None,
+        const_value: Optional["str"] = None,
     ) -> None:
         self.path: Sequence["int"] = path if path is not None else []
         self.container_path = container_path
+        self.const_value = const_value
 
 
 class EthereumERC7730FieldInfo(protobuf.MessageType):
@@ -4837,6 +4813,7 @@ class EthereumERC7730FieldInfo(protobuf.MessageType):
         6: protobuf.Field("decimals", "uint32", repeated=False, required=False, default=None),
         7: protobuf.Field("base", "string", repeated=False, required=False, default=None),
         8: protobuf.Field("prefix", "bool", repeated=False, required=False, default=None),
+        9: protobuf.Field("const_token_address", "bytes", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -4850,6 +4827,7 @@ class EthereumERC7730FieldInfo(protobuf.MessageType):
         decimals: Optional["int"] = None,
         base: Optional["str"] = None,
         prefix: Optional["bool"] = None,
+        const_token_address: Optional["bytes"] = None,
     ) -> None:
         self.path = path
         self.label = label
@@ -4859,6 +4837,7 @@ class EthereumERC7730FieldInfo(protobuf.MessageType):
         self.decimals = decimals
         self.base = base
         self.prefix = prefix
+        self.const_token_address = const_token_address
 
 
 class EthereumDisplayFormatInfo(protobuf.MessageType):
@@ -5866,6 +5845,49 @@ class EthereumDefinitions(protobuf.MessageType):
         self.encoded_display_format = encoded_display_format
 
 
+class EthereumSignAuth7702(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 473
+    FIELDS = {
+        1: protobuf.Field("address_n", "uint32", repeated=True, required=False, default=None),
+        2: protobuf.Field("chain_id", "uint64", repeated=False, required=True),
+        3: protobuf.Field("delegate", "string", repeated=False, required=True),
+        4: protobuf.Field("nonce", "uint64", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        chain_id: "int",
+        delegate: "str",
+        nonce: "int",
+        address_n: Optional[Sequence["int"]] = None,
+    ) -> None:
+        self.address_n: Sequence["int"] = address_n if address_n is not None else []
+        self.chain_id = chain_id
+        self.delegate = delegate
+        self.nonce = nonce
+
+
+class EthereumAuth7702Signature(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 474
+    FIELDS = {
+        1: protobuf.Field("signature_v", "uint32", repeated=False, required=True),
+        2: protobuf.Field("signature_r", "bytes", repeated=False, required=True),
+        3: protobuf.Field("signature_s", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        signature_v: "int",
+        signature_r: "bytes",
+        signature_s: "bytes",
+    ) -> None:
+        self.signature_v = signature_v
+        self.signature_r = signature_r
+        self.signature_s = signature_s
+
+
 class EthereumAccessList(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = None
     FIELDS = {
@@ -6061,6 +6083,7 @@ class EvoluRegistrationRequest(protobuf.MessageType):
     FIELDS = {
         1: protobuf.Field("certificate_chain", "bytes", repeated=True, required=False, default=None),
         2: protobuf.Field("signature", "bytes", repeated=False, required=True),
+        3: protobuf.Field("rotation_index", "uint32", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -6068,9 +6091,11 @@ class EvoluRegistrationRequest(protobuf.MessageType):
         *,
         signature: "bytes",
         certificate_chain: Optional[Sequence["bytes"]] = None,
+        rotation_index: Optional["int"] = None,
     ) -> None:
         self.certificate_chain: Sequence["bytes"] = certificate_chain if certificate_chain is not None else []
         self.signature = signature
+        self.rotation_index = rotation_index
 
 
 class EvoluGetDelegatedIdentityKey(protobuf.MessageType):
@@ -7811,6 +7836,7 @@ class SolanaSignTx(protobuf.MessageType):
         2: protobuf.Field("serialized_tx", "bytes", repeated=False, required=True),
         3: protobuf.Field("additional_info", "SolanaTxAdditionalInfo", repeated=False, required=False, default=None),
         4: protobuf.Field("payment_req", "PaymentRequest", repeated=False, required=False, default=None),
+        5: protobuf.Field("chunkify", "bool", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -7820,11 +7846,13 @@ class SolanaSignTx(protobuf.MessageType):
         address_n: Optional[Sequence["int"]] = None,
         additional_info: Optional["SolanaTxAdditionalInfo"] = None,
         payment_req: Optional["PaymentRequest"] = None,
+        chunkify: Optional["bool"] = None,
     ) -> None:
         self.address_n: Sequence["int"] = address_n if address_n is not None else []
         self.serialized_tx = serialized_tx
         self.additional_info = additional_info
         self.payment_req = payment_req
+        self.chunkify = chunkify
 
 
 class SolanaTxSignature(protobuf.MessageType):
@@ -9310,6 +9338,20 @@ class TronUnfreezeBalanceV2Contract(protobuf.MessageType):
 
 class TronWithdrawUnfreeze(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 2209
+    FIELDS = {
+        1: protobuf.Field("owner_address", "bytes", repeated=False, required=True),
+    }
+
+    def __init__(
+        self,
+        *,
+        owner_address: "bytes",
+    ) -> None:
+        self.owner_address = owner_address
+
+
+class TronWithdrawBalance(protobuf.MessageType):
+    MESSAGE_WIRE_TYPE = 2213
     FIELDS = {
         1: protobuf.Field("owner_address", "bytes", repeated=False, required=True),
     }

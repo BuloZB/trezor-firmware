@@ -1,37 +1,27 @@
-use crate::{
-    strutil::{ShortString, TString},
-    time::Duration,
-    ui::{
-        component::{
-            base::ComponentExt,
-            swipe_detect::SwipeConfig,
-            text::{
-                common::TextBox,
-                layout::{LayoutFit, LineBreaking},
-                TextStyle,
-            },
-            Component, Event, EventCtx, Label, Maybe, Never, Pad, Swipe, TextLayout, Timer,
-        },
-        display,
-        event::TouchEvent,
-        geometry::{Alignment, Alignment2D, Direction, Grid, Insets, Rect},
-        shape::{Bar, Renderer, Text, ToifImage},
-        util::{DisplayStyle, Pager},
-    },
-};
-
-use super::super::super::{
-    component::{
-        button::{Button, ButtonContent, ButtonMsg},
-        keyboard::common::{render_pending_marker, MultiTapKeyboard},
-        theme,
-    },
-    constant::SCREEN,
-    cshape,
-};
-
 use core::cell::Cell;
+
 use num_traits::ToPrimitive;
+
+use super::super::super::component::button::{Button, ButtonContent, ButtonMsg};
+use super::super::super::component::keyboard::common::{render_pending_marker, MultiTapKeyboard};
+use super::super::super::component::theme;
+use super::super::super::constant::SCREEN;
+use super::super::super::cshape;
+use crate::strutil::{ShortString, TString};
+use crate::time::Duration;
+use crate::ui::component::base::ComponentExt;
+use crate::ui::component::swipe_detect::SwipeConfig;
+use crate::ui::component::text::common::TextBox;
+use crate::ui::component::text::layout::{LayoutFit, LineBreaking};
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{
+    Component, Event, EventCtx, Label, Maybe, Never, Pad, Swipe, TextLayout, Timer,
+};
+use crate::ui::display;
+use crate::ui::event::TouchEvent;
+use crate::ui::geometry::{Alignment, Alignment2D, Direction, Grid, Insets, Rect};
+use crate::ui::shape::{Bar, Renderer, Text, ToifImage};
+use crate::ui::util::{DisplayStyle, Pager};
 
 pub enum PassphraseKeyboardMsg {
     Confirmed(ShortString),
@@ -550,7 +540,7 @@ impl Input {
         }
 
         let visible_len = pp_len.min(max_dots);
-        let visible_icons = visible_len - last_char as usize;
+        let visible_icons = visible_len - usize::from(last_char);
 
         // Jiggle when overflowed
         if pp_len > visible_len && pp_len % 2 == 1 && self.display_style != DisplayStyle::Shown {

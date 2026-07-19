@@ -1,7 +1,5 @@
-use core::{
-    cmp::Ordering,
-    ops::{Div, Mul},
-};
+use core::cmp::Ordering;
+use core::ops::{Div, Mul};
 
 use crate::trezorhal::time;
 
@@ -81,6 +79,10 @@ impl Duration {
 
     pub fn checked_sub(self, rhs: Self) -> Option<Self> {
         self.millis.checked_sub(rhs.millis).map(Self::from_millis)
+    }
+
+    pub fn saturating_add(self, rhs: Self) -> Self {
+        Self::from_millis(self.millis.saturating_add(rhs.millis))
     }
 
     /// Returns a new Duration containing only the largest complete time unit

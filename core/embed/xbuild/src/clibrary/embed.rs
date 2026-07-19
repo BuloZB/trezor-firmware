@@ -1,18 +1,13 @@
 use std::path::Path;
 
-use color_eyre::{
-    Result,
-    eyre::{WrapErr, ensure},
-};
+use color_eyre::Result;
+use color_eyre::eyre::{WrapErr, ensure};
+use zlib_rs::{DeflateConfig, ReturnCode, compress_bound, compress_slice};
 
 use super::CLibrary;
+use crate::dep_tracking::{run_command, run_if_changed};
 use crate::helpers::{derive_output_path, ensure_parent_directory, path_from_env};
-use crate::{
-    dep_tracking::{run_command, run_if_changed},
-    is_rust_analyzer,
-};
-
-use zlib_rs::{DeflateConfig, ReturnCode, compress_bound, compress_slice};
+use crate::is_rust_analyzer;
 
 impl CLibrary {
     /// Embeds a binary file into the library by converting it into an object
@@ -93,7 +88,8 @@ impl CLibrary {
         self.embed_binary(compressed_path, section)
     }
 
-    /// Compresses a file using zlib and write the compressed data to an output file.
+    /// Compresses a file using zlib and write the compressed data to an output
+    /// file.
     fn compress_file(&self, input: impl AsRef<Path>, output: impl AsRef<Path>) -> Result<()> {
         let input = input.as_ref();
         let output = output.as_ref();
@@ -105,7 +101,13 @@ impl CLibrary {
 
         let mut data_out = vec![0u8; compress_bound(data_in.len())];
 
-        let config = DeflateConfig::best_compression();
+        let config = DeflateConfig {
+            // < 0 => raw deflate stream (no zlib header)
+            // -10 => 1KB window
+            window_bits: -10,
+            ..DeflateConfig::best_compression()
+        };
+
         let (compressed, code) = compress_slice(&mut data_out, &data_in, config);
 
         ensure!(

@@ -26,8 +26,7 @@ from trezorlib._internal import translations
 from trezorlib.debuglink import DebugSession as Session
 from trezorlib.debuglink import TrezorTestContext as Client
 from trezorlib.debuglink import message_filters
-
-from ..translations import (
+from trezorlib.testing.translations import (
     LANGUAGES,
     build_and_sign_blob,
     get_lang_json,
@@ -59,6 +58,11 @@ def get_ping_button(lang: str, session: Session) -> str:
 def get_ping_title(lang: str) -> str:
     content = get_lang_json(lang)
     return content["translations"]["words__confirm"]
+
+
+def get_version(session: Session) -> tuple[int, int, int, int]:
+    f = session.client.features
+    return (f.major_version, f.minor_version, f.patch_version, f.build_version)
 
 
 @pytest.fixture
@@ -97,7 +101,6 @@ def _check_ping_screen_texts(session: Session, title: str, right_button: str) ->
         right_button = "-"
 
     with session.test_ctx as client:
-        client.watch_layout(True)
         client.set_input_flow(ping_input_flow(session, title, right_button))
         ping = session.call(messages.Ping(message="ahoj!", button_protection=True))
         assert ping == messages.Success(message="ahoj!")
@@ -203,7 +206,7 @@ def test_error_invalid_signature(session: Session):
         pytest.raises(exceptions.TrezorFailure, match="Invalid translations data"),
         session.test_ctx,
     ):
-        blob = prepare_blob("cs", session.model, session.version)
+        blob = prepare_blob("cs", session.model, get_version(session))
         blob.proof = translations.Proof(
             merkle_proof=[],
             sigmask=0b011,
@@ -245,18 +248,19 @@ def test_build_version_mismatch(session: Session):
     assert session.features.language == "en-US"
     # Translations build version is allowed to differ from FW build version.
     # Change the build version to one not matching the current device
-    version = session.version
-    assert len(session.version) == 3
-    version = version + (1,)
-    blob = prepare_blob("cs", session.model, version)
+    cur_version = get_version(session)
+    bumped_version = cur_version[:3] + (cur_version[3] + 1,)
+    blob = prepare_blob("cs", session.model, bumped_version)
     device.change_language(
         session,
         language_data=sign_blob(blob),
     )
     assert session.features.language == "cs-CZ"
+    assert session.features.language_version_matches is True
     _check_ping_screen_texts(
         session, get_ping_title("cs"), get_ping_button("cs", session.client)
     )
+    # Would be nice to test lower build_version but firmware's is usually 0 and hard to change
 
 
 def test_language_is_removed_after_wipe(client: Client):
@@ -462,7 +466,7 @@ def test_header_trailing_data(session: Session):
 
     assert session.features.language == "en-US"
     lang = "cs"
-    blob = prepare_blob(lang, session.model, session.version)
+    blob = prepare_blob(lang, session.model, get_version(session))
     blob.header_bytes += b"trailing dataa"
     assert len(blob.header_bytes) % 2 == 0, "Trailing data must keep the 2-alignment"
     language_data = sign_blob(blob)

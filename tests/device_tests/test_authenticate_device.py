@@ -1,10 +1,15 @@
 import pytest
+from cryptography import x509
 
 from trezorlib import device, exceptions, messages
+from trezorlib.authentication import get_challenge_message
 from trezorlib.debuglink import DebugSession as Session
 
-from ..common import compact_size
-from .certificate import check_signature_optiga, check_signature_tropic
+from .certificate import (
+    check_signature_mcu,
+    check_signature_optiga,
+    check_signature_tropic,
+)
 
 # The tests below require Optiga (and some require Tropic)
 pytestmark = pytest.mark.models("safe")
@@ -48,9 +53,36 @@ def test_authenticate_device_optiga(
         assert proof.mcu_signature is None
         assert proof.mcu_certificates == []
 
-    data = b"\x13AuthenticateDevice:" + compact_size(len(challenge)) + challenge
     check_signature_optiga(
-        proof.optiga_signature, proof.optiga_certificates, session.model, data
+        proof.optiga_signature,
+        proof.optiga_certificates,
+        session.model,
+        get_challenge_message(challenge),
+    )
+
+
+@pytest.mark.models(skip=["safe3", "safe5"])
+def test_authenticate_device_mcu(
+    session: Session, challenge: bytes, chunk_size: int
+) -> None:
+    # NOTE Applications must generate a random challenge for each request.
+
+    if not session.features.bootloader_locked:
+        pytest.xfail("unlocked bootloader")
+
+    if chunk_size == 0:
+        # MCU attestation is sent only when streaming is supported.
+        pytest.skip("MCU attestation requires streaming (chunk_size > 0)")
+
+    proof = device.authenticate(session, challenge, chunk_size)
+    assert proof.mcu_signature is not None
+    assert len(proof.mcu_certificates) >= 1
+
+    check_signature_mcu(
+        proof.mcu_signature,
+        proof.mcu_certificates,
+        session.model,
+        get_challenge_message(challenge),
     )
 
 
@@ -70,12 +102,11 @@ def test_authenticate_device_tropic(
         assert proof.mcu_signature is None
         assert proof.mcu_certificates == []
 
-    data = b"\x13AuthenticateDevice:" + compact_size(len(challenge)) + challenge
     check_signature_tropic(
         proof.tropic_signature,
         proof.tropic_certificates,
         session.model,
-        data,
+        get_challenge_message(challenge),
     )
 
 
@@ -158,6 +189,28 @@ def test_authenticate_device_invalid_range_offset(
                 size=0,
             )
         )
+
+
+@pytest.mark.models(skip=["safe3", "safe5"], reason="Not using Tropic")
+def test_certificate_subject_serial_numbers_match(
+    session: Session,
+) -> None:
+    if not session.features.bootloader_locked:
+        pytest.xfail("unlocked bootloader")
+
+    proof = device.authenticate(session, b"")
+
+    def serial_number(cert_der: bytes) -> str:
+        cert = x509.load_der_x509_certificate(cert_der)
+        attrs = cert.subject.get_attributes_for_oid(x509.oid.NameOID.SERIAL_NUMBER)
+        assert attrs
+        return attrs[0].value
+
+    optiga_sn = serial_number(proof.optiga_certificates[0])
+    tropic_sn = serial_number(proof.tropic_certificates[0])
+    mcu_sn = serial_number(proof.mcu_certificates[0])
+
+    assert optiga_sn == tropic_sn == mcu_sn
 
 
 def test_authenticate_device_unexpected(

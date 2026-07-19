@@ -23,12 +23,12 @@ import typing as t
 
 from cryptography import exceptions, x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, ed25519, types, utils
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, mldsa, types, utils
 from cryptography.x509.oid import NameOID, ObjectIdentifier, SignatureAlgorithmOID
 
-from . import device
+from . import _root_keys, device
 from .client import Session
-from .tools import workflow
+from .tools import compact_size, workflow
 
 LOG = logging.getLogger(__name__)
 
@@ -41,7 +41,22 @@ def _pk_ed25519(pubkey_hex: str) -> PublicKey:
     return Ed25519PublicKey.from_bytes(bytes.fromhex(pubkey_hex))
 
 
+def _pk_mldsa44(pubkey_hex: str) -> PublicKey:
+    return Mldsa44PublicKey.from_bytes(bytes.fromhex(pubkey_hex))
+
+
 CHALLENGE_HEADER = b"AuthenticateDevice:"
+
+
+def get_challenge_message(challenge: bytes) -> bytes:
+    """Build the message that Trezor signs in response to an AuthenticateDevice call."""
+    return (
+        compact_size(len(CHALLENGE_HEADER))
+        + CHALLENGE_HEADER
+        + compact_size(len(challenge))
+        + challenge
+    )
+
 
 OID_TO_NAME = {
     NameOID.COMMON_NAME: "CN",
@@ -53,6 +68,8 @@ OID_TO_NAME = {
     NameOID.SERIAL_NUMBER: "SERIALNUMBER",
     NameOID.DN_QUALIFIER: "DNQ",
 }
+
+MLDSA44_SIGNATURE_ALG_OID = ObjectIdentifier("2.16.840.1.101.3.4.3.17")
 
 
 class DeviceNotAuthentic(Exception):
@@ -87,6 +104,8 @@ class PublicKey:
             return EcdsaPublicKey.from_bytes(data, ec.SECP256R1())
         elif oid == SignatureAlgorithmOID.ED25519:
             return Ed25519PublicKey.from_bytes(data)
+        elif oid == MLDSA44_SIGNATURE_ALG_OID:
+            return Mldsa44PublicKey.from_bytes(data)
         else:
             raise ValueError("Unsupported key type.")
 
@@ -96,6 +115,8 @@ class PublicKey:
             return EcdsaPublicKey(pubkey)
         elif isinstance(pubkey, ed25519.Ed25519PublicKey):
             return Ed25519PublicKey(pubkey)
+        elif isinstance(pubkey, mldsa.MLDSA44PublicKey):
+            return Mldsa44PublicKey(pubkey)
         else:
             raise ValueError("Unsupported key type.")
 
@@ -214,12 +235,48 @@ class Ed25519PublicKey(PublicKey):
         )
 
 
+class Mldsa44PublicKey(PublicKey):
+    def __init__(
+        self, pubkey: mldsa.MLDSA44PublicKey | None = None, *, raw: bytes | None = None
+    ) -> None:
+        assert (pubkey is None) != (raw is None), "Set exactly one of pubkey or raw."
+        self._pubkey = pubkey
+        self._raw = raw
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Mldsa44PublicKey:
+        # Defer construction of the underlying key until it is first used, so that we don't require
+        # ML-DSA-44 backend support unconditionally at import time.
+        return cls(raw=bytes(data))
+
+    @property
+    def pubkey(self) -> mldsa.MLDSA44PublicKey:
+        if self._pubkey is None:
+            assert self._raw is not None
+            self._pubkey = mldsa.MLDSA44PublicKey.from_public_bytes(self._raw)
+        return self._pubkey
+
+    def to_bytes(self) -> bytes:
+        if self._raw is None:
+            self._raw = self.pubkey.public_bytes_raw()
+        return self._raw
+
+    def verify_message(self, *, signature: bytes, message: bytes) -> None:
+        self.pubkey.verify(signature, message)
+
+    def verify_certificate(self, certificate: x509.Certificate) -> None:
+        self.verify_message(
+            signature=certificate.signature, message=certificate.tbs_certificate_bytes
+        )
+
+
 class RootCertificate(t.NamedTuple):
     name: str
     device: str
     devel: bool
     p256_pubkey: PublicKey
     ed25519_pubkey: PublicKey | None = None
+    mldsa44_pubkey: PublicKey | None = None
 
     def pubkey_for_oid(self, oid: ObjectIdentifier) -> PublicKey:
         if oid == SignatureAlgorithmOID.ECDSA_WITH_SHA256:
@@ -228,6 +285,10 @@ class RootCertificate(t.NamedTuple):
             if self.ed25519_pubkey is None:
                 raise ValueError("ED25519 public key not set.")
             return self.ed25519_pubkey
+        elif oid == MLDSA44_SIGNATURE_ALG_OID:
+            if self.mldsa44_pubkey is None:
+                raise ValueError("ML-DSA-44 public key not set.")
+            return self.mldsa44_pubkey
         else:
             raise ValueError("Unsupported key type.")
 
@@ -238,91 +299,69 @@ ROOT_PUBLIC_KEYS = [
         "Trezor Company",
         "Trezor Safe 3",
         False,
-        _pk_p256(
-            "04ca97480ac0d7b1e6efafe518cd433cec2bf8ab9822d76eafd34363b55d63e60"
-            "380bff20acc75cde03cffcb50ab6f8ce70c878e37ebc58ff7cca0a83b16b15fa5"
-        ),
+        _pk_p256(_root_keys.T2B1_DEV_AUTH_ROOT_PROD_P256_HEX),
     ),
     RootCertificate(
         # Root production key for T3B1.
         "Trezor Company",
         "Trezor Safe 3",
         False,
-        _pk_p256(
-            "045b5c3fdd01f3602092834209b86df0ca86a9faf25cac35c73bf6237d66eb21e"
-            "afcec3706f1ccd5eb4cc7f2fa1751213eccb1c78389afba89a5788ff31ee46a5d"
-        ),
+        _pk_p256(_root_keys.T3B1_DEV_AUTH_ROOT_PROD_P256_HEX),
     ),
     RootCertificate(
+        # Root production key for T3T1.
         "Trezor Company",
         "Trezor Safe 5",
         False,
-        _pk_p256(
-            "041854b27fb1d9f65abb66828e78c9dc0ca301e66081ab0c6a4d104f9df1cd0ad"
-            "5a7c75f77a8c092f55cf825d2abaf734f934c9394d5e75f75a5a06a5ee9be93ae"
-        ),
+        _pk_p256(_root_keys.T3T1_DEV_AUTH_ROOT_PROD_P256_HEX),
     ),
     RootCertificate(
         # Root production keys for T3W1.
         "Trezor Company",
         "Trezor Safe 7",
         False,
-        _pk_p256(
-            "040dde0d3e0d4da593fac6fd02a461d0e7eef238aca55c7c50b4e9ec37f387330"
-            "3b6429ef1c9b78b4411a7dcbbc5dde5225979c1c2da3b073e82b1ed3f5f9825bb"
-        ),
-        _pk_ed25519("59237acd17134061d655b3f8d624573ca06ce8d862f38ba4e05140ce1d3d609d"),
+        _pk_p256(_root_keys.T3W1_DEV_AUTH_ROOT_PROD_P256_HEX),
+        _pk_ed25519(_root_keys.T3W1_DEV_AUTH_ROOT_PROD_ED25519_HEX),
+        _pk_mldsa44(_root_keys.T3W1_DEV_AUTH_ROOT_PROD_MLDSA44_HEX),
     ),
     RootCertificate(
         # Root backup production keys for T3W1.
         "Trezor Company",
         "Trezor Safe 7",
         False,
-        _pk_p256(
-            "04c6a673af4ec44b10441b1d78676e15173ad0e36df9f7f2fa1cd819955f20fe3"
-            "2917b60da5fed3b3aa54a9ab8b3ed27d198b3768cad26eef5935cd87af0af065e"
-        ),
-        _pk_ed25519("5612606584ee7e0bc313b13f7ac94156bb4cb75bd77585ddbe579301306e85f1"),
+        _pk_p256(_root_keys.T3W1_DEV_AUTH_ROOT_PROD_BACKUP_P256_HEX),
+        _pk_ed25519(_root_keys.T3W1_DEV_AUTH_ROOT_PROD_BACKUP_ED25519_HEX),
+        _pk_mldsa44(_root_keys.T3W1_DEV_AUTH_ROOT_PROD_BACKUP_MLDSA44_HEX),
     ),
     RootCertificate(
         # Root debug key for T2B1 and T3B1.
         "TESTING ENVIRONMENT. DO NOT USE THIS DEVICE",
         "Trezor Safe 3",
         True,
-        _pk_p256(
-            "047f77368dea2d4d61e989f474a56723c3212dacf8a808d8795595ef38441427c"
-            "4389bc454f02089d7f08b873005e4c28d432468997871c0bf286fd3861e21e96a"
-        ),
+        _pk_p256(_root_keys.T2B1_DEV_AUTH_ROOT_DEBUG_P256_HEX),
     ),
     RootCertificate(
+        # Root debug key for T3T1.
         "TESTING ENVIRONMENT. DO NOT USE THIS DEVICE",
         "Trezor Safe 5",
         True,
-        _pk_p256(
-            "04e48b69cd7962068d3cca3bcc6b1747ef496c1e28b5529e34ad7295215ea161d"
-            "be8fb08ae0479568f9d2cb07630cb3e52f4af0692102da5873559e45e9fa72959"
-        ),
+        _pk_p256(_root_keys.T3T1_DEV_AUTH_ROOT_DEBUG_P256_HEX),
     ),
     RootCertificate(
         # Root debug keys for T3W1.
         "TESTING ENVIRONMENT. DO NOT USE THIS DEVICE",
         "Trezor Safe 7",
         True,
-        _pk_p256(
-            "04521192e173a9da4e3023f747d836563725372681eba3079c56ff11b2fc137ab"
-            "189eb4155f371127651b5594f8c332fc1e9c0f3b80d4212822668b63189706578"
-        ),
+        _pk_p256(_root_keys.T3W1_DEV_AUTH_ROOT_DEBUG_P256_HEX),
     ),
     RootCertificate(
         # Root staging keys for T3W1.
         "TESTING ENVIRONMENT. DO NOT USE THIS DEVICE",
         "Trezor Safe 7",
-        False,
-        _pk_p256(
-            "0465e88f9b2cea67e8364f0cfcfacd500af24e9040b357beee629ccc4fce1704d"
-            "1a7ef7284f387708f92ef14600e2caad6894016fee819d623b95d66210c3e7519"
-        ),
-        _pk_ed25519("cd318dc8405ae4f4144e3284dcb7b0cb0f0c2195c2ca14a0f6fccd9104e32a4b"),
+        True,
+        _pk_p256(_root_keys.T3W1_DEV_AUTH_ROOT_STAGING_P256_HEX),
+        _pk_ed25519(_root_keys.T3W1_DEV_AUTH_ROOT_STAGING_ED25519_HEX),
+        _pk_mldsa44(_root_keys.T3W1_DEV_AUTH_ROOT_STAGING_MLDSA44_HEX),
     ),
 ]
 
@@ -338,6 +377,18 @@ class Certificate:
 
     def signature_algorithm_oid(self) -> ObjectIdentifier:
         return self.cert.signature_algorithm_oid
+
+    def subject_common_name(self) -> str | None:
+        attrs = self.cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if len(attrs) > 1:
+            raise ValueError("Certificate has multiple common name attributes.")
+        return str(attrs[0].value) if attrs else None
+
+    def subject_serial_number(self) -> str | None:
+        attrs = self.cert.subject.get_attributes_for_oid(NameOID.SERIAL_NUMBER)
+        if len(attrs) > 1:
+            raise ValueError("Certificate has multiple serial number attributes.")
+        return str(attrs[0].value) if attrs else None
 
     def _check_ca_extensions(self) -> bool:
         """Check that this certificate is a valid Trezor CA.
@@ -423,6 +474,19 @@ class Certificate:
         return False
 
 
+class AuthenticationResult(t.NamedTuple):
+    """The outcome of verifying a single AuthenticateDevice certificate chain.
+
+    `root` is the matched trust anchor (or None when an explicit `root_pubkey` was
+    supplied). `common_name` and `serial_number` are taken from the subject of the
+    end-entity (device) certificate.
+    """
+
+    root: RootCertificate | None
+    common_name: str | None
+    serial_number: str | None
+
+
 def verify_authentication_response(
     challenge: bytes,
     signature: bytes,
@@ -431,23 +495,20 @@ def verify_authentication_response(
     allowlist: AllowList | None,
     allow_development_devices: bool = False,
     root_pubkey: bytes | PublicKey | None = None,
-) -> RootCertificate | None:
+) -> AuthenticationResult:
     """Evaluate the response to an AuthenticateDevice call.
 
     Performs all steps and logs their results via the logging facility. (The log can be
     accessed via the `LOG` object in this module.)
 
-    When done, raises DeviceNotAuthentic if the device is not authentic.
+    When done, raises DeviceNotAuthentic if the device is not authentic. Otherwise
+    returns an `AuthenticationResult` describing the matched root and the device
+    certificate's subject.
 
     The optional argument `root_pubkey` allows you to specify a root public key either
     as a `PublicKey` object or as a byte-string.
     """
-    challenge_bytes = (
-        len(CHALLENGE_HEADER).to_bytes(1, "big")
-        + CHALLENGE_HEADER
-        + len(challenge).to_bytes(1, "big")
-        + challenge
-    )
+    challenge_bytes = get_challenge_message(challenge)
 
     cert_chain_iter = iter(cert_chain)
 
@@ -458,6 +519,9 @@ def verify_authentication_response(
     except Exception:
         LOG.error("Failed to parse device certificate.")
         raise DeviceNotAuthentic
+
+    device_common_name = cert.subject_common_name()
+    device_serial_number = cert.subject_serial_number()
 
     try:
         cert.public_key.verify_message(signature=signature, message=challenge_bytes)
@@ -538,7 +602,7 @@ def verify_authentication_response(
     if failed:
         raise DeviceNotAuthentic
 
-    return root
+    return AuthenticationResult(root, device_common_name, device_serial_number)
 
 
 @workflow()
@@ -550,13 +614,14 @@ def authenticate_device(
     allow_development_devices: bool = False,
     p256_root_pubkey: bytes | PublicKey | None = None,
     ed25519_root_pubkey: bytes | PublicKey | None = None,
+    mldsa44_root_pubkey: bytes | PublicKey | None = None,
 ) -> None:
     if challenge is None:
         challenge = secrets.token_bytes(16)
 
     resp = device.authenticate(session, challenge)
 
-    optiga_root = verify_authentication_response(
+    optiga_auth_result = verify_authentication_response(
         challenge,
         resp.optiga_signature,
         resp.optiga_certificates,
@@ -565,15 +630,17 @@ def authenticate_device(
         root_pubkey=p256_root_pubkey,
     )
 
+    results = [optiga_auth_result]
+
     if (
-        getattr(optiga_root, "ed25519_pubkey", None) is not None
+        getattr(optiga_auth_result.root, "ed25519_pubkey", None) is not None
         or ed25519_root_pubkey is not None
     ):
         if not resp.tropic_signature:
             LOG.error("Missing Tropic signature.")
             raise DeviceNotAuthentic
 
-        tropic_root = verify_authentication_response(
+        tropic_auth_result = verify_authentication_response(
             challenge,
             resp.tropic_signature,
             resp.tropic_certificates,
@@ -582,6 +649,53 @@ def authenticate_device(
             root_pubkey=ed25519_root_pubkey,
         )
 
-        if optiga_root is not tropic_root:
-            LOG.error("Certificates issued by different root authorities.")
+        results.append(tropic_auth_result)
+
+    if (
+        getattr(optiga_auth_result.root, "mldsa44_pubkey", None) is not None
+        or mldsa44_root_pubkey is not None
+    ):
+        if not resp.mcu_signature:
+            LOG.error("Missing MCU signature.")
             raise DeviceNotAuthentic
+
+        mcu_auth_result = verify_authentication_response(
+            challenge,
+            resp.mcu_signature,
+            resp.mcu_certificates,
+            allowlist=allowlist,
+            allow_development_devices=allow_development_devices,
+            root_pubkey=mldsa44_root_pubkey,
+        )
+
+        results.append(mcu_auth_result)
+
+    # All chains must be issued by the same root authority. Chains rooted in different built-in
+    # authorities and any mix of custom and built-in roots are rejected; chains rooted entirely in
+    # custom keys (all None) are accepted as the caller's deliberate choice.
+    if len(set(r.root for r in results)) != 1:
+        LOG.error("Certificates issued by different root authorities.")
+        raise DeviceNotAuthentic
+
+    # All chains must share the same serial number and common name, and the common name
+    # must identify the model reported in the device's features.
+
+    if len(set(r.serial_number for r in results)) != 1:
+        LOG.error("Device certificates have inconsistent serial numbers.")
+        raise DeviceNotAuthentic
+
+    common_names = set(r.common_name for r in results)
+    if len(common_names) != 1:
+        LOG.error("Device certificates have inconsistent common names.")
+        raise DeviceNotAuthentic
+
+    common_name = common_names.pop()
+    if common_name is None or not common_name.startswith(
+        session.model.internal_name + " "
+    ):
+        LOG.error(
+            "Device certificate common name %s does not match model %s.",
+            common_name,
+            session.model.internal_name,
+        )
+        raise DeviceNotAuthentic

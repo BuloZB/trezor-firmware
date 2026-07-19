@@ -1,17 +1,19 @@
-use anyhow::{Context, Result, ensure};
 use std::process;
 
-use crate::{args::UploadArgs, helpers};
+use anyhow::{Context, Result, ensure};
+
+use crate::args::UploadArgs;
+use crate::helpers;
 
 pub fn upload(args: UploadArgs) -> Result<()> {
     ensure!(
-        args.component.uploadable(),
+        args.project.uploadable(),
         "trezorctl upload is not supported for `{}`",
-        args.component.binary_name()
+        args.project.binary_name()
     );
 
     let binary =
-        helpers::artifacts_dir(args.model)?.join(format!("{}.bin", args.component.binary_name()));
+        helpers::artifacts_dir(args.model)?.join(format!("{}.bin", args.project.binary_name()));
 
     let binary = binary
         .canonicalize()

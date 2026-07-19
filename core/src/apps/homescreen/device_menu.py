@@ -56,8 +56,8 @@ def get_auto_lock_delay() -> tuple[str, str] | None:
     autolock_delay_batt = storage_device.get_autolock_delay_battery_ms()
     autolock_delay_usb = storage_device.get_autolock_delay_ms()
 
-    autolock_delay_batt_fmg = strings.format_autolock_duration(autolock_delay_batt)
-    autolock_delay_usb_fmt = strings.format_autolock_duration(autolock_delay_usb)
+    autolock_delay_batt_fmg = strings.format_duration_ms(autolock_delay_batt)
+    autolock_delay_usb_fmt = strings.format_duration_ms(autolock_delay_usb)
 
     return (autolock_delay_batt_fmg, autolock_delay_usb_fmt)
 
@@ -74,6 +74,7 @@ async def handle_device_menu() -> None:
     from trezor.wire.thp import paired_cache
 
     init_submenu_idx = None
+    init_submenu_offset = 0
 
     # Remain in the device loop until the menu is explicitly closed
     while True:
@@ -133,58 +134,46 @@ async def handle_device_menu() -> None:
             about_items.append((TR.sn__title, serial_no, True))
         about_items.append((TR.words__made_in, "Ostrava, Czechia", False))
 
-        menu_result = await interact(
-            trezorui_api.show_device_menu(
-                init_submenu_idx=init_submenu_idx,
-                backup_failed=backup_failed,
-                backup_needed=backup_needed,
-                ble_enabled=ble_enabled,
-                paired_devices=paired_devices,
-                connected_idx=connected_idx,
-                pin_enabled=config.has_pin() if is_initialized else None,
-                auto_lock=get_auto_lock_delay(),
-                wipe_code_enabled=(
-                    config.has_wipe_code()
-                    if (is_initialized and config.has_pin())
-                    else None
-                ),
-                backup_check_allowed=backup_finished,
-                device_name=(
-                    (storage_device.get_label() or utils.MODEL_FULL_NAME)
-                    if is_initialized
-                    else None
-                ),
-                brightness=TR.brightness__title if is_initialized else None,
-                tap_to_wake_enabled=(
-                    storage_device.get_tap_to_wake()
-                    if tap_to_wake_configurable
-                    else None
-                ),
-                haptics_enabled=(
-                    storage_device.get_haptic_feedback()
-                    if haptic_configurable
-                    else None
-                ),
-                led_enabled=(
-                    storage_device.get_rgb_led() if led_configurable else None
-                ),
-                about_items=about_items,
-                production_year=production_year,
+        with trezorui_api.show_device_menu(
+            init_submenu_idx=init_submenu_idx,
+            init_submenu_offset=init_submenu_offset,
+            backup_failed=backup_failed,
+            backup_needed=backup_needed,
+            ble_enabled=ble_enabled,
+            paired_devices=paired_devices,
+            connected_idx=connected_idx,
+            pin_enabled=config.has_pin() if is_initialized else None,
+            auto_lock=get_auto_lock_delay(),
+            wipe_code_enabled=(
+                config.has_wipe_code()
+                if (is_initialized and config.has_pin())
+                else None
             ),
-            br_name=None,
-            raise_on_cancel=None,
-            layout_type=UsbAwareLayout,
-        )
+            backup_check_allowed=backup_finished,
+            device_name=(
+                (storage_device.get_label() or utils.MODEL_FULL_NAME)
+                if is_initialized
+                else None
+            ),
+            brightness=TR.brightness__title if is_initialized else None,
+            tap_to_wake_enabled=(
+                storage_device.get_tap_to_wake() if tap_to_wake_configurable else None
+            ),
+            haptics_enabled=(
+                storage_device.get_haptic_feedback() if haptic_configurable else None
+            ),
+            led_enabled=(storage_device.get_rgb_led() if led_configurable else None),
+            about_items=about_items,
+            production_year=production_year,
+        ) as layout:
+            menu_result = await interact(
+                layout, br_name=None, layout_type=UsbAwareLayout
+            )
 
-        if not isinstance(menu_result, tuple) or len(menu_result) != 3:
+        if not isinstance(menu_result, tuple) or len(menu_result) != 4:
             raise RuntimeError(f"Unknown menu {menu_result}")
 
-        action, arg, parent_submenu_idx = menu_result
-        # special handling
-        if action == DeviceMenuResult.RefreshMenu:
-            init_submenu_idx = arg
-            continue
-
+        action, arg, init_submenu_idx, init_submenu_offset = menu_result
         handler = _MENU_HANDLERS.get(action)
         if not handler:
             raise RuntimeError(f"Unknown menu {menu_result}")
@@ -197,11 +186,12 @@ async def handle_device_menu() -> None:
         except ExitDeviceMenu:
             break
         except (ActionCancelled, PinCancelled):
-            # return to the submenu if flow was cancelled
+            # return to the submenu if handler was cancelled / succeeded
             continue
-        finally:
-            # return to submenu on success or cancellation
-            init_submenu_idx = parent_submenu_idx
+
+
+async def handle_Close() -> None:
+    raise ExitDeviceMenu  # return to homescreen
 
 
 async def handle_ReviewFailedBackup() -> None:
@@ -213,15 +203,13 @@ async def handle_ReviewFailedBackup() -> None:
     backup_failed = is_initialized and storage_device.unfinished_backup()
     utils.ensure(backup_failed)
 
-    await raise_if_not_confirmed(
-        trezorui_api.show_warning(
-            title=TR.homescreen__title_backup_failed,
-            button=TR.words__wipe,
-            description=TR.wipe__start_again,
-            danger=True,
-        ),
-        "prompt_device_wipe",
-    )
+    with trezorui_api.show_warning(
+        title=TR.homescreen__title_backup_failed,
+        button=TR.words__wipe,
+        description=TR.wipe__start_again,
+        danger=True,
+    ) as layout:
+        await raise_if_not_confirmed(layout, "prompt_device_wipe")
     await wipe_device(WipeDevice())
     raise ExitDeviceMenu  # return to homescreen
 
@@ -242,16 +230,14 @@ async def handle_PairDevice() -> None:
 
     # Show warning if Bluetooth is not enabled
     if not ble.get_enabled():
-        await interact(
-            trezorui_api.show_warning(
-                title=TR.words__important,
-                description=TR.ble__must_be_enabled,
-                button=TR.buttons__turn_on,
-                allow_cancel=True,
-                danger=False,
-            ),
-            "enable_bluetooth",
-        )
+        with trezorui_api.show_warning(
+            title=TR.words__important,
+            description=TR.ble__must_be_enabled,
+            button=TR.buttons__turn_on,
+            allow_cancel=True,
+            danger=False,
+        ) as layout:
+            await interact(layout, "enable_bluetooth")
         ble_enable(True)
 
     hostname_map = {e.mac_addr: e for e in paired_cache.load()}
@@ -322,16 +308,17 @@ async def handle_SetAutoLockUSB() -> None:
     min_ms = storage_device.AUTOLOCK_DELAY_USB_MIN_MS
     max_ms = storage_device.AUTOLOCK_DELAY_USB_MAX_MS
 
-    auto_lock_delay_ms = await interact(
-        trezorui_api.request_duration(
-            title=TR.auto_lock__title,
-            duration_ms=duration_ms,
-            min_ms=min_ms,
-            max_ms=max_ms,
-            description=TR.auto_lock__description,
-        ),
-        br_name=None,
-    )
+    with trezorui_api.request_duration(
+        title=TR.auto_lock__title,
+        duration_ms=duration_ms,
+        min_ms=min_ms,
+        max_ms=max_ms,
+        description=TR.auto_lock__description,
+    ) as layout:
+        auto_lock_delay_ms = await interact(
+            layout,
+            br_name=None,
+        )
     # Necessary for the style check not to raise type error
     assert isinstance(auto_lock_delay_ms, int)
     settings = ApplySettings(
@@ -351,16 +338,17 @@ async def handle_SetAutoLockBattery() -> None:
     min_ms = storage_device.AUTOLOCK_DELAY_BATT_MIN_MS
     max_ms = storage_device.AUTOLOCK_DELAY_BATT_MAX_MS
 
-    auto_lock_delay_ms = await interact(
-        trezorui_api.request_duration(
-            title=TR.auto_lock__title,
-            duration_ms=duration_ms,
-            min_ms=min_ms,
-            max_ms=max_ms,
-            description=TR.auto_lock__description,
-        ),
-        br_name=None,
-    )
+    with trezorui_api.request_duration(
+        title=TR.auto_lock__title,
+        duration_ms=duration_ms,
+        min_ms=min_ms,
+        max_ms=max_ms,
+        description=TR.auto_lock__description,
+    ) as layout:
+        auto_lock_delay_ms = await interact(
+            layout,
+            br_name=None,
+        )
     # Necessary for the style check not to raise type error
     assert isinstance(auto_lock_delay_ms, int)
     settings = ApplySettings(
@@ -411,15 +399,16 @@ async def handle_SetDeviceName() -> None:
 
     utils.ensure(storage_device.is_initialized())
 
-    label = await interact(
-        trezorui_api.request_string(
-            prompt=TR.device_name__enter,
-            max_len=storage_device.LABEL_MAXLENGTH,
-            allow_empty=True,
-            prefill=storage_device.get_label(),
-        ),
-        "device_name",
-    )
+    with trezorui_api.request_string(
+        prompt=TR.device_name__enter,
+        max_len=storage_device.LABEL_MAXLENGTH,
+        allow_empty=True,
+        prefill=storage_device.get_label(),
+    ) as layout:
+        label = await interact(
+            layout,
+            "device_name",
+        )
     # Necessary for the style check not to raise type error
     assert isinstance(label, str)
     await apply_settings(ApplySettings(label=label))
@@ -499,7 +488,12 @@ async def handle_RebootToBootloader() -> None:
     raise RuntimeError
 
 
+async def handle_RefreshMenu() -> None:
+    pass
+
+
 _MENU_HANDLERS = {
+    DeviceMenuResult.Close: handle_Close,
     DeviceMenuResult.ReviewFailedBackup: handle_ReviewFailedBackup,
     DeviceMenuResult.DisconnectDevice: handle_DisconnectDevice,
     DeviceMenuResult.PairDevice: handle_PairDevice,
@@ -522,4 +516,5 @@ _MENU_HANDLERS = {
     DeviceMenuResult.TurnOff: handle_TurnOff,
     DeviceMenuResult.Reboot: handle_Reboot,
     DeviceMenuResult.RebootToBootloader: handle_RebootToBootloader,
+    DeviceMenuResult.RefreshMenu: handle_RefreshMenu,
 }

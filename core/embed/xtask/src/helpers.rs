@@ -1,23 +1,24 @@
+use std::path::{Path, PathBuf};
+use std::{env, fs};
+
 use anyhow::{Context, Result, anyhow};
 use cargo_metadata::MetadataCommand;
-use std::{
-    env, fs,
-    path::{Path, PathBuf},
-};
 
-use crate::args::{BuildArgs, Component, Model};
+use crate::args::{BuildArgs, Model, Project};
 
 /// Returns the path to the built ELF file for the given build arguments.
 pub fn elf_path(args: &BuildArgs) -> Result<PathBuf> {
-    let elf_name = args.component.package_name(args.emulator);
+    let elf_name = args.project.package_name(args.emulator);
     Ok(profile_dir(args)?.join(elf_name))
 }
 
-/// Returns the profile output directory (e.g. `build/thumbv7em-none-eabihf/release`).
+/// Returns the profile output directory (e.g.
+/// `build/thumbv7em-none-eabihf/release`).
 pub fn profile_dir(args: &BuildArgs) -> Result<PathBuf> {
     let mut path = build_dir()?;
     if !args.emulator {
-        path = path.join(args.model.target_triple());
+        let model_config = args.model.config()?;
+        path = path.join(model_config.target_triple()?);
     }
 
     let name = match args.profile_name() {
@@ -58,7 +59,8 @@ pub fn publish_dir() -> Result<PathBuf> {
     Ok(build_dir()?.join("artifacts").join("pub"))
 }
 
-/// Returns the host target triple (e.g. `x86_64-unknown-linux-gnu`) by querying `rustc -vV`.
+/// Returns the host target triple (e.g. `x86_64-unknown-linux-gnu`) by querying
+/// `rustc -vV`.
 pub fn host_triple() -> Result<String> {
     let output = std::process::Command::new("rustc")
         .args(["-vV"])
@@ -116,7 +118,8 @@ pub fn git_modified() -> Result<bool> {
     Ok(modified)
 }
 
-/// Parses a version file and returns the version string in the format "major.minor.patch".
+/// Parses a version file and returns the version string in the format
+/// "major.minor.patch".
 pub fn parse_version_file(file_name: &Path) -> Result<String> {
     let content = std::fs::read_to_string(file_name)
         .with_context(|| format!("Failed to read version file: {}", file_name.display()))?;
@@ -177,17 +180,18 @@ fn parse_address(value: &str) -> Result<u32> {
     }
 }
 
-pub fn get_version_file(component: Component) -> Result<PathBuf> {
+pub fn get_version_file(project: Project) -> Result<PathBuf> {
     Ok(workspace_dir()?
         .join("projects")
-        .join(component.binary_name())
+        .join(project.binary_name())
         .join("version.h"))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_address, parse_version_file, read_symbol_from_content};
     use std::fs;
+
+    use super::{parse_address, parse_version_file, read_symbol_from_content};
 
     #[test]
     fn parses_version_file_symbols() {

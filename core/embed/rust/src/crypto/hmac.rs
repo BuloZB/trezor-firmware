@@ -1,15 +1,14 @@
 use core::pin::Pin;
 
-use zeroize::Zeroize as _;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use super::{
-    ffi,
-    memory::{init_ctx, Memory},
-};
+use super::ffi;
+use super::memory::{init_ctx, Memory};
 
 pub const DIGEST_SIZE: usize = ffi::SHA256_DIGEST_LENGTH as usize;
 pub type Digest = [u8; DIGEST_SIZE];
 
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct HmacSha256<'a> {
     ctx: Pin<&'a mut Memory<ffi::HMAC_SHA256_CTX>>,
 }
@@ -37,12 +36,6 @@ impl<'a> HmacSha256<'a> {
     }
 }
 
-impl Drop for HmacSha256<'_> {
-    fn drop(&mut self) {
-        self.ctx.zeroize();
-    }
-}
-
 pub fn digest_into(key: &[u8], data: &[u8], out: &mut Digest) {
     init_ctx!(HmacSha256, ctx, key);
     ctx.update(data);
@@ -57,9 +50,8 @@ pub fn digest(key: &[u8], data: &[u8]) -> Digest {
 
 #[cfg(test)]
 mod test {
-    use crate::strutil::hexlify;
-
     use super::*;
+    use crate::strutil::hexlify;
 
     const HMAC_SHA256_EMPTY: &[u8] =
         b"b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad";

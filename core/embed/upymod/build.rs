@@ -1,13 +1,14 @@
-use std::{
-    env,
-    fs::{self, File},
-    io::{BufRead, BufReader, Write},
-    iter::once,
-    os::unix,
-    path::{Path, PathBuf},
-};
+use std::env;
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Write};
+use std::iter::once;
+use std::os::unix;
+use std::path::{Path, PathBuf};
 
-use xbuild::{CLibrary, InputFiles, Result, WrapErr, bail, bail_unsupported, ensure};
+use xbuild::{
+    CLibrary, InputFiles, OutputType, Result, WrapErr, bail, bail_unsupported, current_model_id,
+    ensure, model_ids,
+};
 
 fn main() -> Result<()> {
     xbuild::build(|lib| {
@@ -115,11 +116,20 @@ fn main() -> Result<()> {
 
         lib.add_sources_in_dir_with_attrs(mpy_dir, ["py/gc.c", "py/pystack.c", "py/vm.c"], attrs);
 
+        // silence warning about unterminated string literals
+        // TODO: remove this after we upgrade MicroPython
+        let attrs_silence_unterminated =
+            xbuild::CompileAttrs::new().with_flag("-Wno-unterminated-string-initialization");
+        lib.add_sources_in_dir_with_attrs(
+            mpy_dir,
+            ["extmod/moductypes.c"],
+            Some(attrs_silence_unterminated),
+        );
+
         lib.add_sources_in_dir(
             mpy_dir,
             [
                 "extmod/modubinascii.c",
-                "extmod/moductypes.c",
                 "extmod/moduheapq.c",
                 "extmod/modutimeq.c",
                 "extmod/utime_mphal.c",
@@ -289,7 +299,7 @@ fn main() -> Result<()> {
         let scm_revision_xor2 = define_scm_revision(lib)?;
 
         // Build content of genhdr folder
-        let mpy_builder = MpyBuilder::new(lib, scm_revision_xor2);
+        let mpy_builder = MpyBuilder::new(lib, scm_revision_xor2)?;
         let qstr_preprocessed = mpy_builder.build_genhdr()?;
 
         if cfg!(feature = "frozen") && !xbuild::is_rust_analyzer() {
@@ -402,17 +412,19 @@ struct MpyBuilder<'a> {
     genhdr_dir: PathBuf,
     py_src_dir: PathBuf,
     scm_revision_xor2: u8,
+    current_model: String,
 }
 
 impl<'a> MpyBuilder<'a> {
-    fn new(lib: &'a CLibrary, scm_revision_xor2: u8) -> Self {
+    fn new(lib: &'a CLibrary, scm_revision_xor2: u8) -> Result<Self> {
         let crate_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         let mpy_dir = crate_dir.join("../../vendor/micropython");
         let py_src_dir = crate_dir.join("../../src");
         let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
         let genhdr_dir = out_dir.join("genhdr");
+        let current_model = current_model_id()?;
 
-        Self {
+        Ok(Self {
             lib,
             crate_dir,
             mpy_dir,
@@ -420,7 +432,8 @@ impl<'a> MpyBuilder<'a> {
             genhdr_dir,
             py_src_dir,
             scm_revision_xor2,
-        }
+            current_model,
+        })
     }
 
     fn build_genhdr(&self) -> Result<PathBuf> {
@@ -447,8 +460,8 @@ impl<'a> MpyBuilder<'a> {
         // the preprocessed output in corresponding .upydef files next to
         // each object file.
         let upydefs = self.lib.process_sources(
-            "upydef",
-            Some(&["-E", "-DNO_QSTR", "-DN_X64", "-DN_X86", "-DN_THUMB"]),
+            OutputType::Preprocessed("upydef"),
+            Some(&["-DNO_QSTR", "-DN_X64", "-DN_X86", "-DN_THUMB"]),
             Some(&extra_sources),
         )?;
 
@@ -833,7 +846,8 @@ impl<'a> MpyBuilder<'a> {
         let mut mpy_files = xbuild::run_parallel(py_files.as_paths(), compile_func)
             .context("Failed to build frozen modules")?;
 
-        // Sort .mpy files by their path to ensure deterministic order in the generated C file
+        // Sort .mpy files by their path to ensure deterministic order in the generated
+        // C file
         mpy_files.sort_by_key(|mpy_file| mpy_file.display().to_string());
 
         // Build C file from mpy modules
@@ -962,17 +976,9 @@ impl<'a> MpyBuilder<'a> {
             r"s/from typing import/# &/".to_string(),
         ];
 
-        for model in ["T2T1", "T2B1", "T3T1", "T3B1", "T3W1"] {
-            let model_matches = match model {
-                "D001" => cfg!(feature = "model_d001"),
-                "D002" => cfg!(feature = "model_d002"),
-                "T2T1" => cfg!(feature = "model_t2t1"),
-                "T2B1" => cfg!(feature = "model_t2b1"),
-                "T3T1" => cfg!(feature = "model_t3t1"),
-                "T3B1" => cfg!(feature = "model_t3b1"),
-                "T3W1" => cfg!(feature = "model_t3w1"),
-                _ => bail_unsupported!(),
-            };
+        let models_dir = self.crate_dir.join("../models");
+        for model in model_ids(&models_dir)? {
+            let model_matches = model == self.current_model;
 
             let model_cond = py_bool(model_matches);
             let not_model_cond = py_bool(!model_matches);
@@ -995,6 +1001,7 @@ impl<'a> MpyBuilder<'a> {
         let mut files = InputFiles::new();
 
         let src = &self.py_src_dir;
+        let current_model = &self.current_model;
 
         files.add(src, "*.py")?;
 
@@ -1110,14 +1117,14 @@ impl<'a> MpyBuilder<'a> {
         if cfg!(not(feature = "pyopt")) {
             files.add(src, "apps/debug/*.py")?;
 
-            if cfg!(not(feature = "model_t3w1")) {
+            if current_model != "T3W1" {
                 files.remove(src, "apps/debug/n4w1_mock.py");
             }
         }
 
         files.add(src, "apps/homescreen/*.py")?;
 
-        if cfg!(not(feature = "model_t3w1")) {
+        if current_model != "T3W1" {
             files.remove(src, "apps/homescreen/device_menu.py");
         }
 
@@ -1181,7 +1188,7 @@ impl<'a> MpyBuilder<'a> {
             files.add(src, "apps/cardano/*/*.py")?;
             files.add(src, "trezor/enums/Cardano*.py")?;
 
-            if cfg!(feature = "model_t2t1") {
+            if cfg!(feature = "eos") {
                 files.add(src, "apps/eos/*.py")?;
                 files.add(src, "apps/eos/*/*.py")?;
                 files.add(src, "trezor/enums/Eos*.py")?;
@@ -1196,7 +1203,7 @@ impl<'a> MpyBuilder<'a> {
             files.add(src, "trezor/enums/DebugMonero*.py")?;
             files.add(src, "trezor/enums/Monero*.py")?;
 
-            if cfg!(feature = "model_t2t1") {
+            if cfg!(feature = "nem") {
                 files.add(src, "apps/nem/*.py")?;
                 files.add(src, "apps/nem/*/*.py")?;
                 files.add(src, "trezor/enums/NEM*.py")?;
@@ -1229,7 +1236,7 @@ impl<'a> MpyBuilder<'a> {
 
             files.add(src, "apps/webauthn/*.py")?;
 
-            if cfg!(feature = "model_t2t1") {
+            if cfg!(feature = "decred") {
                 files.add(src, "apps/bitcoin/sign_tx/decred.py")?;
             }
 

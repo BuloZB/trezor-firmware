@@ -1,12 +1,13 @@
 #[cfg(feature = "micropython")]
 mod micropython;
 
-#[cfg(feature = "ui")]
-use crate::ui::event::BLEEvent;
+use core::ptr;
 
 use super::ffi;
-use crate::{error::Error, trezorhal::ffi::bt_le_addr_t};
-use core::ptr;
+use crate::error::Error;
+use crate::trezorhal::ffi::bt_le_addr_t;
+#[cfg(feature = "ui")]
+use crate::ui::event::BLEEvent;
 
 pub const ADV_NAME_LEN: usize = ffi::BLE_ADV_NAME_LEN as usize;
 pub const BLE_MAX_BONDS: usize = ffi::BLE_MAX_BONDS as usize;
@@ -41,7 +42,7 @@ pub fn ble_parse_event(event: ffi::ble_event_t) -> BLEEvent {
                 .iter()
                 .take(6)
                 .map(|&b| b - b'0')
-                .fold(0, |acc, d| acc * 10 + d as u32);
+                .fold(0, |acc, d| acc * 10 + u32::from(d));
             BLEEvent::PairingRequest(code)
         }
         ffi::ble_event_type_t_BLE_PAIRING_CANCELLED => BLEEvent::PairingCanceled,

@@ -1,19 +1,13 @@
-use crate::{
-    strutil::TString,
-    time::{Duration, Instant},
-    ui::{
-        animation::Animation,
-        component::{Child, Component, Event, EventCtx},
-        constant,
-        display::{self, Color, Font, LOADER_MAX},
-        geometry::{Offset, Point, Rect},
-        shape,
-        shape::Renderer,
-        util::animation_disabled,
-    },
-};
-
 use super::{theme, Progress};
+use crate::strutil::TString;
+use crate::time::{Duration, Instant};
+use crate::ui::animation::Animation;
+use crate::ui::component::{Child, Component, Event, EventCtx};
+use crate::ui::display::{self, Color, Font, LOADER_MAX};
+use crate::ui::geometry::{Offset, Point, Rect};
+use crate::ui::shape::Renderer;
+use crate::ui::util::animation_disabled;
+use crate::ui::{constant, shape};
 
 pub const DEFAULT_DURATION_MS: u32 = 1000;
 pub const SHRINKING_DURATION_MS: u32 = 500;
@@ -175,7 +169,7 @@ impl Loader {
     ) {
         let width = self.area.width();
         // NOTE: need to calculate this in `i32`, it would overflow using `i16`
-        let split_point = (((width as i32 + 1) * done) / (display::LOADER_MAX as i32)) as i16;
+        let split_point = (((i32::from(width) + 1) * done) / i32::from(display::LOADER_MAX)) as i16;
         let (r_left, r_right) = self.area.split_left(split_point);
         let parts = [(r_left, true), (r_right, false)];
         parts.iter().for_each(|&(r, invert)| {
@@ -259,11 +253,11 @@ impl Component for Loader {
         if let State::Initial = self.state {
             self.render_loader(target, self.styles.normal, 0);
         } else if let State::Grown = self.state {
-            self.render_loader(target, self.styles.normal, display::LOADER_MAX as i32);
+            self.render_loader(target, self.styles.normal, i32::from(display::LOADER_MAX));
         } else {
             let progress = self.progress(now);
             if let Some(done) = progress {
-                self.render_loader(target, self.styles.normal, done as i32);
+                self.render_loader(target, self.styles.normal, i32::from(done));
             } else {
                 self.render_loader(target, self.styles.normal, 0);
             }
@@ -353,7 +347,7 @@ impl Component for ProgressLoader {
             if self.is_animating() {
                 let now = Instant::now();
                 let percentage = self.percentage(now);
-                let new_loader_value = (percentage * LOADER_MAX as u32) / 100;
+                let new_loader_value = (percentage * u32::from(LOADER_MAX)) / 100;
                 self.loader
                     .event(ctx, Event::Progress(new_loader_value as u16, "".into()));
                 // Returning only after the loader was fully painted
@@ -378,6 +372,6 @@ impl crate::trace::Trace for Loader {
     fn trace(&self, t: &mut dyn crate::trace::Tracer) {
         t.component("Loader");
         t.string("text", self.get_text());
-        t.int("duration", self.get_duration().to_millis() as i64);
+        t.int("duration", i64::from(self.get_duration().to_millis()));
     }
 }

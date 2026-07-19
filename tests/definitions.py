@@ -5,8 +5,7 @@ import typing as t
 from hashlib import sha256
 
 from trezorlib import cosi, definitions, messages, protobuf
-
-from .common import PRIVATE_KEYS_DEV
+from trezorlib.testing.common import PRIVATE_KEYS_DEV
 
 
 def make_eth_network(
@@ -115,8 +114,8 @@ def encode_eth_token(
         if isinstance(address, str):
             if address.startswith("0x"):
                 address = address[2:]
-            address = bytes.fromhex(address)  # type: ignore (typechecker is lying)
-        token = make_eth_token(symbol, decimals, address, chain_id, name)  # type: ignore (typechecker is lying)
+            address = bytes.fromhex(address)  # type: ignore [is not assignable to]
+        token = make_eth_token(symbol, decimals, address, chain_id, name)  # type: ignore [cannot be assigned to]
     payload = make_payload(
         data_type=messages.DefinitionType.ETHEREUM_TOKEN, message=token
     )

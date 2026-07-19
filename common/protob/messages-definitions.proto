@@ -132,6 +132,8 @@ enum EthereumERC7730FieldFormatterType {
     FORMATTER_AMOUNT = 1;
     FORMATTER_TOKEN_AMOUNT = 2;
     FORMATTER_UNIT = 3;
+    FORMATTER_RAW = 4;
+    FORMATTER_DATE = 5;
 }
 
 /**
@@ -147,16 +149,19 @@ enum EthereumERC7730ContainerPath {
 
 /**
  * Path used in ERC-7730 field definitions to access values.
- * We currently support two kinds of paths:
+ * We currently support three kinds of value sources:
  *  * paths that access function parameters
  *  * container paths (starting with `@`)
+ *  * constant values (a literal resolved by the parser, e.g. a `$.metadata.constants.*`
+ *    reference or a literal `value`), not walked from calldata
  * `$` and `#` paths are not supported.
  * @embed
  */
 message EthereumERC7730Path {
     // Exactly one of the following should be set:
-    repeated sint32 path = 1;  // eg. (0,) is encoded as [0], (1, 2) is encoded as [1, 2], etc.
+    repeated sint32 path = 1;         // eg. (0,) is encoded as [0], (1, 2) is encoded as [1, 2], etc.
     optional EthereumERC7730ContainerPath container_path = 2;
+    optional string const_value = 3;  // a literal constant value, not walked from calldata
 }
 
 /**
@@ -176,6 +181,10 @@ message EthereumERC7730FieldInfo {
     optional uint32 decimals = 6;
     optional string base = 7;
     optional bool prefix = 8;
+
+    // Constant token address, specific to the contract.
+    // Typically a metadata value, resolved by the parser.
+    optional bytes const_token_address = 9;
 }
 
 /**

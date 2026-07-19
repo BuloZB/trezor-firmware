@@ -1,19 +1,13 @@
-use crate::{
-    time::{Duration, Stopwatch},
-    ui::{
-        component::{
-            base::{AttachType, EventPropagation},
-            Component, Event, EventCtx, Paginate,
-        },
-        constant::screen,
-        display::Color,
-        event::SwipeEvent,
-        geometry::{Direction, Offset, Rect},
-        lerp::Lerp,
-        shape::{self, Renderer},
-        util::{animation_disabled, Pager},
-    },
-};
+use crate::time::{Duration, Stopwatch};
+use crate::ui::component::base::{AttachType, EventPropagation};
+use crate::ui::component::{Component, Event, EventCtx, Paginate};
+use crate::ui::constant::screen;
+use crate::ui::display::Color;
+use crate::ui::event::SwipeEvent;
+use crate::ui::geometry::{Direction, Offset, Rect};
+use crate::ui::lerp::Lerp;
+use crate::ui::shape::{self, Renderer};
+use crate::ui::util::{animation_disabled, Pager};
 
 #[derive(Default, Clone)]
 pub struct SwipeAttachAnimation {
@@ -166,7 +160,7 @@ impl SwipeContext {
     }
 
     fn get_params(&self, bounds: Rect) -> (Offset, Rect, u8) {
-        let progress = self.progress as f32 / 1000.0;
+        let progress = f32::from(self.progress) / 1000.0;
 
         let shift = pareen::constant(0.0).seq_ease_out(
             0.0,

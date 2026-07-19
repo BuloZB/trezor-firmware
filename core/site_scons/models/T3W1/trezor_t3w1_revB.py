@@ -203,6 +203,7 @@ def configure(
 
     if "tropic" in features_wanted:
         sources += ["embed/sec/tropic/tropic.c"]
+        sources += ["embed/sec/tropic/config/tropic_configs.c"]
         sources += ["embed/sec/tropic/stm32/tropic01.c"]
         sources += ["vendor/libtropic/cal/trezor_crypto/lt_trezor_crypto_aesgcm.c"]
         sources += ["vendor/libtropic/cal/trezor_crypto/lt_trezor_crypto_common.c"]
@@ -230,7 +231,9 @@ def configure(
         defines += [("LT_HELPERS", "1")]
 
         paths += ["vendor/libtropic/TROPIC01_fw_update_files/boot_v_1_0_1/fw_v_1_0_0"]
-        defines += [("ABAB", "1")]
+        defines += [("LT_SILICON_REV_ABAB", "1")]
+        defines += [("LT_L1_READ_RETRY_DELAY_MS", "1")]
+        defines += [("LT_L1_READ_MAX_TRIES", "1250")]
 
     if "sbu" in features_wanted:
         sources += ["embed/io/sbu/stm32/sbu.c"]

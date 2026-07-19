@@ -1,11 +1,36 @@
 
-.PHONY: vendor
+.PHONY: help \
+	vendor \
+	run emu \
+	test test_rust \
+	test_emu_sanity test_emu test_emu_multicore test_emu_monero \
+	test_emu_u2f test_emu_fido2 \
+	test_emu_click test_emu_click_ui test_emu_click_ui_multicore \
+	test_emu_persistence test_emu_persistence_ui test_emu_upgrade \
+	test_emu_ui test_emu_ui_multicore test_emu_ui_record test_emu_ui_record_multicore \
+	pylint mypy typecheck pyright clippy \
+	audit_rust vet_rust \
+	templates templates_check translations translations_check \
+	translations_crowdin_push translations_crowdin_pull \
+	build build_embed \
+	build_boardloader build_bootloader build_bootloader_ci \
+	build_bootloader_emu build_bootloader_emu_debug \
+	build_prodtest build_prodtest_emu build_secmon build_firmware \
+	build_unix build_unix_frozen build_unix_debug \
+	clean \
+	flash flash_boardloader flash_bootloader flash_bootloader_ci \
+	flash_prodtest flash_firmware \
+	flash_erase flash_erase_bootloader flash_erase_firmware flash_erase_storage \
+	gdb_boardloader gdb_bootloader gdb_prodtest gdb_firmware \
+	bloaty combine combine_fw upload upload_prodtest \
+	coverage unused
 
 BUILD_DIR = build-xtask/artifacts/latest
 
 TREZOR_MODEL ?= T3W1
 PYTEST_TIMEOUT ?= 500
 TEST_LANG ?= "en"
+XTASK_BUILD_OPTS ?=
 
 ifeq ($(PRODUCTION),1)
 ifeq ($(BOOTLOADER_DEVEL),1)
@@ -29,7 +54,7 @@ MULTICORE ?= "auto"
 RANDOM=$(shell python -c 'import random; print(random.randint(0, 1000000))')
 
 # Please only add options used by CI, otherwise just run xtask directly.
-XTASK_BUILD_OPTS = --model $(TREZOR_MODEL)
+XTASK_BUILD_OPTS += --model $(TREZOR_MODEL)
 ifeq ($(ADDRESS_SANITIZER),1)
 XTASK_BUILD_OPTS += --asan
 endif
@@ -50,6 +75,7 @@ XTASK_BUILD_OPTS += --pyopt true
 else ifeq ($(PYOPT),0)
 XTASK_BUILD_OPTS += --pyopt false
 XTASK_BUILD_OPTS += --disable-animation
+XTASK_BUILD_OPTS += --dbg-console vcp
 endif
 ifeq ($(TREZOR_MEMPERF),1)
 XTASK_BUILD_OPTS += --mem-perf
@@ -60,17 +86,15 @@ endif
 
 ifeq ($(STORAGE_INSECURE_TESTING_MODE),1)
 XTASK_BUILD_OPTS += --storage-insecure-testing-mode
-XTASK_BUILD_OPTS += --disable-tropic true
+XTASK_BUILD_OPTS += --disable-tropic
 XTASK_BUILD_OPTS += --disable-optiga
 else
-	ifeq ($(DISABLE_OPTIGA),1)
-	XTASK_BUILD_OPTS += --disable-optiga
-	endif
-	ifeq ($(DISABLE_TROPIC),1)
-	XTASK_BUILD_OPTS += --disable-tropic true
-	else ifeq ($(DISABLE_TROPIC),0)
-	XTASK_BUILD_OPTS += --disable-tropic false
-	endif
+ifeq ($(DISABLE_OPTIGA),1)
+XTASK_BUILD_OPTS += --disable-optiga
+endif
+ifeq ($(DISABLE_TROPIC),1)
+XTASK_BUILD_OPTS += --disable-tropic
+endif
 endif
 
 ## help commands:
@@ -142,6 +166,9 @@ test_emu_persistence_ui: ## run persistence tests with UI testing
 	$(PYTEST) $(TESTPATH)/persistence_tests $(TESTOPTS) \
 		--ui=test --ui-check-missing --do-master-diff --lang=$(TEST_LANG)
 
+test_emu_upgrade: ## run upgrade tests
+	$(PYTEST) $(TESTPATH)/upgrade_tests $(TESTOPTS) --lang=$(TEST_LANG)
+
 test_emu_ui: ## run ui integration tests
 	$(EMU_TEST) $(PYTEST) $(TESTPATH)/device_tests $(TESTOPTS) \
 		--ui=test --ui-check-missing --do-master-diff \
@@ -179,6 +206,9 @@ clippy:
 
 audit_rust: ## run cargo audit on rust dependencies
 	cd embed ; cargo audit
+
+vet_rust: ## run cargo vet on rust dependencies
+	cd embed ; cargo vet --locked
 
 ## code generation:
 
@@ -344,6 +374,3 @@ coverage: $(COVERAGE_BUILD_DEP) ## generate coverage report
 
 unused:  ## find unused micropython code
 	vulture src src/_vulture_ignore.txt --exclude "messages.py,*/enums/*"
-
-
-.PHONY: templates translations templates_check translations_check

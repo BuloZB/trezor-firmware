@@ -1,29 +1,19 @@
 use core::mem;
 
-use crate::{
-    strutil::{ShortString, TString},
-    time::Duration,
-    trezorhal::random,
-    ui::{
-        component::{
-            base::ComponentExt, text::TextStyle, Child, Component, Event, EventCtx, Label, Maybe,
-            Never, Pad, Timer,
-        },
-        event::TouchEvent,
-        geometry::{Alignment, Alignment2D, Grid, Insets, Offset, Rect},
-        shape::{Renderer, Text, ToifImage},
-        util::DisplayStyle,
-    },
-};
-
-use super::super::{
-    super::fonts,
-    button::{
-        Button, ButtonContent,
-        ButtonMsg::{self, Clicked},
-    },
-    theme,
-};
+use super::super::super::fonts;
+use super::super::button::ButtonMsg::{self, Clicked};
+use super::super::button::{Button, ButtonContent};
+use super::super::theme;
+use crate::strutil::{ShortString, TString};
+use crate::time::Duration;
+use crate::trezorhal::random;
+use crate::ui::component::base::ComponentExt;
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{Child, Component, Event, EventCtx, Label, Maybe, Never, Pad, Timer};
+use crate::ui::event::TouchEvent;
+use crate::ui::geometry::{Alignment, Alignment2D, Grid, Insets, Offset, Rect};
+use crate::ui::shape::{Renderer, Text, ToifImage};
+use crate::ui::util::DisplayStyle;
 
 #[cfg_attr(feature = "debug", derive(ufmt::derive::uDebug))]
 pub enum PinKeyboardMsg {
@@ -383,7 +373,7 @@ impl PinInput {
         // Number of visible icons + characters
         let visible_len = pin_len.min(MAX_SHOWN_LEN);
         // Number of visible icons
-        let visible_icons = visible_len - last_digit as usize;
+        let visible_icons = visible_len - usize::from(last_digit);
 
         // Jiggle when overflowed.
         if pin_len > visible_len && pin_len % 2 == 1 && self.display_style != DisplayStyle::Shown {

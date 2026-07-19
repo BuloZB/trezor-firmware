@@ -1,55 +1,48 @@
 use core::cmp::Ordering;
 
-use crate::{
-    error::{value_error, Error},
-    io::BinaryData,
-    micropython::{buffer::StrBuffer, gc::Gc, iter::IterBuf, list::List, obj::Obj, util},
-    storage,
-    strutil::TString,
-    translations::TR,
-    ui::{
-        component::{
-            swipe_detect::SwipeSettings,
-            text::{
-                op::OpTextLayout,
-                paragraphs::{
-                    Checklist, Paragraph, ParagraphSource, ParagraphVecLong, ParagraphVecShort,
-                    Paragraphs, VecExt,
-                },
-                TextStyle,
-            },
-            CachedJpeg, ComponentExt, Empty, FormattedText, MsgMap, Never, Timeout,
-        },
-        flow::FlowMsg,
-        geometry::{self, Direction, Offset},
-        layout::{
-            obj::{LayoutMaybeTrace, LayoutObj, RootComponent},
-            util::{ContentType, PropsList, RecoveryType},
-        },
-        notification::Notification,
-        ui_firmware::{
-            FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS,
-            MAX_PAIRED_DEVICES, MAX_WORD_QUIZ_ITEMS,
-        },
-        ModelUI,
-    },
-};
 use heapless::Vec;
 
-use super::{
-    component::{
-        check_homescreen_format, Bip39Input, CoinJoinProgress, Frame, FrameMsg, Header, Homescreen,
-        Lockscreen, MnemonicKeyboard, PinKeyboard, Progress, PromptScreen, ScrolledVerticalMenu,
-        SelectWordCount, SelectWordCountLayout, Slip39Input, StatusScreen, SwipeContent,
-        SwipeUpScreen, TradeScreen, VerticalMenu, VerticalMenuChoiceMsg, VerticalMenuItem,
-        VerticalMenuItems,
-    },
-    flow::{
-        self, new_confirm_action_simple, ConfirmActionExtra, ConfirmActionMenuStrings,
-        ConfirmActionOptions, ConfirmActionStrings, ConfirmValue, ShowInfoParams,
-    },
-    fonts, theme, UIDelizia,
+use super::component::{
+    check_homescreen_format, Bip39Input, CoinJoinProgress, Frame, FrameMsg, Header, Homescreen,
+    Lockscreen, MnemonicKeyboard, PinKeyboard, Progress, PromptScreen, ScrolledVerticalMenu,
+    SelectWordCount, SelectWordCountLayout, Slip39Input, StatusScreen, SwipeContent, SwipeUpScreen,
+    TradeScreen, VerticalMenu, VerticalMenuChoiceMsg, VerticalMenuItem, VerticalMenuItems,
 };
+use super::flow::{
+    self, new_confirm_action_simple, ConfirmActionExtra, ConfirmActionMenuStrings,
+    ConfirmActionOptions, ConfirmActionStrings, ConfirmValue, ShowInfoParams,
+};
+use super::{fonts, theme, UIDelizia};
+use crate::error::{value_error, Error};
+use crate::io::BinaryData;
+use crate::micropython::buffer::StrBuffer;
+use crate::micropython::gc::Gc;
+use crate::micropython::iter::IterBuf;
+use crate::micropython::list::List;
+use crate::micropython::obj::Obj;
+use crate::micropython::util;
+use crate::storage;
+use crate::strutil::TString;
+use crate::translations::TR;
+use crate::ui::component::swipe_detect::SwipeSettings;
+use crate::ui::component::text::op::OpTextLayout;
+use crate::ui::component::text::paragraphs::{
+    Checklist, Paragraph, ParagraphSource, ParagraphVecLong, ParagraphVecShort, Paragraphs, VecExt,
+};
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{
+    CachedJpeg, ComponentExt, Empty, FormattedText, MsgMap, Never, Timeout,
+};
+use crate::ui::flow::FlowMsg;
+use crate::ui::geometry::{self, Direction, Offset};
+use crate::ui::layout::obj::{LayoutMaybeTrace, LayoutObj, RootComponent};
+use crate::ui::layout::util::{ContentType, PropsList, RecoveryType};
+use crate::ui::notification::Notification;
+use crate::ui::ui_firmware::{
+    FirmwareUI, MAX_CHECKLIST_ITEMS, MAX_GROUP_SHARE_LINES, MAX_MENU_ITEMS, MAX_PAIRED_DEVICES,
+    MAX_WORD_QUIZ_ITEMS,
+};
+use crate::ui::ModelUI;
 
 impl FirmwareUI for UIDelizia {
     fn confirm_action(
@@ -915,6 +908,7 @@ impl FirmwareUI for UIDelizia {
 
     fn show_device_menu(
         _init_submenu_idx: Option<u8>,
+        _init_submenu_offset: i16,
         _backup_failed: bool,
         _backup_needed: bool,
         _ble_enabled: bool,
@@ -1226,12 +1220,6 @@ impl FirmwareUI for UIDelizia {
         Ok(layout)
     }
 
-    fn show_wait_text(text: TString<'static>) -> Result<impl LayoutMaybeTrace, Error> {
-        Ok(RootComponent::new(
-            Paragraph::new(&theme::TEXT_DEMIBOLD, text).into_paragraphs(),
-        ))
-    }
-
     fn show_warning(
         title: Option<TString<'static>>,
         button: TString<'static>,
@@ -1271,7 +1259,7 @@ impl FirmwareUI for UIDelizia {
                 Frame::with_header(header, content)
             }
         };
-        let frame = if danger {
+        let frame = if danger || title.is_none() {
             frame.with_tap_footer(action)
         } else {
             frame.with_swipeup_footer(action)

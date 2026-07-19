@@ -19,124 +19,6 @@ trezor_lib.workspace = true
 [features]
 
 # --------------------------------------------------------------------------
-# Model features
-# --------------------------------------------------------------------------
-
-model_d001 = [
-    "io/model_d001",
-    "mcu_stm32f429",
-    "dma2d",
-    "pvd",
-    "sdram",
-    "secure_mode",
-    "touch",
-]
-
-model_d002 = [
-    "io/model_d002",
-    "mcu_stm32u5g",
-    "backlight",
-    "boot_ucb",
-    "dma2d",
-    "hash_processor",
-    "lockable_bootloader",
-    "secmon_layout",
-    "secret",
-    "secure_aes",
-    "storage_hw_key",
-    "touch",
-]
-
-model_t2t1 = [
-    "io/model_t2t1",
-    "mcu_stm32f427",
-    "backlight",
-    "dma2d",
-    "pvd",
-    "sd_card",
-    "secure_mode",
-    "touch",
-    ]
-
-model_t2b1 = [
-    "io/model_t2b1",
-    "mcu_stm32f427",
-    "button",
-    "consumption_mask",
-    "lockable_bootloader",
-    # "optiga", # selected from xtask
-    "pvd",
-    "secret",
-    "secure_mode",
-    ]
-
-model_t3b1 = [
-    "io/model_t3b1",
-    "mcu_stm32u58",
-    "button",
-    "consumption_mask",
-    "hash_processor",
-    "lockable_bootloader",
-    # "optiga", # selected from xtask
-    "pvd",
-    "secret",
-    "secure_aes",
-    "secure_mode",
-    "storage_hw_key",
-    "tamper",
-    ]
-
-model_t3t1 = [
-    "io/model_t3t1",
-    "mcu_stm32u58",
-    "backlight",
-    "dma2d",
-    "haptic",
-    "hash_processor",
-    "lockable_bootloader",
-    # "optiga", # selected from xtask
-    "pvd",
-    "sd_card",
-    "secret",
-    "secure_aes",
-    "secure_mode",
-    "storage_hw_key",
-    "tamper",
-    "touch",
-    ]
-
-model_t3w1 = [
-    "io/model_t3w1",
-    "mcu_stm32u5g",
-    "backlight",
-    "backup_ram",
-    "boot_ucb",
-    "ble",
-    "button",
-    "dma2d",
-    "haptic",
-    "hash_processor",
-    "hw_jpeg_decoder",
-    "lockable_bootloader",
-    "mcu_attestation",
-    # "optiga", # selected from xtask
-    "power_manager",
-    "rgb_led",
-    "rtc",
-    "secmon_layout",
-    "secret",
-    "secure_aes",
-    "storage_hw_key",
-    "suspend",
-    "smp",
-    "tamper",
-    "telemetry",
-    "touch",
-    "touch_wakeup",
-    # "tropic", # selected from xtask
-    ]
-
-# --------------------------------------------------------------------------
 # Selectable features
 # --------------------------------------------------------------------------
 
@@ -177,6 +59,7 @@ mcu_stm32f429 = ["io/mcu_stm32f429", "mcu_stm32f4"]
 mcu_stm32f4 = []
 mcu_stm32u58 = ["io/mcu_stm32u58", "mcu_stm32u5"]
 mcu_stm32u5g = ["io/mcu_stm32u5g", "mcu_stm32u5"]
+mcu_stm32u5a = ["io/mcu_stm32u5a", "mcu_stm32u5"]
 mcu_stm32u5 = ["sec/trustzone"]
 
 secure_mode = ["io/secure_mode"]
@@ -188,7 +71,9 @@ ble = ["io/ble", "nrf", "nrf_auth"]
 button = ["io/button"]
 consumption_mask = ["sec/consumption_mask"]
 dbg_console = ["sys/dbg_console"]
+display = ["io/display"]
 dma2d = ["io/dma2d"]
+framebuffer = ["io/framebuffer"]
 haptic = ["io/haptic"]
 hash_processor = ["sec/hash_processor"]
 hw_jpeg_decoder = ["io/hw_jpeg_decoder"]
@@ -207,7 +92,6 @@ secmon_layout = ["models/secmon_layout"]
 secret = ["sec/secret"]
 secure_aes = ["sec/secure_aes"]
 smp = ["io/smp", "trezor_lib/smp", "trezor_lib/nrf"]
-storage_hw_key = ["sec/storage_hw_key"]
 suspend = ["io/suspend"]
 tamper = ["sec/tamper"]
 telemetry = ["sec/telemetry"]

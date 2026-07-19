@@ -1,16 +1,15 @@
 use core::convert::{TryFrom, TryInto};
 
-use crate::{
-    error::Error,
-    micropython::{buffer, gc::Gc, iter::IterBuf, list::List, obj::Obj, qstr::Qstr, util},
-};
-
-use super::{
-    defs::{FieldDef, FieldType, MsgDef},
-    error,
-    obj::MsgObj,
-    zigzag,
-};
+use super::defs::{FieldDef, FieldType, MsgDef};
+use super::obj::MsgObj;
+use super::{error, zigzag};
+use crate::error::Error;
+use crate::micropython::gc::Gc;
+use crate::micropython::iter::IterBuf;
+use crate::micropython::list::List;
+use crate::micropython::obj::Obj;
+use crate::micropython::qstr::Qstr;
+use crate::micropython::{buffer, util};
 
 pub extern "C" fn protobuf_len(obj: Obj) -> Obj {
     let block = || {
@@ -64,8 +63,8 @@ impl Encoder {
 
             let field_key = {
                 let prim_type = field.get_type().primitive_type();
-                let prim_type = prim_type as u64;
-                let field_tag = field.tag as u64;
+                let prim_type = u64::from(prim_type);
+                let field_tag = u64::from(field.tag);
                 field_tag << 3 | prim_type
             };
 

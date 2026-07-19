@@ -1,28 +1,17 @@
-use crate::{
-    strutil::TString,
-    translations::TR,
-    ui::{
-        component::{
-            swipe_detect::SwipeConfig,
-            text::{
-                layout::{LayoutFit, TextLayout},
-                TextStyle,
-            },
-            Component, Event, EventCtx, Never, Paginate,
-        },
-        display::Icon,
-        flow::Swipable,
-        geometry::{Alignment, Alignment2D, Direction, Rect},
-        shape::{Renderer, ToifImage},
-        util::Pager,
-    },
-};
-
-use super::super::{
-    constant::SCREEN,
-    firmware::{ActionBar, ActionBarMsg, Header, HeaderMsg},
-    theme,
-};
+use super::super::constant::SCREEN;
+use super::super::firmware::{ActionBar, ActionBarMsg, Header, HeaderMsg};
+use super::super::theme;
+use crate::strutil::TString;
+use crate::translations::TR;
+use crate::ui::component::swipe_detect::SwipeConfig;
+use crate::ui::component::text::layout::{LayoutFit, TextLayout};
+use crate::ui::component::text::TextStyle;
+use crate::ui::component::{Component, Event, EventCtx, Never, Paginate};
+use crate::ui::display::Icon;
+use crate::ui::flow::Swipable;
+use crate::ui::geometry::{Alignment, Alignment2D, Direction, Rect};
+use crate::ui::shape::{Renderer, ToifImage};
+use crate::ui::util::Pager;
 
 /// Full-screen component for rendering Regulatory certification.
 pub struct RegulatoryScreen {
@@ -144,7 +133,7 @@ impl crate::trace::Trace for RegulatoryScreen {
         t.child("Header", &self.header);
         t.child("Content", &self.content);
         t.child("ActionBar", &self.action_bar);
-        t.int("page_count", self.content.pager().total() as i64);
+        t.int("page_count", i64::from(self.content.pager().total()));
     }
 }
 
