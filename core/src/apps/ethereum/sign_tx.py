@@ -4,23 +4,18 @@ from typing import TYPE_CHECKING
 from trezor import TR
 from trezor.crypto import rlp
 from trezor.messages import EthereumTxRequest
-from trezor.utils import HashWriter
 from trezor.wire import DataError
 
-from .helpers import (
-    address_from_bytes,
-    bytes_from_address,
-    get_data_confirmer,
-    get_progress_indicator,
-)
+from .helpers import address_from_bytes, bytes_from_address, get_data_confirmer
 from .keychain import with_keychain_from_chain_id
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes
     from typing import Sequence
 
-    from trezor.messages import EthereumSignTx, EthereumTxAck
+    from trezor.messages import EthereumSignTx
     from trezor.ui.layouts import StrPropertyType
+    from trezor.utils import HashWriter
 
     from apps.common.keychain import Keychain
     from apps.common.payment_request import PaymentRequestVerifier
@@ -132,36 +127,23 @@ _DATA_CHUNK_SIZE = const(1024)
 
 async def request_initial_data(msg: MsgInSignTx, sha: HashWriter) -> AnyBytes:
     """Request at most `MAX_DATA_STORED` which we keep locally"""
+    from trezor.utils import empty_bytearray
 
     data_length = msg.data_length
     if data_length > len(msg.data_initial_chunk):
         # pre-allocate memory
-        initial_data = bytearray(min(data_length, _MAX_DATA_STORED))
+        buf_capacity = min(data_length, _MAX_DATA_STORED)
+        buf = empty_bytearray(buf_capacity)
 
-        chunk = msg.data_initial_chunk
-        initial_data[0 : len(chunk)] = chunk
-        initial_data_length = len(chunk)
-        rlp.write_header(sha, data_length, rlp.STRING_HEADER_BYTE, chunk)
-        sha.extend(chunk)
-        data_left = data_length - initial_data_length
-        while (
-            data_left > 0 and initial_data_length + _DATA_CHUNK_SIZE <= _MAX_DATA_STORED
-        ):
-            resp = await _send_request_chunk(data_left)
-            chunk = resp.data_chunk
-            initial_data[initial_data_length : initial_data_length + len(chunk)] = chunk
-            data_left -= len(chunk)
-            initial_data_length += len(chunk)
-            sha.extend(chunk)
+        buf.extend(msg.data_initial_chunk)
+        while (data_left := buf_capacity - len(buf)) > 0:
+            buf.extend(await _get_next_chunk(data_left))
     else:
-        initial_data = msg.data_initial_chunk
-        initial_data_length = len(msg.data_initial_chunk)
-        rlp.write_header(
-            sha, data_length, rlp.STRING_HEADER_BYTE, msg.data_initial_chunk
-        )
-        sha.extend(msg.data_initial_chunk)
+        buf = msg.data_initial_chunk
 
-    return initial_data
+    rlp.write_header(sha, data_length, rlp.STRING_HEADER_BYTE, buf)
+    sha.extend(buf)
+    return buf
 
 
 async def confirm_tx_data(
@@ -254,17 +236,15 @@ async def confirm_tx_data(
         )
     elif not clear_signed:
         if data_length > 0:
-            confirm_data_chunk = get_data_confirmer(data_length)
-        else:
-            confirm_data_chunk = get_progress_indicator(data_length)
-        token = (
-            None  # what we want to confirm here is the ETH amount being sent on-chain
-        )
-
-        # Stream, confirm and hash the rest of the calldata chunks.
-        await _confirm_data_chunks(
-            confirm_data_chunk, initial_data, data_length, data_chunk_loader
-        )
+            # Stream, confirm and hash the rest of the calldata chunks.
+            await _confirm_data_chunks(
+                get_data_confirmer(data_length),
+                initial_data,
+                data_length,
+                data_chunk_loader,
+            )
+        # what we want to confirm here is the ETH amount being sent on-chain
+        token = None
         return await require_confirm_tx(
             recipient_str,
             format_ethereum_amount(value, token, network),
@@ -305,8 +285,7 @@ def _get_digest_length(msg: EthereumSignTx, data_total: int) -> int:
 
 def create_data_chunk_loader(h: HashWriter) -> DataChunkLoader:
     async def data_chunk_loader(data_left: int) -> AnyBytes:
-        resp = await _send_request_chunk(data_left)
-        chunk = resp.data_chunk
+        chunk = await _get_next_chunk(data_left)
         h.extend(chunk)
         return chunk
 
@@ -329,13 +308,17 @@ async def _confirm_data_chunks(
         data_left -= len(chunk)
 
 
-async def _send_request_chunk(data_left: int) -> EthereumTxAck:
+async def _get_next_chunk(data_left: int) -> AnyBytes:
     from trezor.messages import EthereumTxAck
     from trezor.wire.context import call
 
     req = EthereumTxRequest()
     req.data_length = min(data_left, _DATA_CHUNK_SIZE)
-    return await call(req, EthereumTxAck)
+    resp = await call(req, EthereumTxAck)
+    data_chunk = resp.data_chunk
+    if len(data_chunk) > req.data_length:
+        raise DataError("Too much data")
+    return data_chunk
 
 
 def _sign_digest(
