@@ -190,6 +190,7 @@ impl FirmwareUI for UICaesar {
         _subtitle: Option<TString<'static>>,
         _verb: Option<TString<'static>>,
         _verb_cancel: Option<TString<'static>>,
+        _verb_view_all: Option<TString<'static>>,
         _hold: bool,
         _chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
@@ -207,15 +208,19 @@ impl FirmwareUI for UICaesar {
     fn confirm_coinjoin(
         max_rounds: TString<'static>,
         max_feerate: TString<'static>,
+        max_coordinator_fee_pct: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
-        // Decreasing bottom padding between paragraphs to fit one screen
         let paragraphs = Paragraphs::new([
+            // Decreasing bottom padding between paragraphs to fit one screen:
             Paragraph::new(&theme::TEXT_BOLD, TR::coinjoin__max_rounds).with_bottom_padding(2),
             Paragraph::new(&theme::TEXT_MONO, max_rounds),
             Paragraph::new(&theme::TEXT_BOLD, TR::coinjoin__max_mining_fee)
                 .with_bottom_padding(2)
                 .no_break(),
             Paragraph::new(&theme::TEXT_MONO, max_feerate).with_bottom_padding(2),
+            // Shown in a separate screen:
+            Paragraph::new(&theme::TEXT_BOLD, TR::coinjoin__max_coordinator_fee_pct),
+            Paragraph::new(&theme::TEXT_MONO, max_coordinator_fee_pct),
         ]);
 
         content_in_button_page(
@@ -582,7 +587,8 @@ impl FirmwareUI for UICaesar {
                     let (btn_layout, btn_actions) = btns_info_page(is_last);
 
                     let mut ops = OpTextLayout::new(theme::TEXT_MONO);
-                    for item in unwrap!(IterBuf::new().try_iterate(*info_obj)) {
+                    let mut iter_buf = IterBuf::new();
+                    for item in unwrap!(iter_buf.try_iterate(*info_obj)) {
                         let [key, value, _is_data]: [Obj; 3] = unwrap!(util::iter_into_array(item));
                         if !ops.is_empty() {
                             // Each key-value pair is on its own page

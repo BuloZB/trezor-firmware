@@ -320,6 +320,8 @@ The primary function of the synchronization layer is to work as the *Alternating
 
 It is possible that some packets are lost by the Data transfer layer (L1). In order to guarantee reliable communication, THP uses the *Alternating Bit Protocol* in combination with a *CRC32* checksum.
 
+Only the following message types take part in the synchronization layer: `handshake_init_request`, `handshake_init_response`, `handshake_completion_request`, `handshake_completion_response`, `encrypted_transport` and `ACK`. Notably `channel_allocation_request`, `channel_allocation_response` and `transport_error` don't carry a sequence number and are not acknowledged.
+
 ### Alternating Bit Protocol
 
 The *Alternating Bit Protocol* (ABP) is a protocol between a sender and a receiver over an unreliable channel. The channel is unreliable in the sense that it can discard or duplicate messages, but it cannot change their order or content. The protocol guarantees the eventual and non-duplicative delivery of messages.
@@ -407,6 +409,12 @@ flowchart LR
     R1 -- in: Message(Seq=1); out: Ack(Seq=1); return Message for processing --> R0
     R1 -- in: Message(Seq=0); out: Ack(Seq=0); discard Message as duplicate --> R1
 ```
+
+#### Encoding
+
+The sequence bit is encoded into the control byte of the applicable messages, mask 0x10 (00010000).
+
+The ACK bit can be similarly accessed using the mask 0x08 (00001000). On messages other than ACK, the ACK number is ignored unless piggybacking is enabled.
 
 ### ACK Message structure
 
@@ -868,10 +876,12 @@ The behavior of Trezor in the state **TP2** is defined as follows:
 - When the message ThpSelectMethod(*selected_pairing_method*) is received, transition to the intermediate state “selected method”.
 - When the message ThpCodeEntryCpaceHostTag(*cpace_host_public_key*, *tag*) is received, take the following actions:
     1. Clear the screen.
-    2. Set *shared_secret* = X25519(*cpace_trezor_private_key*, *cpace_host_public_key*).
-    3. Assert that *tag* == SHA-256(*shared_secret*).
-    4. Send the message ThpCodeEntrySecret(*code_entry_secret*) to the host.
-    5. Transition to the state **TC1**.
+    2. Assert that *cpace_host_public_key* != 0x00 ^ 32.
+    3. Set *shared_secret* = X25519(*cpace_trezor_private_key*, *cpace_host_public_key*).
+    4. Assert that *shared_secret* != 0x00 ^ 32. This prevents the host from using low-order points to bypass code entry authentication.
+    5. Assert that *tag* == SHA-256(*shared_secret*).
+    6. Send the message ThpCodeEntrySecret(*code_entry_secret*) to the host.
+    7. Transition to the state **TC1**.
 
 #### State TP3b
 
@@ -1096,7 +1106,7 @@ sequenceDiagram
   Trezor -->> host - first time: code (user rewrites code from Trezor to host)
   note over host - first time: pregenerator = sha512(prefix || code || padding || handshake_hash_H || 0x00)[:32]<br>generator = ELLIGATOR2(pregenerator)<br>cpace_host_private_key = random_bytes(32)<br>cpace_host_public_key = X25519(cpace_host_private_key, generator)<br>shared_secret = X25519(cpace_host_private_key, cpace_trezor_public_key)<br>tag=sha256(shared_secret)
   host - first time ->> Trezor: cpace_host_public_key, tag
-  note over Trezor: shared_secret = X25519(cpace_trezor_private_key, cpace_host_public_key)
+  note over Trezor: assert cpace_host_public_key != 0x00 ^ 32<br>shared_secret = X25519(cpace_trezor_private_key, cpace_host_public_key)<br>assert shared_secret != 0x00 ^ 32
   note over Trezor: assert tag == sha256(shared_secret)
   Trezor ->> host - first time: secret
   note over host - first time: assert commitment == sha256(secret)
@@ -1114,7 +1124,7 @@ sequenceDiagram
   Trezor -->> host - second (or more) time : code (user rewrites code from Trezor to host)
   note over host - second (or more) time : pregenerator = sha512(prefix || code || padding || handshake_hash_H || 0x00)[:32]<br>generator = ELLIGATOR2(pregenerator)<br>cpace_host_private_key = random_bytes(32)<br>cpace_host_public_key = X25519(cpace_host_private_key, generator)<br>shared_secret = X25519(cpace_host_private_key, cpace_trezor_public_key)<br>tag=sha256(shared_secret)
   host - second (or more) time  ->> Trezor: cpace_host_public_key, tag
-  note over Trezor: shared_secret = X25519(cpace_trezor_private_key, cpace_host_public_key)
+  note over Trezor: assert cpace_host_public_key != 0x00 ^ 32<br>shared_secret = X25519(cpace_trezor_private_key, cpace_host_public_key)<br>assert shared_secret != 0x00 ^ 32
   note over Trezor: assert tag == sha256(shared_secret)
   Trezor ->> host - second (or more) time : secret
   note over host - second (or more) time : assert commitment == sha256(secret)
@@ -1144,7 +1154,7 @@ sequenceDiagram
   Trezor -->> host: code (user rewrites code from Trezor to host)
   note over host: pregenerator = sha512(prefix || code || padding || handshake_hash_H || 0x00)[:32]<br>generator = ELLIGATOR2(pregenerator)<br>cpace_host_private_key = random_bytes(32)<br>cpace_host_public_key = X25519(cpace_host_private_key, generator)<br>shared_secret = X25519(cpace_host_private_key, cpace_trezor_public_key)<br>tag=sha256(shared_secret)
   host ->> Trezor: cpace_host_public_key, tag
-  note over Trezor: shared_secret = X25519(cpace_trezor_private_key, cpace_host_public_key)
+  note over Trezor: assert cpace_host_public_key != 0x00 ^ 32<br>shared_secret = X25519(cpace_trezor_private_key, cpace_host_public_key)<br>assert shared_secret != 0x00 ^ 32
   note over Trezor: assert tag == sha256(shared_secret)
   Trezor ->> host: secret
   note over host: assert commitment == sha256(secret)

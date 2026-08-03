@@ -50,8 +50,10 @@ function help_and_die() {
   echo "Options:"
   echo "  --skip-bitcoinonly - do not build bitcoin-only firmwares"
   echo "  --skip-normal - do not build regular firmwares"
+  echo "  --skip-translations - do not add the translations Merkle root to the fingerprints file"
   echo "  --repository path/to/repo - checkout the repository from the given path/url"
   echo "  --no-init - do not recreate docker environments"
+  echo "  --init-only - set up the docker environment and exit without building"
   echo "  --models - comma-separated list of models. default: --models T1B1,T2B1,T2T1,T3T1,T3W1"
   echo "  --targets - comma-separated list of targets for core build. default: --targets boardloader,bootloader,secmon,firmware"
   echo "  --nrf - build nRF bootloader and firmware (for bluetooth devices, i.e. T3W1)"
@@ -67,7 +69,9 @@ function help_and_die() {
 OPT_BUILD_NORMAL=1
 OPT_BUILD_BITCOINONLY=1
 OPT_BUILD_NRF=0
+OPT_ADD_TRANSLATIONS=1
 INIT=1
+INIT_ONLY=0
 MODELS=(T1B1 T2B1 T2T1 T3T1 T3W1)
 CORE_TARGETS=(boardloader bootloader secmon firmware)
 
@@ -86,12 +90,20 @@ while true; do
       OPT_BUILD_NORMAL=0
       shift
       ;;
+    --skip-translations)
+      OPT_ADD_TRANSLATIONS=0
+      shift
+      ;;
     --repository)
       REPOSITORY="$2"
       shift 2
       ;;
     --no-init)
       INIT=0
+      shift
+      ;;
+    --init-only)
+      INIT_ONLY=1
       shift
       ;;
     --models)
@@ -137,7 +149,7 @@ if [ -n "${DIRSUFFIX_OVERRIDE:-}" ] && [ "$OPT_BUILD_NORMAL" -eq 1 ] && [ "$OPT_
 fi
 
 TAG="$1"
-COMMIT_HASH="$(git rev-parse "$TAG")"
+COMMIT_HASH="$(git rev-parse "$TAG^{commit}")"
 PRODUCTION=${PRODUCTION:-1}
 
 if which wget > /dev/null ; then
@@ -217,8 +229,32 @@ fi  # init
 
 # append common part to script
 cat <<EOF >> "$SCRIPT_NAME"
+  # With --no-init the snapshot's checkout is pinned at the commit it was
+  # created from. Bring it to the requested commit, so that the environment can
+  # be reused when only the sources moved (e.g. a signed secmon binary was
+  # committed between the secmon and firmware builds). Toolchain changes still
+  # require a re-init.
+  if [ "\$(git rev-parse HEAD)" != "${COMMIT_HASH}" ]; then
+    echo ">>> UPDATING CHECKOUT TO $TAG (${COMMIT_HASH})"
+    git fetch --depth=1 origin "$TAG"
+    git checkout --detach "${COMMIT_HASH}"
+    touch /build/._checkout_updated
+  fi
+EOF
+
+if [ $INIT -eq 0 ]; then
+  cat <<EOF >> "$SCRIPT_NAME"
+  if ! sed "s|./ci/|./|" shell.nix | cmp -s - /shell.nix; then
+    echo "shell.nix changed since this environment was initialized."
+    echo "Re-run without --no-init to rebuild it."
+    exit 1
+  fi
+EOF
+fi
+
+cat <<EOF >> "$SCRIPT_NAME"
   $GIT_CLEAN_REPO
-  git submodule update --init --recursive
+  git submodule update --init --recursive --depth 1
   uv sync --locked
   cd core/embed/rust
   cargo fetch
@@ -232,6 +268,8 @@ echo
 echo ">>> DOCKER REFRESH $SNAPSHOT_NAME"
 echo
 
+rm -f build/._checkout_updated
+
 $DOCKER run \
   --network=host \
   -v "$PWD:/local" \
@@ -243,12 +281,26 @@ $DOCKER run \
 
 rm $SCRIPT_NAME
 
-echo
-echo ">>> DOCKER COMMIT $SNAPSHOT_NAME"
-echo
-
-$DOCKER commit "$SNAPSHOT_NAME" "$SNAPSHOT_NAME"
+# The refresh only changes the environment when it moves the checkout (any
+# dependency change implies a new commit, since the lock files are part of the
+# repository). A fresh init must always be committed, while a reused snapshot
+# whose checkout was already current can skip the costly docker commit.
+if [ $INIT -eq 1 ] || [ -f build/._checkout_updated ]; then
+  echo
+  echo ">>> DOCKER COMMIT $SNAPSHOT_NAME"
+  echo
+  $DOCKER commit "$SNAPSHOT_NAME" "$SNAPSHOT_NAME"
+else
+  echo
+  echo ">>> DOCKER COMMIT SKIPPED (environment unchanged)"
+  echo
+fi
 $DOCKER rm "$SNAPSHOT_NAME"
+rm -f build/._checkout_updated
+
+if [ $INIT_ONLY -eq 1 ]; then
+  exit 0
+fi
 
 # stat under macOS has slightly different cli interface
 USER=$(stat -c "%u" . 2>/dev/null || stat -f "%u" .)
@@ -257,6 +309,8 @@ GROUP=$(stat -c "%g" . 2>/dev/null || stat -f "%g" .)
 DIR=$(pwd)
 
 # build core
+
+CORE_FIRMWARE_BUILT=0
 
 for TREZOR_MODEL in ${MODELS[@]}; do
   if [ "$TREZOR_MODEL" = "T1B1" ]; then
@@ -271,8 +325,23 @@ for TREZOR_MODEL in ${MODELS[@]}; do
 
     MAKE_TARGETS=""
     for TARGET in ${CORE_TARGETS[@]}; do
+      if [ "$BITCOIN_ONLY" = "1" ]; then
+        # Skip targets that have no bitcoin-only variant.
+        case "$TARGET" in boardloader|bootloader|secmon|prodtest)
+            continue
+            ;;
+        esac
+      fi
       MAKE_TARGETS="$MAKE_TARGETS build_$TARGET"
     done
+
+    if [ -z "$MAKE_TARGETS" ]; then
+      continue
+    fi
+
+    if [[ "$MAKE_TARGETS" == *build_firmware* ]]; then
+      CORE_FIRMWARE_BUILT=1
+    fi
 
     SCRIPT_NAME=".build_core_${TREZOR_MODEL}_${BITCOIN_ONLY}.sh"
     cat <<EOF > "build/$SCRIPT_NAME"
@@ -285,11 +354,16 @@ for TREZOR_MODEL in ${MODELS[@]}; do
       rm -rf /build/*
       uv run make clean vendor $MAKE_TARGETS QUIET_MODE=1
       for item in bootloader secmon kernel firmware prodtest; do
-        if [ -s build-xtask/artifacts/$TREZOR_MODEL/\$item.bin ]; then
-          uv run ../python/tools/firmware-fingerprint.py \
-                      -o build-xtask/artifacts/$TREZOR_MODEL/\$item.bin.fingerprint \
-                      build-xtask/artifacts/$TREZOR_MODEL/\$item.bin \
-                      || echo "No fingerprint for build-xtask/artifacts/$TREZOR_MODEL/\$item.bin"
+        # Append the labeled fingerprint, preceded by '# <artifact name>'.
+        if [ "\$item" != kernel ] && [ -s build-xtask/artifacts/$TREZOR_MODEL/\$item.bin ]; then
+          src=\$(ls build-xtask/artifacts/pub/\$item-$TREZOR_MODEL*.bin 2>/dev/null | head -n1 || true)
+          src=\${src##*/}
+          {
+            echo "# core${DIRSUFFIX}/\$item/\${src:-\$item.bin}"
+            uv run ../python/tools/firmware-fingerprint.py \
+                build-xtask/artifacts/$TREZOR_MODEL/\$item.bin
+            echo
+          } >> /local/build/${COMMIT_HASH}.fingerprints
         fi
         if [ -f build-xtask/artifacts/$TREZOR_MODEL/\$item.elf ]; then
           # copy only the artifacts to the build output directory
@@ -300,6 +374,7 @@ for TREZOR_MODEL in ${MODELS[@]}; do
         fi
       done
       chown -R $USER:$GROUP /build
+      chown $USER:$GROUP /local/build/${COMMIT_HASH}.fingerprints 2>/dev/null || true
 EOF
 
     echo
@@ -433,7 +508,7 @@ fi
 
 # build legacy
 
-if echo "${MODELS[@]}" | grep -q T1B1 ; then
+if echo "${MODELS[@]}" | grep -q T1B1 && echo "${CORE_TARGETS[@]}" | grep -qw firmware ; then
   for BITCOIN_ONLY in ${VARIANTS[@]}; do
 
     DIRSUFFIX=${BITCOIN_ONLY/1/-bitcoinonly}
@@ -456,10 +531,15 @@ if echo "${MODELS[@]}" | grep -q T1B1 ; then
       cp firmware/trezor.bin build/firmware/firmware.bin
       cp firmware/firmware*.bin build/firmware/ || true  # ignore missing file as it will not be present in old tags
       cp firmware/trezor.elf build/firmware/firmware.elf
-      uv run ../python/tools/firmware-fingerprint.py \
-                 -o build/firmware/firmware.bin.fingerprint \
-                 build/firmware/firmware.bin
+      src=\$(ls build/firmware/firmware-T1B1*.bin 2>/dev/null | head -n1 || true)
+      src=\${src##*/}
+      {
+        echo "# legacy${DIRSUFFIX}/firmware/\${src:-firmware.bin}"
+        uv run ../python/tools/firmware-fingerprint.py build/firmware/firmware.bin
+        echo
+      } >> /local/build/${COMMIT_HASH}.fingerprints
       chown -R $USER:$GROUP /build
+      chown $USER:$GROUP /local/build/${COMMIT_HASH}.fingerprints 2>/dev/null || true
 EOF
 
     echo
@@ -489,29 +569,46 @@ echo "  docker rmi $SNAPSHOT_NAME"
 echo
 echo "Built from commit $COMMIT_HASH"
 echo
-echo "Fingerprints:"
 
-# Display core and legacy fingerprints (if built)
-for VARIANT in core legacy; do
-  for MODEL in ${MODELS[@]}; do
-    for DIRSUFFIX in "" "-bitcoinonly" $DIRSUFFIX_OVERRIDE; do
-      BUILD_DIR=build/${VARIANT}-${MODEL}${DIRSUFFIX}
-      for file in $BUILD_DIR/*/*.fingerprint; do
-        if [ -f "$file" ]; then
-          origfile="${file%.fingerprint}"
-          fingerprint=$(tr -d '\n' < $file)
-          chunkified_fingerprint=$(echo "$fingerprint" | sed 's/.\{4\}/& /g')
-          echo -e "\033[1m$chunkified_fingerprint\033[0m $origfile"
-        fi
-      done
-    done
-  done
-done
+FINGERPRINTS_FILE="build/${COMMIT_HASH}.fingerprints"
+MASTER_FILE="build/${COMMIT_HASH}.master"
+if [ -f "$FINGERPRINTS_FILE" ]; then
+  # Append the translations root if a firmware that consumes them was built and
+  # compute the master fingerprint.
+  $DOCKER run \
+      --network=host \
+      --rm \
+      -v "$DIR:/local" \
+      --init \
+      "$SNAPSHOT_NAME" \
+      /nix/var/nix/profiles/default/bin/nix-shell --run \
+        "cd /reproducible-build/trezor-firmware \
+         && if [ $OPT_ADD_TRANSLATIONS -eq 1 ] && [ $CORE_FIRMWARE_BUILT -eq 1 ] \
+               && ! grep -q '^translations:' /local/$FINGERPRINTS_FILE; then \
+              translations_root=\$(uv run core/translations/cli.py merkle-root) \
+              && { echo '# core/translations'; \
+                   echo \"translations: \$translations_root\"; \
+                   echo; } >> /local/$FINGERPRINTS_FILE; \
+            fi \
+         && uv run python/tools/master-fingerprint.py /local/$FINGERPRINTS_FILE \
+              > /local/$MASTER_FILE \
+         && chown $USER:$GROUP /local/$MASTER_FILE" \
+    || { rm -f "$MASTER_FILE"; exit 1; }
+  echo "Fingerprints ($FINGERPRINTS_FILE):"
+  echo
+  cat "$FINGERPRINTS_FILE"
+  cat "$MASTER_FILE"
+else
+  echo "(no core/legacy firmware images built)"
+fi
 
-# Display nRF fingerprints (if built)
+# nRF fingerprints (if built) use a plain sha256 of the whole binary and are not
+# part of the labeled fingerprints file.
 if [ "$OPT_BUILD_NRF" -eq 1 ]; then
   NRF_BUILD_DIR=build/nrf
   if [ -d "$NRF_BUILD_DIR" ]; then
+    echo
+    echo "nRF fingerprints:"
     for file in $NRF_BUILD_DIR/firmware/*.fingerprint $NRF_BUILD_DIR/bootloader/*.fingerprint; do
       if [ -f "$file" ]; then
         origfile="${file%.fingerprint}"

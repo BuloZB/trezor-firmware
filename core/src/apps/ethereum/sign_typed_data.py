@@ -83,7 +83,6 @@ async def _generate_typed_data_hash(
         confirm_empty_typed_message,
         confirm_message_hash,
         confirm_typed_data_final,
-        should_show_domain,
     )
 
     progress_obj = progress(indeterminate=True)
@@ -94,13 +93,10 @@ async def _generate_typed_data_hash(
     )
     await typed_data_envelope.collect_types(lambda p: progress_obj.report(int(p * 700)))
 
-    name, version = await _get_name_and_version_for_domain(typed_data_envelope)
-    show_domain = await should_show_domain(name, version)
-
     domain_separator = await typed_data_envelope.hash_struct(
         "EIP712Domain",
         [0],
-        show_domain,
+        True,
         ["EIP712Domain"],
         lambda p: progress_obj.report(700 + int(p * 300)),
     )
@@ -153,7 +149,6 @@ class TypedDataEnvelope:
     ) -> None:
         self.primary_type = primary_type
         self.metamask_v4_compat = metamask_v4_compat
-        self.prefetched_eip712_values: dict[tuple[int, ...], AnyBytes] = {}
         self.types: dict[str, EthereumTypedDataStructAck] = {}
 
     async def collect_types(
@@ -282,12 +277,26 @@ class TypedDataEnvelope:
         i.e. the concatenation of the encoded member values in the order that they appear in the type.
         Each encoded member value is exactly 32-byte long.
         """
-        from .layout import confirm_typed_value, should_show_array
+        from trezor.enums import ButtonRequestType
+        from trezor.ui.layouts import confirm_properties
+
+        from .layout import confirm_typed_value, extract_properties, should_show_array
 
         type_members = self.types[primary_type].members
         members_count = len(type_members)
         member_value_path = member_path + [0]
         current_parent_objects = parent_objects + [""]
+
+        _NESTED = (EthereumDataType.ARRAY, EthereumDataType.STRUCT)
+
+        if primary_type == "EIP712Domain":
+            if any(member.type.data_type in _NESTED for member in type_members):
+                # https://eips.ethereum.org/EIPS/eip-712#definition-of-domainseparator
+                raise DataError("Unexpected member in EIP712Domain")
+            combined_props = []  # all items will be confirmed using a single layout
+        else:
+            combined_props = None  # items will be confirmed separately
+
         for member_index, member in enumerate(type_members):
             if report_progress:
                 report_progress(member_index / members_count)
@@ -379,22 +388,41 @@ class TypedDataEnvelope:
                             )
                 w.extend(arr_w.get_digest())
             else:
-                path_key = tuple(member_value_path)
-                if (
-                    primary_type == "EIP712Domain"
-                    and path_key in self.prefetched_eip712_values
-                ):
-                    value = self.prefetched_eip712_values[path_key]
-                else:
-                    value = await get_value(field_type, member_value_path)
+                value = await get_value(field_type, member_value_path)
                 encode_field(w, field_type, value)
                 if show_data:
-                    await confirm_typed_value(
-                        field_name,
-                        value,
-                        parent_objects,
-                        field_type,
-                    )
+                    if combined_props is None:
+                        await confirm_typed_value(
+                            field_name,
+                            value,
+                            parent_objects,
+                            field_type,
+                        )
+                    else:
+                        combined_props.append(
+                            extract_properties(field_name, value, field_type)
+                        )
+
+        if show_data and combined_props is not None:
+            if combined_props:
+                # Confirm all EIP712Domain items at once:
+                await confirm_properties(
+                    "confirm_typed_value",
+                    primary_type,
+                    combined_props,
+                    br_code=ButtonRequestType.Other,
+                )
+            else:
+                from trezor import TR
+                from trezor.ui.layouts import show_warning
+
+                # Show a warning if no EIP712Domain items:
+                await show_warning(
+                    content=TR.ethereum__eip_712_empty_domain,
+                    button=TR.buttons__continue,
+                    br_name="confirm_typed_value",
+                    br_code=ButtonRequestType.Warning,
+                )
 
 
 def encode_field(
@@ -563,24 +591,3 @@ async def get_value(
     _validate_value(field=field, value=value)
 
     return value
-
-
-async def _get_name_and_version_for_domain(
-    typed_data_envelope: TypedDataEnvelope,
-) -> tuple[AnyBytes, AnyBytes]:
-    domain_name = b"unknown"
-    domain_version = b"unknown"
-
-    domain_members = typed_data_envelope.types["EIP712Domain"].members
-    member_value_path = [0, 0]
-    for member_index, member in enumerate(domain_members):
-        member_value_path[-1] = member_index
-        if member.name in ("name", "version"):
-            value = await get_value(member.type, member_value_path)
-            path_key = tuple(member_value_path)
-            typed_data_envelope.prefetched_eip712_values[path_key] = value
-            if member.name == "name":
-                domain_name = value
-            elif member.name == "version":
-                domain_version = value
-    return domain_name, domain_version

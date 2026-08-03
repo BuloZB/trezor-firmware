@@ -456,23 +456,6 @@ def confirm_empty_typed_message() -> Awaitable[None]:
     )
 
 
-async def should_show_domain(name: AnyBytes, version: AnyBytes) -> bool:
-    domain_name = decode_typed_data(name, "string")
-    domain_version = decode_typed_data(version, "string")
-
-    para = (
-        (TR.ethereum__name_and_version, False),
-        (domain_name, False),
-        (domain_version, False),
-    )
-    return await should_show_more(
-        TR.ethereum__title_confirm_domain,
-        para,
-        TR.ethereum__show_full_domain,
-        "should_show_domain",
-    )
-
-
 async def should_show_struct(
     description: str,
     data_members: list[EthereumStructMember],
@@ -557,6 +540,21 @@ async def confirm_typed_value(
             data,
             description,
         )
+
+
+def extract_properties(
+    name: str,
+    value: AnyBytes,
+    field: EthereumFieldType,
+) -> StrPropertyType:
+
+    from .helpers import get_type_name
+
+    type_name = get_type_name(field)
+    key = f"{name} ({type_name})"
+    data = decode_typed_data(value, type_name)
+
+    return (key, data, True)
 
 
 def limit_str(s: str, limit: int = 16) -> str:

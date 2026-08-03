@@ -7,7 +7,7 @@ build = "build.rs"
 
 [features]
 default = ["layout_bolt"]
-crypto = ["dep:zeroize"]
+crypto = ["dep:crypto"]
 layout_bolt = []
 layout_caesar = []
 layout_delizia = []
@@ -61,9 +61,9 @@ telemetry = []
 n4w1 = []
 translations = ["crypto"]
 secmon_layout = []
-dbg_console = []
+dbg_console = ["dep:sys"]
 app_loading = []
-thp = ["crypto", "dep:trezor-thp", "dep:zeroize"]
+thp = ["crypto/thp", "dep:trezor-thp", "dep:zeroize"]
 test = [
     "backlight",
     "button",
@@ -111,6 +111,7 @@ num-derive.workspace = true
 num-traits.workspace = true
 pareen.workspace = true
 qrcodegen.workspace = true
+rtl.workspace = true
 spin.workspace = true
 static-alloc.workspace = true
 trezor-tjpgdec.workspace = true
@@ -118,7 +119,9 @@ ufmt.workspace = true
 unsize.workspace = true
 without-alloc.workspace = true
 
+crypto = { workspace = true, optional = true }
 io = { workspace = true, optional = true }
+sys = { workspace = true, optional = true }
 trezor-thp = { workspace = true, optional = true }
 upymod = { workspace = true, optional = true }
 zeroize = { workspace = true, optional = true }

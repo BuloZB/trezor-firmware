@@ -272,22 +272,23 @@ Ethereum commands.
     - HTTP or HTTPS URL
     - path to local directory
     - path to local tar archive
-    
 
-    For debugging purposes, it is possible to force use a specific network and token definition by
-    using the `--network` and `--token` options. These options accept either a path to a file with a
-    binary blob, or a hex-encoded string.
+    For debugging purposes, it is possible to force use a specific network, token or contract
+    descriptor definition by using the `--network`, `--token` and `--display-format` options. These
+    options accept either a path to a file with a binary blob, or a hex-encoded string.
 
   Options:
     -d, --definitions TEXT  Source for Ethereum definition blobs.
     -a, --auto-definitions  Automatically download required definitions from trezor.io
     --network TEXT          Network definition blob.
     --token TEXT            Token definition blob.
+    --display-format TEXT   ERC-7730 clear-signing contract descriptor blob.
     --help                  Show this message and exit.
 
   Commands:
     get-address           Get Ethereum address in hex encoding.
     get-public-node       Get Ethereum public node of given path.
+    sign-auth-eip7702     Sign EIP-7702 authorization.
     sign-message          Sign message with Ethereum address.
     sign-tx               Sign (and optionally publish) Ethereum transaction.
     sign-typed-data       Sign typed data (EIP-712) with Ethereum address.
@@ -488,7 +489,9 @@ Solana commands.
   Commands:
     get-address     Get Solana address.
     get-public-key  Get Solana public key.
+    sign-message    Sign a Solana off-chain message.
     sign-tx         Sign Solana transaction.
+    verify-message  Verify a signed Solana off-chain message.
 
 Stellar commands.
 ~~~~~~~~~~~~~~~~~
@@ -507,8 +510,9 @@ Stellar commands.
     --help  Show this message and exit.
 
   Commands:
-    get-address       Get Stellar public address.
-    sign-transaction  Sign a base64-encoded transaction envelope.
+    get-address                 Get Stellar public address.
+    sign-soroban-authorization  Sign a base64-encoded Soroban authorization entry.
+    sign-transaction            Sign a base64-encoded transaction envelope.
 
 Telemetry commands.
 ~~~~~~~~~~~~~~~~~~~

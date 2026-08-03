@@ -6,10 +6,16 @@ from trezor.wire import DataError, ProcessError
 from ..writers import (
     write_bool,
     write_bytes_fixed,
+    write_int64,
+    write_invoke_contract_args,
     write_pubkey,
+    write_sc_address,
+    write_sc_val,
+    write_soroban_authorized_invocation,
     write_string,
     write_uint32,
     write_uint64,
+    write_vec,
 )
 
 if TYPE_CHECKING:
@@ -24,6 +30,8 @@ if TYPE_CHECKING:
         StellarClaimClaimableBalanceOp,
         StellarCreateAccountOp,
         StellarCreatePassiveSellOfferOp,
+        StellarHostFunction,
+        StellarInvokeHostFunctionOp,
         StellarManageBuyOfferOp,
         StellarManageDataOp,
         StellarManageSellOfferOp,
@@ -31,6 +39,9 @@ if TYPE_CHECKING:
         StellarPathPaymentStrictSendOp,
         StellarPaymentOp,
         StellarSetOptionsOp,
+        StellarSorobanAddressCredentials,
+        StellarSorobanAuthorizationEntry,
+        StellarSorobanCredentials,
     )
     from trezor.utils import Writer
 
@@ -109,9 +120,7 @@ def write_path_payment_strict_receive_op(
 
     _write_asset(w, msg.destination_asset)
     write_uint64(w, msg.destination_amount)
-    write_uint32(w, len(msg.paths))
-    for p in msg.paths:
-        _write_asset(w, p)
+    write_vec(w, msg.paths, _write_asset)
 
 
 def write_path_payment_strict_send_op(
@@ -123,9 +132,7 @@ def write_path_payment_strict_send_op(
 
     _write_asset(w, msg.destination_asset)
     write_uint64(w, msg.destination_min)
-    write_uint32(w, len(msg.paths))
-    for p in msg.paths:
-        _write_asset(w, p)
+    write_vec(w, msg.paths, _write_asset)
 
 
 def write_payment_op(w: Writer, msg: StellarPaymentOp) -> None:
@@ -238,3 +245,50 @@ def _write_claimable_balance_id(w: Writer, claimable_balance_id: AnyBytes) -> No
     if claimable_balance_id[:4] != b"\x00\x00\x00\x00":  # CLAIMABLE_BALANCE_ID_TYPE_V0
         raise DataError("Stellar: invalid claimable balance id, unknown type")
     write_bytes_fixed(w, claimable_balance_id, 36)
+
+
+def write_invoke_host_function_op(w: Writer, msg: StellarInvokeHostFunctionOp) -> None:
+    _write_host_function(w, msg.function)
+    write_vec(w, msg.auth, _write_soroban_authorization_entry)
+
+
+def _write_host_function(w: Writer, msg: StellarHostFunction) -> None:
+    from trezor.enums import StellarHostFunctionType
+
+    write_uint32(w, msg.type)
+    if msg.type == StellarHostFunctionType.HOST_FUNCTION_TYPE_INVOKE_CONTRACT:
+        if msg.invoke_contract is None:
+            raise DataError("Stellar: missing invoke_contract")
+        write_invoke_contract_args(w, msg.invoke_contract)
+    else:
+        raise ProcessError("Stellar: unsupported host function type")
+
+
+def _write_soroban_authorization_entry(
+    w: Writer, msg: StellarSorobanAuthorizationEntry
+) -> None:
+    _write_soroban_credentials(w, msg.credentials)
+    write_soroban_authorized_invocation(w, msg.root_invocation)
+
+
+def _write_soroban_credentials(w: Writer, msg: StellarSorobanCredentials) -> None:
+    from trezor.enums import StellarSorobanCredentialsType
+
+    write_uint32(w, msg.type)
+    if msg.type == StellarSorobanCredentialsType.SOROBAN_CREDENTIALS_SOURCE_ACCOUNT:
+        pass  # void
+    elif msg.type == StellarSorobanCredentialsType.SOROBAN_CREDENTIALS_ADDRESS_V2:
+        if msg.address_v2 is None:
+            raise DataError("Stellar: missing address credentials")
+        _write_soroban_address_credentials(w, msg.address_v2)
+    else:
+        raise ProcessError("Stellar: unsupported credentials type")
+
+
+def _write_soroban_address_credentials(
+    w: Writer, msg: StellarSorobanAddressCredentials
+) -> None:
+    write_sc_address(w, msg.address)
+    write_int64(w, msg.nonce)
+    write_uint32(w, msg.signature_expiration_ledger)
+    write_sc_val(w, msg.signature)

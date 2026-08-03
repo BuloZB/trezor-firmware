@@ -44,10 +44,20 @@ if TYPE_CHECKING:
 
     # Parses a Value from a slice of the calldata.
     # Assumes that the memoryview contains just that value.
-    Parser = Callable[[memoryview], AnyValue]
+    Parser = Callable[[memoryview], Value]
+
+    # One displayed row: ((label, formatted value, is_mono), token, token_address)
+    DisplayedField = tuple[
+        tuple[str, str | AboveThreshold | None, bool | None],
+        EthereumTokenInfo | None,
+        AnyBytes | None,
+    ]
 
 
 SC_FUNC_SIG_BYTES = const(4)
+_EVM_WORD_SIZE = const(32)  # in bytes
+_EVM_WORD_BITS = const(8 * _EVM_WORD_SIZE)
+_ADDRESS_BYTES = const(20)
 
 
 class ClearSigningFailed(Exception):
@@ -86,38 +96,34 @@ class InvalidFormatDefinition(ClearSigningFailed):
     pass
 
 
-# Value Parsers
-
-
 def _check_padding_zero(
     raw_data: memoryview, used_bytes: int, exc: type[ValueOverflow] = ValueOverflow
 ) -> None:
     """Sanity check to make sure unused data is zeroed out."""
-    if not 0 <= used_bytes <= 32:
+    if not 0 <= used_bytes <= _EVM_WORD_SIZE:
         raise InvalidFormatDefinition
-    if any(raw_data[: 32 - used_bytes]):
+    if any(raw_data[: _EVM_WORD_SIZE - used_bytes]):
         raise exc
 
 
 def parse_address(raw_data: memoryview) -> Value:
-    _ZERO_PADDING = const(20)
-    if len(raw_data) < 32:
+    if len(raw_data) < _EVM_WORD_SIZE:
         raise OutOfBounds
-    _check_padding_zero(raw_data, _ZERO_PADDING, DirtyAddress)
-    return bytes(raw_data[32 - _ZERO_PADDING :])
+    _check_padding_zero(raw_data, _ADDRESS_BYTES, DirtyAddress)
+    return bytes(raw_data[_EVM_WORD_SIZE - _ADDRESS_BYTES :])
 
 
-def parse_uint256(raw_data: memoryview) -> Value:
-    if len(raw_data) < 32:
+def parse_uint256(raw_data: memoryview) -> int:
+    if len(raw_data) < _EVM_WORD_SIZE:
         raise OutOfBounds
     return int.from_bytes(raw_data, "big")
 
 
-def _make_uint_parser(bit_width: int) -> "Parser":
+def make_uint_parser(bit_width: int) -> "Parser":
     byte_width = bit_width // 8
 
     def parser(raw_data: memoryview) -> Value:
-        if len(raw_data) < 32:
+        if len(raw_data) < _EVM_WORD_SIZE:
             raise OutOfBounds
         _check_padding_zero(raw_data, byte_width)
         return parse_uint256(raw_data)
@@ -125,30 +131,56 @@ def _make_uint_parser(bit_width: int) -> "Parser":
     return parser
 
 
-parse_uint248 = _make_uint_parser(248)
-parse_uint160 = _make_uint_parser(160)
-parse_uint128 = _make_uint_parser(128)
-parse_uint120 = _make_uint_parser(120)
-parse_uint112 = _make_uint_parser(112)
-parse_uint96 = _make_uint_parser(96)
-parse_uint72 = _make_uint_parser(72)
-parse_uint64 = _make_uint_parser(64)
-parse_uint48 = _make_uint_parser(48)
-parse_uint40 = _make_uint_parser(40)
-parse_uint32 = _make_uint_parser(32)
-parse_uint24 = _make_uint_parser(24)
-parse_uint16 = _make_uint_parser(16)
-parse_uint8 = _make_uint_parser(8)
+def make_fixed_bytes_parser(byte_width: int) -> "Parser":
+    """bytesN values are left-aligned in the word: the padding to check
+    for zeroes is on the right, unlike the numeric types.
+    See "bytes<M>: enc(X) is the sequence of bytes in X padded with
+    trailing zero-bytes to a length of 32 bytes" in
+    https://docs.soliditylang.org/en/latest/abi-spec.html#formal-specification-of-the-encoding
+    """
+
+    def parser(raw_data: memoryview) -> Value:
+        if len(raw_data) < _EVM_WORD_SIZE:
+            raise OutOfBounds
+        if any(raw_data[byte_width:_EVM_WORD_SIZE]):
+            raise ValueOverflow
+        return bytes(raw_data[:byte_width])
+
+    return parser
 
 
-def parse_bytes32(raw_data: memoryview) -> Value:
-    if len(raw_data) < 32:
-        raise OutOfBounds
-    return bytes(raw_data[:32])
+def make_int_parser(bit_width: int) -> Parser:
+    if not 0 < bit_width <= _EVM_WORD_BITS:
+        raise InvalidFormatDefinition
+
+    def parser(raw_data: memoryview) -> Value:
+        value = parse_uint256(raw_data)
+        # Two's complement.
+        if value >= 1 << (_EVM_WORD_BITS - 1):
+            value -= 1 << _EVM_WORD_BITS
+        # the range check doubles as the sign-extension padding check
+        if not -(1 << (bit_width - 1)) <= value < 1 << (bit_width - 1):
+            raise ValueOverflow
+        return value
+
+    return parser
+
+
+def _word_bytes(value: AnyValue) -> AnyValue:
+    """An EVM word can be viewed as an integer or as 32 bytes. A byte-slice
+    step selects the bytes view: e.g. `token.[-20:]` reads the low 20 bytes
+    of a uint256 (the 1inch packed `Address` type). Non-numeric values are
+    returned unchanged - they are sliced directly."""
+    if type(value) is int:  # not isinstance: bool is an int subclass
+        if value < 0:
+            # byte-slicing a signed value has no defined meaning
+            raise InvalidFormatDefinition
+        return value.to_bytes(_EVM_WORD_SIZE, "big")
+    return value
 
 
 def parse_bool(raw_data: memoryview) -> Value:
-    if len(raw_data) < 32:
+    if len(raw_data) < _EVM_WORD_SIZE:
         raise OutOfBounds
     uint_value = parse_uint256(raw_data)
     if uint_value not in (0, 1):
@@ -164,16 +196,7 @@ def parse_string(raw_data: memoryview) -> Value:
     return bytes(raw_data).decode("utf-8")
 
 
-def parse_uint256_array(raw_data: memoryview) -> list[Value]:
-    if len(raw_data) % 32 != 0:
-        raise InvalidFunctionCall
-    return [
-        parse_uint256(raw_data[i * 32 : (i + 1) * 32])
-        for i in range(len(raw_data) // 32)
-    ]
-
-
-DYNAMIC_DATA_PARSERS = [parse_bytes, parse_string, parse_uint256_array]
+DYNAMIC_DATA_PARSERS = [parse_bytes, parse_string]
 
 
 def _get_parser(t: int, is_dynamic: bool) -> Parser:
@@ -194,37 +217,47 @@ def _get_parser(t: int, is_dynamic: bool) -> Parser:
     elif t == T.ABI_UINT256:
         return parse_uint256
     elif t == T.ABI_UINT248:
-        return parse_uint248
+        return make_uint_parser(248)
     elif t == T.ABI_UINT160:
-        return parse_uint160
+        return make_uint_parser(160)
     elif t == T.ABI_UINT128:
-        return parse_uint128
+        return make_uint_parser(128)
     elif t == T.ABI_UINT120:
-        return parse_uint120
+        return make_uint_parser(120)
     elif t == T.ABI_UINT112:
-        return parse_uint112
+        return make_uint_parser(112)
     elif t == T.ABI_UINT96:
-        return parse_uint96
+        return make_uint_parser(96)
     elif t == T.ABI_UINT72:
-        return parse_uint72
+        return make_uint_parser(72)
     elif t == T.ABI_UINT64:
-        return parse_uint64
+        return make_uint_parser(64)
     elif t == T.ABI_UINT48:
-        return parse_uint48
+        return make_uint_parser(48)
     elif t == T.ABI_UINT40:
-        return parse_uint40
+        return make_uint_parser(40)
     elif t == T.ABI_UINT32:
-        return parse_uint32
+        return make_uint_parser(32)
     elif t == T.ABI_UINT24:
-        return parse_uint24
+        return make_uint_parser(24)
     elif t == T.ABI_UINT16:
-        return parse_uint16
+        return make_uint_parser(16)
     elif t == T.ABI_UINT8:
-        return parse_uint8
+        return make_uint_parser(8)
     elif t == T.ABI_BOOL:
         return parse_bool
+    elif t == T.ABI_INT160:
+        return make_int_parser(160)
     elif t == T.ABI_BYTES32:
-        return parse_bytes32
+        return make_fixed_bytes_parser(32)
+    elif t == T.ABI_BYTES20:
+        return make_fixed_bytes_parser(20)
+    elif t == T.ABI_BYTES16:
+        return make_fixed_bytes_parser(16)
+    elif t == T.ABI_BYTES8:
+        return make_fixed_bytes_parser(8)
+    elif t == T.ABI_BYTES4:
+        return make_fixed_bytes_parser(4)
     raise InvalidFormatDefinition
 
 
@@ -459,9 +492,55 @@ class DateFormatter(FieldFormatter):
 
         if value is None:
             return None, None, None
+        if isinstance(value, (bytes, bytearray)):
+            # a sliced word, e.g. `goodUntil.[-4:]`: big-endian seconds
+            value = int.from_bytes(value, "big")
         if isinstance(value, int):
             return format_timestamp(value), None, None
         raise InvalidFormatDefinition
+
+
+class CalldataFormatter(RawFormatter):
+    """ERC-7730 `calldata` format: the field's value is the embedded calldata
+    of a nested call, rendered with the display format of the called contract
+    (resolved from `callee_path`). Unlike every other formatter it expands
+    into multiple display rows, so `DisplayFormat.parse_calldata` handles it
+    directly (see `_expand_calldata_field`) instead of going through the
+    single-value `format` interface. Subclassing `RawFormatter` is defense
+    in depth: should a code path ever fail to special-case this formatter,
+    the inherited `format` renders the blob as raw hex instead of failing
+    clear signing."""
+
+    def __init__(self, callee_path: Path, selector: bytes | None = None) -> None:
+        self.callee_path = callee_path
+        self.selector = selector
+
+
+class EnumFormatter(FieldFormatter):
+    """ERC-7730 `enum` format: the value read from calldata is a key into a
+    descriptor-supplied mapping and is displayed as the mapped string."""
+
+    def __init__(self, entries: dict[int, str]) -> None:
+        self.entries = entries
+
+    async def format(
+        self,
+        value: AnyValue,
+        _msg: MsgInSignTx,
+        _definitions: Definitions,
+        _path_walker: PathWalker,
+    ) -> tuple[str | AboveThreshold | None, EthereumTokenInfo | None, AnyBytes | None]:
+        if value is None:
+            return None, None, None
+        if isinstance(value, (bytes, bytearray)):
+            # byte sliced to be read as an int
+            value = int.from_bytes(value, "big")
+        if type(value) is not int:
+            raise InvalidFormatDefinition
+        formatted = self.entries.get(value)
+        if formatted is None:
+            raise InvalidFormatDefinition
+        return formatted, None, None
 
 
 async def _format_field_value(
@@ -527,7 +606,44 @@ class BindingContext:
 
 
 class ABIValue:
-    def parse(self, raw_data: memoryview, offset: int) -> tuple[AnyValue, int]:
+    """A node of an ABI type tree, able to parse its value from raw calldata.
+
+    Encoding reference: the Solidity ABI specification,
+    https://docs.soliditylang.org/en/latest/abi-spec.html#formal-specification-of-the-encoding
+
+    Per the spec, every type is either static or dynamic (`is_dynamic`):
+
+    * a static value is encoded in place, occupying `head_size` bytes;
+    * a dynamic value's head is a single word holding the offset of its
+      body, relative to the start of the enclosing block.
+
+    `parse` implements this head rule once for all types; subclasses only
+    describe what their body looks like by implementing `parse_body`.
+    """
+
+    is_dynamic = False
+    head_size = _EVM_WORD_SIZE
+
+    def parse(
+        self, raw_data: memoryview, offset: int, block_start: int = 0
+    ) -> tuple[AnyValue, int]:
+        """Parse one value whose head is at `offset`.
+
+        `block_start` is where the enclosing block starts; offsets inside
+        heads are relative to it. Relevant for arrays, etc.
+        Returns the parsed value and the head bytes consumed.
+        """
+        if offset + self.head_size > len(raw_data):
+            raise OutOfBounds
+        if self.is_dynamic:
+            # the head of any dynamic type is one word: the offset of its body
+            # Dynamic types must have a parse_body method.
+            pointer = int.from_bytes(raw_data[offset : offset + _EVM_WORD_SIZE], "big")
+            return self.parse_body(raw_data, block_start + pointer), self.head_size
+        return self.parse_body(raw_data, offset), self.head_size
+
+    def parse_body(self, raw_data: memoryview, pos: int) -> AnyValue:
+        """Parse the value body located directly at `pos` (no indirection)."""
         raise NotImplementedError
 
     @staticmethod
@@ -535,7 +651,7 @@ class ABIValue:
         if info.atomic is not None:
             return Atomic(_get_parser(info.atomic, is_dynamic=False))
         elif info.dynamic is not None:
-            return Dynamic(_get_parser(info.dynamic, is_dynamic=True))
+            return DynamicLeaf(_get_parser(info.dynamic, is_dynamic=True))
         elif info.tuple is not None:
             return Tuple(
                 tuple(_get_leaf_parser(f) for f in info.tuple.fields),
@@ -546,12 +662,17 @@ class ABIValue:
             if element.atomic is not None:
                 return Array(Atomic(_get_parser(element.atomic, is_dynamic=False)))
             elif element.dynamic is not None:
-                return Array(Dynamic(_get_parser(element.dynamic, is_dynamic=True)))
+                return Array(DynamicLeaf(_get_parser(element.dynamic, is_dynamic=True)))
             elif element.tuple is not None:
+                fields = tuple(_get_leaf_parser(f) for f in element.tuple.fields)
+                # A non-array (leaf) struct/tuple is dynamic if any of its fields is dynamic.
+                # E.g. of dynamic members: bytes, string, uint256[], bytes[], bytes[][] etc.
+                # An array (this outer structure) is always* dynamic regardless of its fields.
+                # (*Unless it's of fixed length, which generally don't exist.)
                 return Array(
                     Tuple(
-                        tuple(_get_leaf_parser(f) for f in element.tuple.fields),
-                        is_dynamic=False,  # Tuples inside Arrays are always parsed as static!
+                        fields,
+                        is_dynamic=any(p in DYNAMIC_DATA_PARSERS for p in fields),
                     )
                 )
             elif element.array is not None:
@@ -562,7 +683,7 @@ class ABIValue:
                     )
                 elif inner.dynamic is not None:
                     return Array(
-                        Array(Dynamic(_get_parser(inner.dynamic, is_dynamic=True)))
+                        Array(DynamicLeaf(_get_parser(inner.dynamic, is_dynamic=True)))
                     )
                 raise InvalidFormatDefinition  # deeper nesting not supported
             raise InvalidFormatDefinition
@@ -570,135 +691,120 @@ class ABIValue:
 
 
 class Atomic(ABIValue):
-    """Atomic values, such as integers or addresses, are always stored on 32 bytes."""
+    """Atomic values, such as integers or addresses, are static types
+    always stored on one EVM word."""
 
     def __init__(self, parser: Parser) -> None:
         self.parser = parser
 
-    def parse(self, raw_data: memoryview, offset: int) -> tuple[AnyValue, int]:
-        if offset + 32 > len(raw_data):
-            raise OutOfBounds
-        return self.parser(raw_data[offset : offset + 32]), 32
+    def parse_body(self, raw_data: memoryview, pos: int) -> AnyValue:
+        # bounds already ensured by `parse`: pos + head_size <= len(raw_data)
+        return self.parser(raw_data[pos : pos + _EVM_WORD_SIZE])
 
 
 def _read_dynamic_data(raw_data: memoryview, pointer: int) -> memoryview:
     """Read a variable-length blob located at `pointer` in `raw_data`,
-    encoded as a 32-byte length prefix followed by `length` bytes of data."""
-    if pointer + 32 > len(raw_data):
+    encoded as a one-word length prefix followed by `length` bytes of data."""
+    if pointer + _EVM_WORD_SIZE > len(raw_data):
         raise OutOfBounds
-    length = int.from_bytes(raw_data[pointer : pointer + 32], "big")
-    if pointer + 32 + length > len(raw_data):
+    length = int.from_bytes(raw_data[pointer : pointer + _EVM_WORD_SIZE], "big")
+    body_start = pointer + _EVM_WORD_SIZE
+    if body_start + length > len(raw_data):
         raise OutOfBounds
-    return raw_data[pointer + 32 : pointer + 32 + length]
+    return raw_data[body_start : body_start + length]
 
 
-class Dynamic(ABIValue):
-    """Dynamic values, such as strings or `bytes` are stored later in the calldata,
-    the inline value being just a pointer to the actual location.
-    Also they have an arbitrary length, which is encoded on the first 32 bytes,
-    after which the actual value follows."""
+class DynamicLeaf(ABIValue):
+    """`strings` or `bytes`. Their body is a
+    one-word byte length followed by that many bytes of data."""
+
+    is_dynamic = True
 
     def __init__(self, parser: Parser) -> None:
         self.parser = parser
 
-    def parse(self, raw_data: memoryview, offset: int) -> tuple[AnyValue, int]:
-        if offset + 32 > len(raw_data):
-            raise OutOfBounds
-        pointer = int.from_bytes(raw_data[offset : offset + 32], "big")
-        data = _read_dynamic_data(raw_data, pointer)
-        return self.parser(data), 32
+    def parse_body(self, raw_data: memoryview, pos: int) -> AnyValue:
+        return self.parser(_read_dynamic_data(raw_data, pos))
 
 
 class Tuple(ABIValue):
-    """Tuples (or Structs, which are essentially the same thing as far as ABI is concerned)
-    contain multiple values of different types.
-    A Tuple is "dynamic" if at least one of the values is dynamic.
-    However, dynamic structs inside arrays behave as static structs,
-    hence we cannot guess if the Tuple is dynamic by looking at just its fields."""
+    """Tuples (or Structs - the same thing as far as the ABI is concerned)
+    contain multiple values of possibly different types. Only leaf fields
+    (atomic types, `bytes`, `string`) are supported here i.e. no more nesting; the dynamic
+    fields are the ones whose parser is in DYNAMIC_DATA_PARSERS.
+
+    A tuple is a dynamic type iff at least one of its fields is dynamic.
+    Its body is the concatenation of its fields' heads: a static field is
+    encoded in place, while a dynamic field's head is the offset of its
+    length-prefixed data, relative to the body start. A static tuple is
+    therefore just its field values back to back - no length prefix and no
+    offset words anywhere."""
 
     def __init__(self, fields: tuple[Parser, ...], is_dynamic: bool) -> None:
+        if not fields:
+            # Zero-field structs do not exist in Solidity. Rejecting them here
+            # also guarantees head_size >= _EVM_WORD_SIZE for every type: a
+            # static tuple with head_size == 0 inside an Array would defeat
+            # the heads bounds pre-check (array_length * 0) and let an
+            # attacker-controlled length word drive an unbounded parse loop.
+            raise InvalidFormatDefinition
         self.fields = fields
         self.is_dynamic = is_dynamic
-        self.static_size = len(fields) * 32
+        self.fields_size = len(fields) * _EVM_WORD_SIZE
+        if not is_dynamic:
+            # a static tuple is encoded in place, so its head is its whole body
+            self.head_size = self.fields_size
 
-    def parse(self, raw_data: memoryview, offset: int) -> tuple[TupleValue, int]:
-        if not self.is_dynamic:
-            base_offset = offset
-            consumed = self.static_size
-        else:
-            if offset + 32 > len(raw_data):
-                raise OutOfBounds
-            pointer = int.from_bytes(raw_data[offset : offset + 32], "big")
-            base_offset = pointer
-            consumed = 32  # dynamic structs just consume the pointer
-
-        if base_offset + self.static_size > len(raw_data):
+    def parse_body(self, raw_data: memoryview, pos: int) -> AnyValue:
+        if pos + self.fields_size > len(raw_data):
             raise OutOfBounds
 
         value: list[Value] = [None] * len(self.fields)
 
         for i, parser in enumerate(self.fields):
-            field_head_pos = base_offset + (i * 32)
-            raw_field = raw_data[field_head_pos : field_head_pos + 32]
+            field_head_pos = pos + (i * _EVM_WORD_SIZE)
+            raw_field = raw_data[field_head_pos : field_head_pos + _EVM_WORD_SIZE]
             if parser not in DYNAMIC_DATA_PARSERS:
-                v = parser(raw_field)
-                if isinstance(v, (tuple, list)):
-                    # Tuple or Array inside a Tuple
-                    raise NotImplementedError
-                value[i] = v
+                value[i] = parser(raw_field)
             else:
-                field_pointer = base_offset + int.from_bytes(raw_field, "big")
-                raw_field = _read_dynamic_data(raw_data, field_pointer)
-                v = parser(raw_field)
-                if isinstance(v, (tuple, list)):
-                    # Tuple or Array inside a Tuple
-                    raise NotImplementedError
-                value[i] = v
-        return tuple(value), consumed
+                field_pointer = pos + int.from_bytes(raw_field, "big")
+                value[i] = parser(_read_dynamic_data(raw_data, field_pointer))
+        return tuple(value)
 
 
 class Array(ABIValue):
-    """Arrays are sequences of value of the same type."""
+    """Arrays (`T[]`) are sequences of values of the same type, and are
+    always dynamic types themselves. The body is a one-word element count
+    followed by the elements' heads - in place values for static element
+    types (e.g. `uint256[]`, or an array of static structs, laid out at a
+    stride of the element's `head_size`), or one-word body offsets for
+    dynamic element types (e.g. `bytes[]`, `uint256[][]`, or an array of
+    structs containing a dynamic field)."""
+
+    is_dynamic = True
 
     def __init__(self, element_definition: ABIValue) -> None:
         self.element_definition = element_definition
 
-    def parse(self, raw_data: memoryview, offset: int) -> tuple[ListValue, int]:
-        if offset + 32 > len(raw_data):
+    def parse_body(self, raw_data: memoryview, pos: int) -> AnyValue:
+        if pos + _EVM_WORD_SIZE > len(raw_data):
             raise OutOfBounds
-        array_pointer = int.from_bytes(raw_data[offset : offset + 32], "big")
-        return self._parse_body(raw_data, array_pointer), 32
-
-    def _parse_body(self, raw_data: memoryview, array_start: int) -> ListValue:
-        if array_start + 32 > len(raw_data):
-            raise OutOfBounds
-        array_length = int.from_bytes(raw_data[array_start : array_start + 32], "big")
-        array_heads_end = array_start + 32 + (array_length * 32)
-        if array_heads_end > len(raw_data):
+        array_length = int.from_bytes(raw_data[pos : pos + _EVM_WORD_SIZE], "big")
+        element = self.element_definition
+        # element heads are laid out right after the length word, and any
+        # offsets among them are relative to this position
+        elements_start = pos + _EVM_WORD_SIZE
+        if elements_start + (array_length * element.head_size) > len(raw_data):
             raise OutOfBounds
 
         value = []
-
-        for i in range(array_length):
-            p = array_start + 32 + (i * 32)
-            if p + 32 > len(raw_data):
-                raise OutOfBounds
-            if isinstance(self.element_definition, Atomic):
-                # atomic types are encoded in place
-                data, _ = self.element_definition.parse(raw_data, p)
-            elif isinstance(self.element_definition, Array):
-                # inner arrays: element head is a relative offset to the inner array body
-                element_pointer = int.from_bytes(raw_data[p : p + 32], "big")
-                inner_array_start = array_start + 32 + element_pointer
-                data = self.element_definition._parse_body(raw_data, inner_array_start)
-            else:
-                element_pointer = int.from_bytes(raw_data[p : p + 32], "big")
-                element_absolute_pointer = array_start + 32 + element_pointer
-                data, _ = self.element_definition.parse(
-                    raw_data, element_absolute_pointer
-                )
+        element_head_offset = elements_start
+        for _ in range(array_length):
+            data, consumed = element.parse(
+                raw_data, element_head_offset, elements_start
+            )
             value.append(data)
-
+            element_head_offset += consumed
         return value
 
 
@@ -735,7 +841,13 @@ class FieldDefinition:
                 # A literal constant value, resolved by the parser — not walked
                 # from calldata. Rendered as-is (typically by the raw formatter).
                 return p.const_value
-            return tuple(p.path)
+            steps: list[int | tuple[int] | tuple[int, int]] = list(p.path)
+            if p.slice_end is not None:
+                # `data.[0:20]` or `takerTraits.[:1]` (start defaults to 0)
+                steps.append((p.slice_start or 0, p.slice_end))
+            elif p.slice_start is not None:
+                steps.append((p.slice_start,))  # `token.[-20:]`
+            return tuple(steps)
 
         path = decode_path(info.path)
 
@@ -768,6 +880,22 @@ class FieldDefinition:
             formatter = RawFormatter
         elif fmt_type == FT.FORMATTER_DATE:
             formatter = DateFormatter
+        elif fmt_type == FT.FORMATTER_CALLDATA:
+            if info.callee_path is None:
+                raise InvalidFormatDefinition
+            selector = bytes(info.selector) if info.selector is not None else None
+            if selector is not None and len(selector) != SC_FUNC_SIG_BYTES:
+                raise InvalidFormatDefinition
+            formatter = CalldataFormatter(decode_path(info.callee_path), selector)
+        elif fmt_type == FT.FORMATTER_ENUM:
+            if not info.enum_values:
+                raise InvalidFormatDefinition
+            enum_entries: dict[int, str] = {}
+            for e in info.enum_values:
+                if e.key in enum_entries:
+                    raise InvalidFormatDefinition
+                enum_entries[e.key] = e.value
+            formatter = EnumFormatter(enum_entries)
         else:
             raise InvalidFormatDefinition
 
@@ -789,12 +917,14 @@ class DisplayFormat:
         intent: str,
         parameter_definitions: list[ABIValue],
         field_definitions: list[FieldDefinition],
+        provider_name: str | None = None,
     ) -> None:
         self.binding_context = binding_context
         self.func_sig = func_sig
         self.intent = intent
         self.parameter_definitions = parameter_definitions
         self.field_definitions = field_definitions
+        self.provider_name = provider_name
 
         self.parameters = []
 
@@ -806,21 +936,26 @@ class DisplayFormat:
 
         return self.binding_context.matches(chain_id, address)
 
+    def matches_call(self, func_sig: bytes, chain_id: int, address: bytes) -> bool:
+        """Assert the received descriptor is what was requested"""
+        return self.func_sig == func_sig and self.matches_context(chain_id, address)
+
     async def parse_calldata(
         self,
         calldata: memoryview,
         msg: MsgInSignTx,
         defs: Definitions,
-    ) -> tuple[
-        list[AnyValue],
-        list[
-            tuple[
-                tuple[str, str | AboveThreshold | None, bool | None],
-                EthereumTokenInfo | None,
-                AnyBytes | None,
-            ]
-        ],
-    ]:
+        nested: bool = False,
+        override_callee: bytes | None = None,
+    ) -> tuple[list[AnyValue], list[DisplayedField]]:
+        """Parse `calldata` (without the selector) and format the display fields.
+
+        `nested` marks the parse of an embedded subcall's calldata (see
+        `_expand_calldata_field`): container paths other than `@.to` are
+        unresolvable there, and any further calldata fields render as raw
+        hex instead of triggering tertiary lookups. `override_callee` substitutes
+        the `@.to` container path (the subcall's callee, not the outer
+        transaction's recipient)."""
         parameters: list[AnyValue] = []
 
         offset = 0
@@ -846,13 +981,28 @@ class DisplayFormat:
                 return path
             if isinstance(path, int):  # ContainerPath
                 # standard container paths like @.from, @.value...
+                if path == ContainerPath.To:
+                    # `@.to` means "the contract this call goes to". For the
+                    # outer transaction that is `msg.to`. When parsing a
+                    # subcall, the wrapper (`msg.to`) merely forwards the
+                    # call: `override_callee` holds the actual callee, so e.g. a
+                    # nested transfer's `token_path=@.to` resolves to the
+                    # token contract, not to the wrapper.
+                    if override_callee is not None:
+                        return override_callee
+                    return bytes_from_address(msg.to)
+                if nested:
+                    # In a subcall, `@.from` is ambiguous - the wrapper
+                    # contract if it CALLs the callee, the original signer if
+                    # it DELEGATECALLs - and `@.value` is decided by wrapper
+                    # logic; neither can be resolved from `msg` without
+                    # risking a confidently wrong display.
+                    raise InvalidFormatDefinition
                 if path == ContainerPath.From:
                     account, _ = get_account_and_path(msg.address_n)
                     return account
                 elif path == ContainerPath.Value:
                     return int.from_bytes(msg.value, "big")
-                elif path == ContainerPath.To:
-                    return bytes_from_address(msg.to)
                 else:
                     raise NotImplementedError  # TODO
             else:
@@ -866,6 +1016,9 @@ class DisplayFormat:
                     if p is None:
                         p = None
                         break
+                    if isinstance(step, tuple):
+                        # slices view numeric values as bytes (see _word_bytes)
+                        p = _word_bytes(p)
                     if isinstance(p, (list, tuple, bytes)):
                         # walk inside Arrays or Tuples
                         try:
@@ -889,17 +1042,26 @@ class DisplayFormat:
                     raise InvalidFormatDefinition
                 return p
 
-        fields: list[
-            tuple[
-                tuple[str, str | AboveThreshold | None, bool | None],
-                EthereumTokenInfo | None,
-                AnyBytes | None,
-            ]
-        ] = []
+        fields: list[DisplayedField] = []
         for field_definition in self.field_definitions:
             try:
-                value = get_value_for_path(field_definition.path)
                 formatter = field_definition.get_formatter()
+                if isinstance(formatter, CalldataFormatter):
+                    # Expands into multiple rows (the subcall's provider and
+                    # intent, then its own fields), so it bypasses the
+                    # single-value formatting below.
+                    fields.extend(
+                        await _expand_calldata_field(
+                            field_definition,
+                            formatter,
+                            get_value_for_path,
+                            msg,
+                            defs,
+                            nested,
+                        )
+                    )
+                    continue
+                value = get_value_for_path(field_definition.path)
                 formatted, token, token_address = await _format_field_value(
                     formatter, value, msg, defs, get_value_for_path
                 )
@@ -937,6 +1099,7 @@ class DisplayFormat:
             binding_context=BindingContext([(proto.chain_id, bytes(proto.address))]),
             func_sig=bytes(proto.func_sig),
             intent=proto.intent,
+            provider_name=proto.provider_name,
             parameter_definitions=[
                 ABIValue.from_proto(p) for p in proto.parameter_definitions
             ],
@@ -975,6 +1138,183 @@ async def request_definitions(
     return definitions, display_format
 
 
+async def _find_display_format(
+    func_sig: bytes, address_bytes: bytes, msg: MsgInSignTx, nested: bool = False
+) -> DisplayFormat | None:
+    """Find a display format for calling `func_sig` on the `address_bytes`
+    contract, trying built-ins, then the definitions provided in the initial
+    request, then a definition request over the wire."""
+
+    from .clear_signing_definitions import all_display_formats
+
+    for f in all_display_formats():
+        if f.matches_call(func_sig, msg.chain_id, address_bytes):
+            return f
+
+    if not nested and msg.definitions and msg.definitions.encoded_display_format:
+        f = DisplayFormat.from_encoded(msg.definitions.encoded_display_format)
+        if f.matches_call(func_sig, msg.chain_id, address_bytes):
+            return f
+
+    if msg.supports_definition_request:
+        _, f = await request_definitions(msg.chain_id, address_bytes, func_sig)
+        if f is not None and f.matches_call(func_sig, msg.chain_id, address_bytes):
+            return f
+
+    return None
+
+
+async def _expand_calldata_field(
+    field_definition: FieldDefinition,
+    formatter: CalldataFormatter,
+    path_walker: PathWalker,
+    msg: MsgInSignTx,
+    defs: Definitions,
+    nested: bool,
+) -> list[DisplayedField]:
+    """Expand one `calldata` field into display rows.
+
+    The field's path resolves either to one `bytes` blob of embedded calldata
+    (a single subcall), or to an array of such blobs (e.g. a multicall's
+    `bytes[] data`). In the array case each element is expanded as its own
+    subcall and its rows are labeled "(Subcall #1)", "(Subcall #2)", ...;
+    `callee_path` then resolves either to a single address shared by all
+    subcalls or to a parallel array of addresses of the same length."""
+    blobs = path_walker(field_definition.path)
+    callees = path_walker(formatter.callee_path)
+
+    if not isinstance(blobs, list):
+        return await _expand_one_subcall(
+            field_definition, formatter, blobs, callees, msg, defs, nested
+        )
+
+    if isinstance(callees, list):
+        if len(callees) != len(blobs):
+            raise InvalidFormatDefinition
+    else:
+        # Same callee for all subcalls
+        callees = [callees] * len(blobs)
+
+    rows: list[DisplayedField] = []
+    for i, (blob, callee) in enumerate(zip(blobs, callees)):
+        rows.extend(
+            await _expand_one_subcall(
+                field_definition,
+                formatter,
+                blob,
+                callee,
+                msg,
+                defs,
+                nested,
+                index=i + 1,
+            )
+        )
+    return rows
+
+
+async def _expand_one_subcall(
+    field_definition: FieldDefinition,
+    formatter: CalldataFormatter,
+    blob: AnyValue,
+    callee: AnyValue,
+    msg: MsgInSignTx,
+    defs: Definitions,
+    nested: bool,
+    index: int | None = None,
+) -> list[DisplayedField]:
+    """Expand one embedded subcall into display rows.
+
+    On success the rows are the subcall's provider and intent, followed by
+    the fields of the callee's display format, labels prefixed. Whenever the
+    subcall cannot be clear-signed - no display format available, malformed
+    inner calldata, unresolvable inner fields - it degrades to two rows, the
+    callee and the raw hex blob, instead of failing the outer transaction.
+    `index` is the subcall's 1-based position when it comes from an array of
+    subcalls, reflected in the label prefix: "(Subcall #<index>)"."""
+    from .sc_constants import lookup_known_address
+
+    if not isinstance(blob, bytes):
+        # Calldata should be a bytes field
+        raise InvalidFormatDefinition
+
+    if not isinstance(callee, bytes) or len(callee) != _ADDRESS_BYTES:
+        raise InvalidFormatDefinition
+
+    subcall = TR.ethereum__subcall
+    if index is not None:
+        subcall = f"{subcall} #{index}"
+
+    def callee_str() -> str:
+        return lookup_known_address(msg.chain_id, callee) or address_from_bytes(
+            callee, defs.network
+        )
+
+    def raw_rows() -> list[DisplayedField]:
+        """No subparsing. Show the callee and the raw hex blob."""
+        from ubinascii import hexlify
+
+        to_label = TR.ethereum__subcall_to
+        blob_label = field_definition.label
+        if index is not None:
+            to_label = f"({subcall}) {TR.ethereum__to}"
+            blob_label = f"({subcall}) {blob_label}"
+        return [
+            ((to_label, callee_str(), None), None, None),
+            ((blob_label, hexlify(blob).decode(), None), None, None),
+        ]
+
+    if nested:
+        # already inside a subcall: no tertiary lookups
+        return raw_rows()
+
+    if formatter.selector is not None:
+        # per ERC-7730, an explicit selector means the blob is args-only
+        func_sig = formatter.selector
+        body = memoryview(blob)
+    elif len(blob) >= SC_FUNC_SIG_BYTES:
+        func_sig = bytes(blob[:SC_FUNC_SIG_BYTES])
+        body = memoryview(blob)[SC_FUNC_SIG_BYTES:]
+    else:
+        return raw_rows()
+
+    try:
+        inner_format = await _find_display_format(func_sig, callee, msg, nested=True)
+        if inner_format is None:
+            return raw_rows()
+        _, inner_fields = await inner_format.parse_calldata(
+            body, msg, defs, nested=True, override_callee=callee
+        )
+    except (ClearSigningFailed, DataError) as e:
+        if __debug__:
+            from trezor import log
+
+            log.debug(
+                __name__,
+                'clear signing: subcall "%s" degraded to raw hex (%s)',
+                field_definition.label,
+                type(e).__name__,
+            )
+        return raw_rows()
+
+    rows: list[DisplayedField] = [
+        (
+            (
+                f"({subcall}) {TR.words__provider}",
+                inner_format.provider_name or callee_str(),
+                None,
+            ),
+            None,
+            None,
+        ),
+        ((f"({subcall}) {TR.words__intent}", inner_format.intent, None), None, None),
+    ]
+    for (inner_label, formatted, is_mono), token, token_address in inner_fields:
+        rows.append(
+            ((f"({subcall}) {inner_label}", formatted, is_mono), token, token_address)
+        )
+    return rows
+
+
 async def try_confirm(
     data: AnyBytes,
     address_bytes: bytes,
@@ -987,7 +1327,6 @@ async def try_confirm(
     from .clear_signing_definitions import (
         APPROVE_DISPLAY_FORMAT,
         TRANSFER_DISPLAY_FORMAT,
-        all_display_formats,
     )
 
     if not address_bytes:
@@ -998,30 +1337,7 @@ async def try_confirm(
 
     func_sig = bytes(data[0:SC_FUNC_SIG_BYTES])
 
-    display_format = None
-    for f in all_display_formats():
-        # Start by trying built-in definitions...
-        if f.func_sig == func_sig and f.matches_context(msg.chain_id, address_bytes):
-            display_format = f
-            break
-    else:
-        if msg.definitions and msg.definitions.encoded_display_format:
-            # ... look at definitions provided in the initial request...
-            f = DisplayFormat.from_encoded(msg.definitions.encoded_display_format)
-            if f.func_sig == func_sig and f.matches_context(
-                msg.chain_id, address_bytes
-            ):
-                display_format = f
-        if display_format is None:
-            # ... finally request the display format via another call!
-            if msg.supports_definition_request:
-                _, f = await request_definitions(msg.chain_id, address_bytes, func_sig)
-                if f:
-                    if f.func_sig == func_sig and f.matches_context(
-                        msg.chain_id, address_bytes
-                    ):
-                        display_format = f
-
+    display_format = await _find_display_format(func_sig, address_bytes, msg)
     if display_format is None:
         return False
 
@@ -1077,7 +1393,7 @@ async def _handle_approve(
     fee_items: Iterable[StrPropertyType],
 ) -> None:
     from .layout import require_confirm_approve
-    from .sc_constants import KNOWN_ADDRESSES
+    from .sc_constants import lookup_known_address
     from .yielding_vaults import UNKNOWN_VAULT, lookup_vault
 
     # approve() is not payable; surface any native ETH sent along with it.
@@ -1108,7 +1424,14 @@ async def _handle_approve(
 
     assert isinstance(arg1_raw_value, int)
 
-    recipient_str = KNOWN_ADDRESSES.get((msg.chain_id, arg0_raw_value))
+    recipient_str = (
+        lookup_known_address(msg.chain_id, arg0_raw_value)
+        if display_format.provider_name is None
+        else display_format.provider_name
+    )
+
+    # Ideally our vault name and definition should also be added in the ERC-7730 registry
+    # Until that is verified, we'll keep our vault information hardcoded.
     if recipient_str is None:
         vault = lookup_vault(defs.network, arg0_raw_value)
         if vault is not UNKNOWN_VAULT:
@@ -1218,32 +1541,25 @@ async def _handle_generic_ui(
     from . import tokens
     from .helpers import bytes_from_address
     from .layout import require_confirm_clear_signing
-    from .sc_constants import KNOWN_ADDRESSES
+    from .sc_constants import lookup_known_address
 
-    # Surface the native ETH value in the summary when non-zero - unless the
-    # display format already renders it as an `AmountFormatter` field (e.g. a
-    # swap's "Amount to Send"). That field shows the same canonical string the
-    # summary would, so repeating it there is pure duplication. A `@.value`
-    # field formatted any other way still gets its own summary line.
+    # Surface the native ETH value in the summary when non-zero - unless one of
+    # the display format's own fields already renders it (e.g. a swap's "Amount
+    # to Send"), in which case repeating it in the summary is pure duplication.
+
     value = int.from_bytes(msg.value, "big")
-    value_shown_as_amount_field = any(
-        fd.path == ContainerPath.Value
-        and isinstance(fd.get_formatter(), AmountFormatter)
-        for fd in display_format.field_definitions
-    )
-    amount = (
-        format_ethereum_amount(value, None, defs.network)
-        if value and not value_shown_as_amount_field
-        else None
-    )
+    amount = format_ethereum_amount(value, None, defs.network) if value else None
 
     _, fields = await display_format.parse_calldata(calldata, msg, defs)
 
     properties_to_confirm = []
+    value_shown_as_field = False
 
     for (label, formatted, is_mono), actual_token, actual_token_address in fields:
         if isinstance(formatted, AboveThreshold):
             formatted = formatted.message
+        if amount is not None and formatted == amount:
+            value_shown_as_field = True
         properties_to_confirm.append((label, formatted, is_mono))
         if actual_token is tokens.UNKNOWN_TOKEN:
             assert actual_token_address is not None
@@ -1255,10 +1571,16 @@ async def _handle_generic_ui(
             )
             properties_to_confirm.append(token_address_property)
 
-    recipient_str = KNOWN_ADDRESSES.get(
-        (msg.chain_id, bytes_from_address(msg.to)), msg.to
+    recipient_str = (
+        (lookup_known_address(msg.chain_id, bytes_from_address(msg.to)) or msg.to)
+        if display_format.provider_name is None
+        else display_format.provider_name
     )
 
     await require_confirm_clear_signing(
-        recipient_str, display_format.intent, properties_to_confirm, maximum_fee, amount
+        recipient_str,
+        display_format.intent,
+        properties_to_confirm,
+        maximum_fee,
+        None if value_shown_as_field else amount,
     )

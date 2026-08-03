@@ -1640,44 +1640,43 @@ class InputFlowEIP712ShowMore(InputFlowBase):
 
     def input_flow_common(self) -> BRGeneratorType:
         """Triggers show more wherever possible"""
-        yield  # confirm address
+        assert (yield).name == "confirm_address"  # confirm address
         self.debug.press_yes()
 
-        yield  # confirm domain
-        self.debug.read_layout()
+        # confirm EIP712 domain properties
+        yield from swipe_if_necessary(
+            self.debug, br_name="confirm_typed_value", br_code=B.Other
+        )
+        self.debug.press_yes()
+
+        assert (yield).name == "should_show_struct"  # confirm message
         self._confirm_show_more()
 
-        # confirm domain properties
-        for _ in range(4):
-            yield from swipe_if_necessary(self.debug)  # EIP712 DOMAIN
-            self.debug.press_yes()
-
-        yield  # confirm message
-        self.debug.read_layout()
-        self._confirm_show_more()
-
-        yield  # confirm message.from
-        self.debug.read_layout()
+        assert (yield).name == "should_show_struct"  # confirm message.from
         self._confirm_show_more()
 
         # confirm message.from properties
         for _ in range(2):
-            yield from swipe_if_necessary(self.debug)
+            yield from swipe_if_necessary(
+                self.debug, br_name="confirm_typed_value", br_code=B.Other
+            )
             self.debug.press_yes()
 
-        yield  # confirm message.to
+        assert (yield).name == "should_show_struct"  # confirm message.to
         self.debug.read_layout()
         self._confirm_show_more()
 
         # confirm message.to properties
         for _ in range(2):
-            yield from swipe_if_necessary(self.debug)
+            yield from swipe_if_necessary(
+                self.debug, br_name="confirm_typed_value", br_code=B.Other
+            )
             self.debug.press_yes()
 
-        yield  # confirm message.contents
+        assert (yield).name == "confirm_typed_value"  # confirm message.contents
         self.debug.press_yes()
 
-        yield  # confirm final hash
+        assert (yield).name == "confirm_typed_data_final"  # confirm final hash
         self.debug.press_yes()
 
 
@@ -1722,6 +1721,9 @@ class InputFlowEthereumSignTxData(InputFlowBase):
 
         # First blob confirmation layout has different semantic on those models:
         is_intro = self.client.layout_type in (LayoutType.Delizia, LayoutType.Eckhart)
+        if is_intro:
+            # make sure the translated string is not empty (i.e. blanked)
+            assert TR.instructions__view_all_data
 
         while True:
             br = yield
@@ -1735,10 +1737,18 @@ class InputFlowEthereumSignTxData(InputFlowBase):
                 assert layout.title().startswith(TR.ethereum__title_input_data)
 
                 # Only intro layout contains "view all" functionality:
-                assert is_intro == (
-                    TR.instructions__view_all_data in layout.text_content()
-                    or TR.buttons__view_all_data in layout.button_contents()
-                )
+                if self.client.layout_type is LayoutType.Delizia:
+                    # shown as the first paragraph
+                    assert is_intro == (
+                        TR.instructions__view_all_data in layout.text_content()
+                    )
+                elif self.client.layout_type is LayoutType.Eckhart:
+                    # shown as a separate label
+                    assert is_intro == bool(
+                        layout.find_unique_object_with_key_and_value(
+                            key="text", value=TR.instructions__view_all_data
+                        )
+                    )
 
                 if self.scroll:
                     self._go_to_next_page(is_intro)
@@ -1750,6 +1760,13 @@ class InputFlowEthereumSignTxData(InputFlowBase):
                     else:
                         self._confirm_all(is_intro)
                 is_intro = False
+                continue
+
+            if br.name == "confirm_digest":
+                content = self.debug.read_layout().text_content()
+                # TODO: read and verify hash (needs keccak256)
+                assert TR.ethereum__calldata_digest in content
+                self.debug.press_yes()
                 continue
 
             # data confirmation is over - confirm tx details

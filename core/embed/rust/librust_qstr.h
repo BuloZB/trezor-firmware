@@ -297,6 +297,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_code;
   MP_QSTR_coinjoin__access_account;
   MP_QSTR_coinjoin__do_not_disconnect;
+  MP_QSTR_coinjoin__max_coordinator_fee_pct;
   MP_QSTR_coinjoin__max_mining_fee;
   MP_QSTR_coinjoin__max_rounds;
   MP_QSTR_coinjoin__title;
@@ -433,7 +434,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_instructions__hold_to_continue;
   MP_QSTR_instructions__hold_to_exit_tutorial;
   MP_QSTR_instructions__hold_to_sign;
-  MP_QSTR_instructions__learn_more;
   MP_QSTR_instructions__menu_to_continue;
   MP_QSTR_instructions__shares_continue_with_x_template;
   MP_QSTR_instructions__shares_start_with_1;
@@ -478,6 +478,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_lockscreen__title_locked;
   MP_QSTR_lockscreen__title_not_connected;
   MP_QSTR_lockscreen__unlock;
+  MP_QSTR_max_coordinator_fee_pct;
   MP_QSTR_max_count;
   MP_QSTR_max_feerate;
   MP_QSTR_max_len;
@@ -572,6 +573,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_pin__please_check_again;
   MP_QSTR_pin__reenter;
   MP_QSTR_pin__reenter_new;
+  MP_QSTR_pin__reenter_new_description;
   MP_QSTR_pin__reenter_to_confirm;
   MP_QSTR_pin__remove;
   MP_QSTR_pin__setup_completed;
@@ -970,6 +972,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_verb;
   MP_QSTR_verb_cancel;
   MP_QSTR_verb_info;
+  MP_QSTR_verb_view_all;
   MP_QSTR_verify;
   MP_QSTR_version;
   MP_QSTR_wait_ble_host_confirmation;
@@ -1010,10 +1013,12 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__address;
   MP_QSTR_words__amount;
   MP_QSTR_words__are_you_sure;
+  MP_QSTR_words__arguments;
   MP_QSTR_words__array_of;
   MP_QSTR_words__asset;
   MP_QSTR_words__assets;
   MP_QSTR_words__authenticate;
+  MP_QSTR_words__authorization;
   MP_QSTR_words__blockhash;
   MP_QSTR_words__bluetooth;
   MP_QSTR_words__buying;
@@ -1042,6 +1047,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_words__fee_limit;
   MP_QSTR_words__forget;
   MP_QSTR_words__from;
+  MP_QSTR_words__function;
   MP_QSTR_words__important;
   MP_QSTR_words__instructions;
   MP_QSTR_words__intent;
@@ -1279,6 +1285,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ethereum__auth_done;
   MP_QSTR_ethereum__auth_title;
   MP_QSTR_ethereum__auth_warn;
+  MP_QSTR_ethereum__calldata_digest;
   MP_QSTR_ethereum__calldata_suffix;
   MP_QSTR_ethereum__confirm_contract;
   MP_QSTR_ethereum__contract_address;
@@ -1289,6 +1296,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ethereum__delegating;
   MP_QSTR_ethereum__deposit_amount;
   MP_QSTR_ethereum__deposit_to;
+  MP_QSTR_ethereum__eip_712_empty_domain;
   MP_QSTR_ethereum__gas_limit;
   MP_QSTR_ethereum__gas_price;
   MP_QSTR_ethereum__interaction_contract;
@@ -1311,6 +1319,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ethereum__show_full_message;
   MP_QSTR_ethereum__show_full_struct;
   MP_QSTR_ethereum__sign_eip712;
+  MP_QSTR_ethereum__skip_to_hash;
   MP_QSTR_ethereum__smart_info;
   MP_QSTR_ethereum__staking_claim;
   MP_QSTR_ethereum__staking_claim_address;
@@ -1320,6 +1329,8 @@ static void _librust_qstrs(void) {
   MP_QSTR_ethereum__staking_stake_intro;
   MP_QSTR_ethereum__staking_unstake;
   MP_QSTR_ethereum__staking_unstake_intro;
+  MP_QSTR_ethereum__subcall;
+  MP_QSTR_ethereum__subcall_to;
   MP_QSTR_ethereum__subtitle_input_data_bytes;
   MP_QSTR_ethereum__title_confirm_domain;
   MP_QSTR_ethereum__title_confirm_message;
@@ -1342,6 +1353,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_ethereum__vault_redeem_intro;
   MP_QSTR_ethereum__vault_redeem_to;
   MP_QSTR_ethereum__vault_withdraw_intro;
+  MP_QSTR_ethereum__view_data_and_hash;
   MP_QSTR_ethereum__withdraw;
   MP_QSTR_ethereum__withdraw_amount;
   MP_QSTR_ethereum__withdraw_from;
@@ -1448,7 +1460,6 @@ static void _librust_qstrs(void) {
   MP_QSTR_ripple__destination_tag_missing;
   MP_QSTR_ripple__destination_tag_template;
   MP_QSTR_solana__account_index;
-  MP_QSTR_solana__app_domain;
   MP_QSTR_solana__associated_token_account;
   MP_QSTR_solana__base_fee;
   MP_QSTR_solana__claim;
@@ -1502,11 +1513,14 @@ static void _librust_qstrs(void) {
   MP_QSTR_stellar__delete_trust;
   MP_QSTR_stellar__destination;
   MP_QSTR_stellar__exchanges_require_memo;
+  MP_QSTR_stellar__ext_auth;
+  MP_QSTR_stellar__ext_auth_message;
   MP_QSTR_stellar__final_confirm;
   MP_QSTR_stellar__hash;
   MP_QSTR_stellar__high;
   MP_QSTR_stellar__home_domain;
   MP_QSTR_stellar__inflation;
+  MP_QSTR_stellar__invoke_contract;
   MP_QSTR_stellar__issuer_template;
   MP_QSTR_stellar__key;
   MP_QSTR_stellar__limit;
@@ -1517,6 +1531,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_stellar__new_passive_offer;
   MP_QSTR_stellar__no_memo_set;
   MP_QSTR_stellar__no_restriction;
+  MP_QSTR_stellar__on_behalf_of;
   MP_QSTR_stellar__path_pay;
   MP_QSTR_stellar__path_pay_at_least;
   MP_QSTR_stellar__pay;
@@ -1529,6 +1544,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_stellar__set_data;
   MP_QSTR_stellar__set_flags;
   MP_QSTR_stellar__set_sequence_to_template;
+  MP_QSTR_stellar__sign_authorization;
   MP_QSTR_stellar__sign_tx_count_template;
   MP_QSTR_stellar__sign_tx_fee_template;
   MP_QSTR_stellar__sign_with;
@@ -1541,6 +1557,7 @@ static void _librust_qstrs(void) {
   MP_QSTR_stellar__update;
   MP_QSTR_stellar__valid_from;
   MP_QSTR_stellar__valid_to;
+  MP_QSTR_stellar__valid_until_ledger;
   MP_QSTR_stellar__value_sha256;
   MP_QSTR_stellar__wanna_clean_value_key_template;
   MP_QSTR_tezos__baker_address;

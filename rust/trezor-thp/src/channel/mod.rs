@@ -353,10 +353,11 @@ impl<R: Role, B: Backend> Channel<R, B> {
             // Verify checksum.
             let _ = Reassembler::<R>::single(packet_buffer)?;
             let sb = SyncBits::try_from(packet_buffer)?;
-            self.sync.send_mark_delivered(sb);
-            if self.sync.can_send() {
+            if self.sync.send_mark_delivered(sb) {
                 self.send_state = SendState::Idle;
                 return Ok(());
+            } else {
+                log::warn!("[{:04x}] Unexpected ACK bit.", self.channel_id);
             }
         }
         log::warn!("[{:04x}] Unexpected ACK.", self.channel_id);
@@ -409,15 +410,12 @@ impl<R: Role, B: Backend> Channel<R, B> {
             && matches!(self.send_state, SendState::Sending { .. })
         {
             // ACK we sent was lost. Will be retransmitted along current outgoing message.
-            log::debug!("[{:04x}] Bad sync bit, ignoring packet.", self.channel_id);
+            log::debug!("[{:04x}] Bad seq bit, ignoring packet.", self.channel_id);
         } else if !matches!(self.receive_state, ReceiveState::Receiving { .. }) {
             // Might happen when we've sent an ACK and it got lost or delayed.
             // We end up sending reply while the other side is retransmitting.
             // NOTE: no checksum verification because we drop the continuations
-            log::debug!(
-                "[{:04x}] Bad sync bit, resending last ACK.",
-                self.channel_id
-            );
+            log::debug!("[{:04x}] Bad seq bit, resending last ACK.", self.channel_id);
             self.send_ack = Some(SyncBits::new().with_ack_bit(sb.seq_bit()));
         }
         Err(Error::malformed_data())
@@ -450,8 +448,7 @@ impl<R: Role, B: Backend> Channel<R, B> {
                 && self.sync.is_ack_piggybacking_allowed()
                 && !self.sync.can_send()
             {
-                self.sync.send_mark_delivered(reassembler.sync_bits());
-                if self.sync.can_send() {
+                if self.sync.send_mark_delivered(reassembler.sync_bits()) {
                     ack_received = true;
                     self.send_state = SendState::Idle;
                 } else {
@@ -892,13 +889,20 @@ impl<R: Role, B: Backend> ChannelIO for Channel<R, B> {
             log::warn!("[{:04x}] Nothing to retransmit.", self.channel_id);
             return Ok(());
         };
+        *retry = retry.saturating_add(1);
+        if !fragmenter.is_done() {
+            log::warn!(
+                "[{:04x}] Not retransmitting before all fragments are sent.",
+                self.channel_id
+            );
+            return Ok(());
+        }
         log::debug!(
             "[{:04x}] Retransmitting message, retry {}.",
             self.channel_id,
             retry
         );
         fragmenter.reset();
-        *retry = retry.saturating_add(1);
         Ok(())
     }
 

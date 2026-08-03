@@ -11,7 +11,7 @@ from trezor.ui.layouts import (
 )
 from trezor.wire import DataError, ProcessError
 
-from ..layout import format_amount
+from ..layout import confirm_invocation, confirm_invoke_contract_args, format_amount
 
 if TYPE_CHECKING:
     from buffer_types import StrOrBytes
@@ -25,6 +25,8 @@ if TYPE_CHECKING:
         StellarClaimClaimableBalanceOp,
         StellarCreateAccountOp,
         StellarCreatePassiveSellOfferOp,
+        StellarHostFunction,
+        StellarInvokeHostFunctionOp,
         StellarManageBuyOfferOp,
         StellarManageDataOp,
         StellarManageSellOfferOp,
@@ -32,6 +34,7 @@ if TYPE_CHECKING:
         StellarPathPaymentStrictSendOp,
         StellarPaymentOp,
         StellarSetOptionsOp,
+        StellarSorobanAuthorizationEntry,
     )
     from trezor.ui.layouts import PropertyType
 
@@ -416,3 +419,114 @@ async def confirm_asset_issuer(asset: StellarAsset) -> None:
         br_name="confirm_asset_issuer",
         verb=TR.buttons__continue,
     )
+
+
+def _is_root_auth_entry(
+    auth_entry: StellarSorobanAuthorizationEntry, invoked_fn: StellarHostFunction
+) -> bool:
+    from trezor.enums import (
+        StellarHostFunctionType,
+        StellarSorobanAuthorizedFunctionType,
+    )
+
+    from ..writers import write_invoke_contract_args
+
+    auth_fn = auth_entry.root_invocation.function
+
+    if (
+        auth_fn.type
+        == StellarSorobanAuthorizedFunctionType.SOROBAN_AUTHORIZED_FUNCTION_TYPE_CONTRACT_FN
+        and invoked_fn.type
+        == StellarHostFunctionType.HOST_FUNCTION_TYPE_INVOKE_CONTRACT
+    ):
+        if auth_fn.contract_fn is None or invoked_fn.invoke_contract is None:
+            return False
+
+        b1 = bytearray()
+        write_invoke_contract_args(b1, auth_fn.contract_fn)
+        b2 = bytearray()
+        write_invoke_contract_args(b2, invoked_fn.invoke_contract)
+
+        return b1 == b2
+
+    return False
+
+
+async def confirm_invoke_host_function_op(op: StellarInvokeHostFunctionOp) -> None:
+    from trezor.enums import StellarHostFunctionType, StellarSorobanCredentialsType
+    from trezor.ui.layouts import should_show_more
+
+    function = op.function
+
+    if function.type == StellarHostFunctionType.HOST_FUNCTION_TYPE_INVOKE_CONTRACT:
+        if function.invoke_contract is None:
+            raise DataError("Stellar: missing invoke_contract")
+
+        await confirm_invoke_contract_args(
+            function.invoke_contract,
+            br_name_prefix="op_invoke",
+        )
+    else:
+        raise ProcessError("Stellar: unsupported host function type")
+
+    # Auth entries fall into two kinds by credential type:
+    #
+    # - SOURCE_ACCOUNT credentials are authorized by the signature the device
+    #   produces over the transaction envelope. Approving that signature approves
+    #   these entries, so we must always show them for confirmation.
+    #
+    # - ADDRESS* credentials are authorized by a separate signature over the
+    #   ENVELOPE_TYPE_SOROBAN_AUTHORIZATION* preimage, which must already
+    #   be present in the entry at the time of signing the transaction.
+    #   Entries of this type are therefore hidden behind an opt-in and only
+    #   shown for information; the user does not need to review them to sign safely.
+
+    shown = 0
+    non_src_entries = []
+
+    for auth_entry in op.auth:
+        if (
+            auth_entry.credentials.type
+            == StellarSorobanCredentialsType.SOROBAN_CREDENTIALS_SOURCE_ACCOUNT
+        ):
+            shown += 1
+            await _confirm_auth_entry(
+                auth_entry, shown, _is_root_auth_entry(auth_entry, function)
+            )
+        else:
+            non_src_entries.append(auth_entry)
+
+    show_non_src = non_src_entries and await should_show_more(
+        TR.stellar__ext_auth,
+        ((TR.stellar__ext_auth_message, False),),
+        button_text=TR.buttons__show_all,
+    )
+    if show_non_src:
+        for auth_entry in non_src_entries:
+            shown += 1
+            await _confirm_auth_entry(
+                auth_entry, shown, _is_root_auth_entry(auth_entry, function)
+            )
+
+
+async def _confirm_auth_entry(
+    auth: StellarSorobanAuthorizationEntry, position: int, is_root: bool = False
+) -> None:
+    from trezor.enums import StellarSorobanCredentialsType
+
+    creds = auth.credentials
+
+    if creds.type == StellarSorobanCredentialsType.SOROBAN_CREDENTIALS_ADDRESS_V2:
+        if creds.address_v2 is None:
+            raise DataError("Stellar: missing address_v2 credentials")
+
+        await confirm_address(
+            f"{TR.words__authorization} #{position}",
+            creds.address_v2.address,
+            description=TR.words__address,
+            br_name="op_auth_entry_address",
+        )
+
+    # Show the whole authorized invocation tree starting from its root (not just the
+    # nested sub-invocations), so the user sees exactly what this signature authorizes.
+    await confirm_invocation(auth.root_invocation, f"#{position}", is_root=is_root)

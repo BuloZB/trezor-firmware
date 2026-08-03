@@ -216,6 +216,7 @@ def confirm_value_intro(
     verb_cancel: str | None = None,
     hold: bool = False,
     chunkify: bool = False,
+    verb_view_all: str | None = None,
 ) -> LayoutContext[UiResult]:
     """Similar to `confirm_value`, but only the first page is shown.
     This function is intended as a building block for a higher level `confirm_blob`
@@ -228,6 +229,7 @@ def confirm_coinjoin(
     *,
     max_rounds: str,
     max_feerate: str,
+    max_coordinator_fee_pct: str,
 ) -> LayoutContext[UiResult]:
     """Confirm coinjoin authorization."""
 
@@ -811,7 +813,7 @@ def show_simple(
     text: str,
     title: str | None = None,
     button: str | None = None,
-) -> LayoutObj[UiResult]:
+) -> LayoutContext[UiResult]:
     """Simple dialog with text. TT: optional button."""
 
 

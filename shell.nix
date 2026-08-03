@@ -1,6 +1,7 @@
 { fullDeps ? false
 , hardwareTest ? false
 , devTools ? false
+, pythonTest ? false
  }:
 
 let
@@ -12,10 +13,10 @@ let
   });
   # define this variable and devTools if you want nrf{util,connect}
   acceptJlink = builtins.getEnv "TREZOR_FIRMWARE_ACCEPT_JLINK_LICENSE" == "yes";
-  # the last successful build of nixpkgs-unstable as of 2026-03-16
+  # the last successful build of nixpkgs-unstable as of 2026-07-17
   nixpkgs = import (builtins.fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/a07d4ce6bee67d7c838a8a5796e75dff9caa21ef.tar.gz";
-    sha256 = "0f6zni3jn6ji5icwbidbpmcgxdal2qnjszp7ragdcy0857hvq3c5";
+    url = "https://github.com/NixOS/nixpkgs/archive/59682e0069f0ed0a452e2179a7f4c1f247027b9e.tar.gz";
+    sha256 = "136vd5g72cq5xgwnxzcwwjdl16wgi4as7dyfjj6dp59fh0fvxj67";
   }) {
     config = {
       allowUnfree = acceptJlink;
@@ -159,6 +160,18 @@ stdenvNoCC.mkDerivation ({
   # Enabling rust-analyzer extension in VSCode
   RUST_SRC_PATH = "${rustProfiles.rust-src}/lib/rustlib/src/rust/library";
 
-} // (lib.optionalAttrs fullDeps) {
+  # Avoid printing "Using udevCheckHook", there are no rules to check
+  dontUdevCheck = 1;
+} // (if pythonTest then {
+  # Allow uv to use any python version for python tests
+  UV_PYTHON_PREFERENCE = "managed";
+  UV_PYTHON_DOWNLOADS = "automatic";
+} else {
+  # Force uv to use the nix-provided Python instead of its own managed builds.
+  # Without this, uv defaults to python-preference=managed + python-downloads=automatic,
+  # silently downloading/reusing its own interpreter and ignoring python3 on PATH.
+  UV_PYTHON_PREFERENCE = "only-system";
+  UV_PYTHON_DOWNLOADS = "never";
+}) // (lib.optionalAttrs fullDeps) {
   TREZOR_MONERO_TESTS_PATH = moneroTestsPatched;
 })

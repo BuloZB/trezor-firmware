@@ -78,7 +78,7 @@ jobs:
           submodules: recursive
       - uses: ./.github/actions/environment
       # LD_LIBRARY_PATH workaround: https://discourse.nixos.org/t/nixpkgs-nixos-unstable-many-package-fail-with-glibc-2-38-not-found/35078 https://github.com/NixOS/nixpkgs/issues/287764
-      - run: nix-shell --run "unset LD_LIBRARY_PATH && cd python && uv run tox"
+      - run: nix-shell --arg pythonTest true --run "unset LD_LIBRARY_PATH && cd python && uv run tox"
 
   rust_test:
     name: Rust crates test
@@ -123,9 +123,14 @@ jobs:
 
       - run: mkdir _artifacts/
 
+      - name: Initialize build environment
+        run: ./build-docker.sh --init-only ${REF}
+
       - name: Build prodtest & bootloader
+        # The T1B1 bootloader is built by the monolithic legacy build in the firmware step.
+        if: ${{ matrix.model != 'T1B1' }}
         run: |
-          ./build-docker.sh --models ${{ matrix.model }} --targets 'prodtest,bootloader' --skip-bitcoinonly ${REF}
+          ./build-docker.sh --no-init --models ${{ matrix.model }} --targets 'prodtest,bootloader' --skip-bitcoinonly ${REF}
           cd build/ && cp -v --recursive --parents * ../_artifacts/
 
       - name: Build secmon
@@ -143,10 +148,19 @@ jobs:
       - name: Show fingerprints
         run: |
           tree _artifacts
-          for file in _artifacts/*/*/*.fingerprint
-          do
-            echo "\`$(tr -d '\n' < $file)\` ${file%.fingerprint}" >> $GITHUB_STEP_SUMMARY
-          done
+          COMMIT_HASH=$(git rev-parse HEAD)
+          fingerprints_file="_artifacts/${COMMIT_HASH}.fingerprints"
+          master_file="_artifacts/${COMMIT_HASH}.master"
+          if [ -f "$fingerprints_file" ]; then
+            {
+              echo '```'
+              cat "$fingerprints_file"
+              if [ -f "$master_file" ]; then
+                cat "$master_file"
+              fi
+              echo '```'
+            } >> $GITHUB_STEP_SUMMARY
+          fi
           cat $GITHUB_STEP_SUMMARY
         if: always()
 

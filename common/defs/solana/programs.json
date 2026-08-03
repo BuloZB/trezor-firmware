@@ -37,6 +37,10 @@
               "display_name": "Create account"
             },
             {
+              "parameter": "owner",
+              "display_name": "Owner"
+            },
+            {
               "parameter": "lamports",
               "display_name": "Deposit"
             },
@@ -148,6 +152,10 @@
             {
               "account": "created_account",
               "display_name": "Create account"
+            },
+            {
+              "parameter": "owner",
+              "display_name": "Owner"
             },
             {
               "parameter": "lamports",
@@ -350,6 +358,10 @@
             {
               "parameter": "space",
               "display_name": "Data size"
+            },
+            {
+              "parameter": "owner",
+              "display_name": "Owner"
             }
           ]
         },
@@ -1143,8 +1155,12 @@
               "display_name": "Initialize multisig"
             },
             {
+              "parameter": "number_of_signers",
+              "display_name": "Threshold"
+            },
+            {
               "account": "signer_accounts",
-              "display_name": "Required signers"
+              "display_name": "Signers"
             }
           ]
         },
@@ -1212,6 +1228,10 @@
             {
               "parameter": "amount",
               "display_name": "Allowance"
+            },
+            {
+              "account": "source_account",
+              "display_name": "From"
             },
             {
               "account": "owner",
@@ -1787,8 +1807,12 @@
               "display_name": "Init multisig"
             },
             {
+              "parameter": "number_of_signers",
+              "display_name": "Threshold"
+            },
+            {
               "account": "signer_accounts",
-              "display_name": "Required signers"
+              "display_name": "Signers"
             }
           ]
         },
@@ -1856,6 +1880,10 @@
             {
               "parameter": "amount",
               "display_name": "Allowance"
+            },
+            {
+              "account": "source_account",
+              "display_name": "From"
             },
             {
               "account": "owner",

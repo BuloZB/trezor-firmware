@@ -8,62 +8,59 @@ links = "prodtest"
 xbuild.workspace = true
 
 [dependencies]
-trezor_lib.workspace = true
+crypto.workspace = true
 io.workspace = true
+models.workspace = true
+rtl.workspace = true
 sec.workspace = true
 sys.workspace = true
-rtl.workspace = true
-models.workspace = true
+trezor_lib.workspace = true
 
 [features]
 
 # --------------------------------------------------------------------------
-#  Selectable features
+# Build options
 # --------------------------------------------------------------------------
 
 bootloader_devel = ["sec/bootloader_devel"]
 clippy = ["trezor_lib/clippy"]
-emulator = ["io/emulator"]
-dbg_console_swo = ["dbg_console"]
-dbg_console_system_view = ["dbg_console", "sys/system_view"]
+dbg_console_swo = ["dbg_console", "sys/dbg_console_swo"]
+dbg_console_system_view = ["dbg_console", "sys/dbg_console_system_view"]
 debug = ["trezor_lib/debug"]
 debuglink = ["trezor_lib/debuglink", "io/usb_iface_debug"]
+emulator = ["io/emulator"]
 production = ["io/production"]
 ui_debug = ["trezor_lib/ui_debug"]
 ui_debug_overlay = ["trezor_lib/ui_debug_overlay"]
 ui_performance_overlay = ["trezor_lib/ui_performance_overlay"]
 
 # --------------------------------------------------------------------------
-# Automatically derived features (do not enable from outside)
+# MCU selection - only enable one of these at a time
 # --------------------------------------------------------------------------
-
-default = [
-    "io/display",
-    # "io/fancy_fatal_error", # switched off in prodtest
-    "io/kernel_mode",
-    "io/secure_mode",
-    "io/usb_iface_vcp",
-    "models/prodtest",
-    "rtl/sprintf",
-    "rtl/mldsa",
-    "rtl/aes_gcm",
-    "rtl/noise",
-
-    "trezor_lib/with_new_crates", # only for transitional period
-
-    "trezor_lib/crypto",
-    "trezor_lib/ui",
-    "trezor_lib/prodtest",
-    "trezor_lib/usb",
-]
 
 mcu_stm32f427 = ["io/mcu_stm32f427", "mcu_stm32f4"]
 mcu_stm32f429 = ["io/mcu_stm32f429", "mcu_stm32f4"]
-mcu_stm32f4 = []
 mcu_stm32u58 = ["io/mcu_stm32u58", "mcu_stm32u5"]
 mcu_stm32u5g = ["io/mcu_stm32u5g", "mcu_stm32u5"]
 mcu_stm32u5a = ["io/mcu_stm32u5a", "mcu_stm32u5"]
-mcu_stm32u5 = ["sec/trustzone"]
+
+# --------------------------------------------------------------------------
+# Layout selection - only enable one of these at a time
+# --------------------------------------------------------------------------
+
+layout_bolt = ["trezor_lib/layout_bolt"]
+layout_caesar = ["trezor_lib/layout_caesar"]
+# "trezor_lib/layout_delizia" is not implemented for prodtest; reuse bolt
+layout_delizia = ["trezor_lib/layout_bolt", "trezor_lib/ui_font_kerning"]
+layout_eckhart = ["trezor_lib/layout_eckhart", "trezor_lib/ui_font_kerning"]
+
+display_mono = ["trezor_lib/display_mono"]
+display_rgb565 = ["trezor_lib/display_rgb565"]
+display_rgba8888 = ["trezor_lib/display_rgba8888", "trezor_lib/ui_color_32bit"]
+
+# --------------------------------------------------------------------------
+# Selectable components
+# --------------------------------------------------------------------------
 
 backlight = ["io/backlight", "trezor_lib/backlight"]
 backup_ram = ["sec/backup_ram"]
@@ -72,8 +69,8 @@ boot_ucb = ["sec/boot_ucb", "trezor_lib/boot_ucb"]
 button = ["io/button", "trezor_lib/button"]
 consumption_mask = ["sec/consumption_mask"]
 dbg_console = ["sys/dbg_console", "trezor_lib/dbg_console"]
-dma2d = ["io/dma2d", "trezor_lib/dma2d"]
 display = ["io/display"]
+dma2d = ["io/dma2d", "trezor_lib/dma2d"]
 framebuffer = ["io/framebuffer", "trezor_lib/framebuffer"]
 haptic = ["io/haptic", "trezor_lib/haptic"]
 hash_processor = ["sec/hash_processor"]
@@ -97,8 +94,8 @@ power_manager = [
 pvd = ["sys/pvd"]
 rgb_led = ["io/rgb_led", "trezor_lib/rgb_led"]
 rtc = ["sys/rtc"]
-sd_card = ["io/sd_card", "trezor_lib/sd_card"]
 sbu = ["io/sbu", "trezor_lib/sbu"]
+sd_card = ["io/sd_card", "trezor_lib/sd_card"]
 sdram = ["sys/sdram"]
 secmon_header = []
 secret = ["sec/secret"]
@@ -111,13 +108,29 @@ touch = ["io/touch", "trezor_lib/touch"]
 touch_wakeup = ["io/touch_wakeup", "trezor_lib/touch_wakeup"]
 tropic = ["sec/tropic", "trezor_lib/tropic"]
 
+# --------------------------------------------------------------------------
+# Automatically derived features (do not enable from outside)
+# --------------------------------------------------------------------------
 
-display_mono = ["trezor_lib/display_mono"]
-display_rgb565 = ["trezor_lib/display_rgb565"]
-display_rgba8888 = ["trezor_lib/display_rgba8888", "trezor_lib/ui_color_32bit"]
+default = [
+    "io/display",
+    # "io/fancy_fatal_error", # switched off in prodtest
+    "io/kernel_mode",
+    "io/secure_mode",
+    "io/usb_iface_vcp",
+    "models/prodtest",
+    "rtl/sprintf",
+    "crypto/aes_gcm",
+    "crypto/mldsa",
+    "crypto/noise",
 
-layout_bolt = ["trezor_lib/layout_bolt"]
-layout_caesar = ["trezor_lib/layout_caesar"]
-# "trezor_lib/layout_delizia" is not implemented for prodtest; reuse bolt
-layout_delizia = ["trezor_lib/layout_bolt", "trezor_lib/ui_font_kerning"]
-layout_eckhart = ["trezor_lib/layout_eckhart", "trezor_lib/ui_font_kerning"]
+    "trezor_lib/with_new_crates", # only for transitional period
+
+    "trezor_lib/crypto",
+    "trezor_lib/ui",
+    "trezor_lib/prodtest",
+    "trezor_lib/usb",
+]
+
+mcu_stm32f4 = []
+mcu_stm32u5 = ["sec/trustzone"]

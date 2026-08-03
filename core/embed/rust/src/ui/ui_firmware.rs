@@ -74,12 +74,14 @@ pub trait FirmwareUI {
         external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
+    #[allow(clippy::too_many_arguments)]
     fn confirm_value_intro(
         title: TString<'static>,
         value: Obj, // TODO: replace Obj
         subtitle: Option<TString<'static>>,
         verb: Option<TString<'static>>,
         verb_cancel: Option<TString<'static>>,
+        verb_view_all: Option<TString<'static>>,
         hold: bool,
         chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error>; // TODO: return LayoutMaybeTrace
@@ -92,6 +94,7 @@ pub trait FirmwareUI {
     fn confirm_coinjoin(
         max_rounds: TString<'static>,
         max_feerate: TString<'static>,
+        max_coordinator_fee_pct: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error>;
 
     fn confirm_emphasized(

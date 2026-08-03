@@ -212,6 +212,10 @@ extern "C" fn new_confirm_value_intro(n_args: usize, args: *const Obj, kwargs: *
             .get(Qstr::MP_QSTR_verb_cancel)
             .unwrap_or_else(|_| Obj::const_none())
             .try_into_option()?;
+        let verb_view_all: Option<TString> = kwargs
+            .get(Qstr::MP_QSTR_verb_view_all)
+            .unwrap_or_else(|_| Obj::const_none())
+            .try_into_option()?;
         let hold: bool = kwargs.get_or(Qstr::MP_QSTR_hold, false)?;
         let chunkify: bool = kwargs.get_or(Qstr::MP_QSTR_chunkify, false)?;
 
@@ -221,6 +225,7 @@ extern "C" fn new_confirm_value_intro(n_args: usize, args: *const Obj, kwargs: *
             subtitle,
             verb,
             verb_cancel,
+            verb_view_all,
             hold,
             chunkify,
         )?;
@@ -233,8 +238,11 @@ extern "C" fn new_confirm_coinjoin(n_args: usize, args: *const Obj, kwargs: *mut
     let block = move |_args: &[Obj], kwargs: &Map| {
         let max_rounds: TString = kwargs.get(Qstr::MP_QSTR_max_rounds)?.try_into()?;
         let max_feerate: TString = kwargs.get(Qstr::MP_QSTR_max_feerate)?.try_into()?;
+        let max_coordinator_fee_pct: TString = kwargs
+            .get(Qstr::MP_QSTR_max_coordinator_fee_pct)?
+            .try_into()?;
 
-        let layout = ModelUI::confirm_coinjoin(max_rounds, max_feerate)?;
+        let layout = ModelUI::confirm_coinjoin(max_rounds, max_feerate, max_coordinator_fee_pct)?;
         Ok(LayoutObj::new_root(layout)?.into())
     };
     unsafe { util::try_with_args_and_kwargs(n_args, args, kwargs, block) }
@@ -1571,6 +1579,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     verb_cancel: str | None = None,
     ///     hold: bool = False,
     ///     chunkify: bool = False,
+    ///     verb_view_all: str | None = None,
     /// ) -> LayoutContext[UiResult]:
     ///     """Similar to `confirm_value`, but only the first page is shown.
     ///     This function is intended as a building block for a higher level `confirm_blob`
@@ -1582,6 +1591,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     *,
     ///     max_rounds: str,
     ///     max_feerate: str,
+    ///     max_coordinator_fee_pct: str,
     /// ) -> LayoutContext[UiResult]:
     ///     """Confirm coinjoin authorization."""
     Qstr::MP_QSTR_confirm_coinjoin => obj_fn_kw!(0, new_confirm_coinjoin).as_obj(),
@@ -2117,7 +2127,7 @@ pub static mp_module_trezorui_api: Module = obj_module! {
     ///     text: str,
     ///     title: str | None = None,
     ///     button: str | None = None,
-    /// ) -> LayoutObj[UiResult]:
+    /// ) -> LayoutContext[UiResult]:
     ///     """Simple dialog with text. TT: optional button."""
     Qstr::MP_QSTR_show_simple => obj_fn_kw!(0, new_show_simple).as_obj(),
 

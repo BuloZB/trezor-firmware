@@ -313,6 +313,11 @@ trezor_message_impl! {
     StellarPathPaymentStrictSendOp => MessageType_StellarPathPaymentStrictSendOp,
     StellarClaimClaimableBalanceOp => MessageType_StellarClaimClaimableBalanceOp,
     StellarSignedTx => MessageType_StellarSignedTx,
+    StellarInvokeHostFunctionOp => MessageType_StellarInvokeHostFunctionOp,
+    StellarTxExtRequest => MessageType_StellarTxExtRequest,
+    StellarTxExt => MessageType_StellarTxExt,
+    StellarSignSorobanAuthorization => MessageType_StellarSignSorobanAuthorization,
+    StellarSorobanAuthorizationSignature => MessageType_StellarSorobanAuthorizationSignature,
 }
 
 #[cfg(feature = "tezos")]

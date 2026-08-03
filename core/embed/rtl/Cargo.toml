@@ -5,37 +5,24 @@ edition = "2024"
 links = "rtl"
 
 [build-dependencies]
+bindgen.workspace = true
 color-eyre.workspace = true
 xbuild.workspace = true
 
 [dependencies]
+cty.workspace = true
 models.workspace = true
-
 
 [features]
 
 # --------------------------------------------------------------------------
-# Selectable features
+# Selectable components
 # --------------------------------------------------------------------------
 
-aes_gcm = []
-ed25519_no_precomp = []
-emulator = ["insecure_prng", "models/emulator"]
-eos = []
-insecure_prng = []
-mldsa = []
-nem = []
-noise = ["aes_gcm"]
+emulator = ["models/emulator"]
 production = ["models/production"]
-secp256k1_zkp = []
-sphincsplus = []
 sprintf = []
 universal_fw = []
+error_shims = []
 
-test = [
-    "models/model_t3w1",
-    "emulator",
-]
-
-
-
+test = ["models/model_t3w1", "emulator", "error_shims"]

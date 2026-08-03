@@ -935,6 +935,12 @@ def get_instruction(
                         None,
                     ),
                     UIProperty(
+                        "owner",
+                        None,
+                        "Owner",
+                        None,
+                    ),
+                    UIProperty(
                         "lamports",
                         None,
                         "Deposit",
@@ -1086,6 +1092,12 @@ def get_instruction(
                         None,
                         "created_account",
                         "Create account",
+                        None,
+                    ),
+                    UIProperty(
+                        "owner",
+                        None,
+                        "Owner",
                         None,
                     ),
                     UIProperty(
@@ -1363,6 +1375,12 @@ def get_instruction(
                         "space",
                         None,
                         "Data size",
+                        None,
+                    ),
+                    UIProperty(
+                        "owner",
+                        None,
+                        "Owner",
                         None,
                     ),
                 ),
@@ -2490,9 +2508,15 @@ def get_instruction(
                         None,
                     ),
                     UIProperty(
+                        "number_of_signers",
+                        None,
+                        "Threshold",
+                        None,
+                    ),
+                    UIProperty(
                         None,
                         "signer_accounts",
-                        "Required signers",
+                        "Signers",
                         None,
                     ),
                 ),
@@ -2581,6 +2605,12 @@ def get_instruction(
                         "amount",
                         None,
                         "Allowance",
+                        None,
+                    ),
+                    UIProperty(
+                        None,
+                        "source_account",
+                        "From",
                         None,
                     ),
                     UIProperty(
@@ -3345,9 +3375,15 @@ def get_instruction(
                         None,
                     ),
                     UIProperty(
+                        "number_of_signers",
+                        None,
+                        "Threshold",
+                        None,
+                    ),
+                    UIProperty(
                         None,
                         "signer_accounts",
-                        "Required signers",
+                        "Signers",
                         None,
                     ),
                 ),
@@ -3436,6 +3472,12 @@ def get_instruction(
                         "amount",
                         None,
                         "Allowance",
+                        None,
+                    ),
+                    UIProperty(
+                        None,
+                        "source_account",
+                        "From",
                         None,
                     ),
                     UIProperty(

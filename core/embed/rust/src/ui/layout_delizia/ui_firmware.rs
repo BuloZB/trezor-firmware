@@ -156,6 +156,7 @@ impl FirmwareUI for UIDelizia {
         subtitle: Option<TString<'static>>,
         verb: Option<TString<'static>>,
         verb_cancel: Option<TString<'static>>,
+        verb_view_all: Option<TString<'static>>,
         hold: bool,
         chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
@@ -166,7 +167,9 @@ impl FirmwareUI for UIDelizia {
             Some(TR::instructions__view_all_data.into()),
         )
         .with_verb(verb)
-        .with_verb_info(Some(TR::buttons__view_all_data.into()))
+        .with_verb_info(Some(
+            verb_view_all.unwrap_or(TR::buttons__view_all_data.into()),
+        ))
         .with_description_font(&theme::TEXT_SUB_GREEN_LIME)
         .with_subtitle(subtitle)
         .with_verb_cancel(verb_cancel)
@@ -220,12 +223,15 @@ impl FirmwareUI for UIDelizia {
     fn confirm_coinjoin(
         max_rounds: TString<'static>,
         max_feerate: TString<'static>,
+        max_coordinator_fee_pct: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let paragraphs = ParagraphVecShort::from_iter([
             Paragraph::new(&theme::TEXT_NORMAL, TR::coinjoin__max_rounds),
             Paragraph::new(&theme::TEXT_MONO, max_rounds),
             Paragraph::new(&theme::TEXT_NORMAL, TR::coinjoin__max_mining_fee),
             Paragraph::new(&theme::TEXT_MONO, max_feerate),
+            Paragraph::new(&theme::TEXT_NORMAL, TR::coinjoin__max_coordinator_fee_pct),
+            Paragraph::new(&theme::TEXT_MONO, max_coordinator_fee_pct),
         ])
         .into_paragraphs();
 
@@ -444,13 +450,17 @@ impl FirmwareUI for UIDelizia {
         items: Obj,
         hold: bool,
         _verb: Option<TString<'static>>,
-        _external_menu: bool,
+        external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let paragraphs = PropsList::new(items)?;
 
         let flow = flow::new_confirm_action_simple(
             paragraphs.into_paragraphs(),
-            ConfirmActionExtra::Menu(ConfirmActionMenuStrings::new()),
+            if external_menu {
+                ConfirmActionExtra::ExternalMenu
+            } else {
+                ConfirmActionExtra::Menu(ConfirmActionMenuStrings::new())
+            },
             ConfirmActionStrings::new(title, subtitle, None, hold.then_some(title)),
             ConfirmActionOptions::new().with_hold(hold),
         )?;
@@ -1252,7 +1262,7 @@ impl FirmwareUI for UIDelizia {
             Some(title) => {
                 let header = Header::left_aligned(title);
                 let header = if danger {
-                    header.with_danger_icon()
+                    header.with_danger().with_danger_icon()
                 } else {
                     header.with_warning_low_icon()
                 };

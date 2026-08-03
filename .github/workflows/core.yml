@@ -140,8 +140,6 @@ jobs:
       - uses: ./.github/actions/environment
       - run: nix-shell --run "uv run make -C core build_bootloader_emu"
         if: matrix.coins == 'universal' && matrix.asan == 'noasan'
-      - run: nix-shell --run "uv run make -C core build_prodtest_emu"
-        if: matrix.coins == 'universal' && matrix.type != 'debuglink' && matrix.model == 'T3W1'
       - run: nix-shell --run "uv run make -C core build_unix_frozen"
       - run: nix-shell --run "uv run make -C core test_emu_sanity"
       - run: cp core/build-xtask/artifacts/latest/firmware-emu core/build-xtask/artifacts/latest/firmware-emu-${{ matrix.model }}-${{ matrix.coins }}${{ matrix.n4w1 && '-n4w1' || '' }}
@@ -197,6 +195,37 @@ jobs:
             core/build-xtask/artifacts/latest/bootloader-emu
           retention-days: 2
 
+  prodtest_emu:
+    name: Build and test prodtest emu (${{ matrix.model }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [T3W1]
+    env:
+      SDL_VIDEODRIVER: dummy
+      TREZOR_MODEL: ${{ matrix.model }}
+      PYTEST_TIMEOUT: 400
+      TESTOPTS: "--durations 10"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # actions/checkout@v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/environment
+      - name: Build prodtest emulator
+        run: nix-shell --run "uv run xtask build prodtest --model ${{ matrix.model }} --emulator"
+      - name: Upload prodtest emulator artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # actions/upload-artifact@v7.0.0
+        with:
+          name: prodtest-emu-${{ matrix.model }}
+          path: |
+            core/build-xtask/artifacts/${{ matrix.model }}/prodtest-emu
+          retention-days: 7
+      - name: Run prodtest device tests
+        run: nix-shell --run "uv run make -C core test_emu_prodtest"
+
   core_unit_python_test:
     name: Python unit tests (${{ matrix.model }}, ${{ matrix.coins }}, ${{ matrix.asan }})
     runs-on: ubuntu-latest
@@ -248,13 +277,7 @@ jobs:
         with:
           submodules: recursive
       - uses: ./.github/actions/environment
-      - run: nix-shell --run "uv run make -C core -f Makefile.scons build_unix"
-      # Ensure that "cargo build" works when NOT executed through our makefiles,
-      # indicating that it does not rely on particular envvars or other flags.
-      # This makes sure that rust-analyzer will work on our codebase.
-      - run: nix-shell --run "cd core/embed/rust && cargo build"
-        if: matrix.asan == 'noasan'
-      - run: nix-shell --run "uv run make -C core -f Makefile.scons test_rust"
+      - run: nix-shell --run "uv run make -C core test_rust"
       - run: nix-shell --run "uv run make -C core clippy"
 
   core_rust_client_test:
@@ -735,7 +758,7 @@ jobs:
           do
             (echo '##' ${build_type}; \
              echo '```'; \
-             find artifacts/core-firmware-*-${build_type}/ -name '*-*-*.bin' -printf "%-40f %10s\n" | sort; \
+             find artifacts/core-firmware-*-${build_type}/ -name '*-*-*.bin' -printf "%10s %f\n" | sort -k 2; \
              echo '```') >> $GITHUB_STEP_SUMMARY
           done
 

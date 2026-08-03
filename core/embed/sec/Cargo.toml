@@ -9,14 +9,15 @@ color-eyre.workspace = true
 xbuild.workspace = true
 
 [dependencies]
-sys.workspace = true
-rtl.workspace = true
+crypto.workspace = true
 models.workspace = true
+rtl.workspace = true
+sys.workspace = true
 
 [features]
 
 # --------------------------------------------------------------------------
-# MCU features
+# MCU selection
 # --------------------------------------------------------------------------
 
 mcu_stm32f427 = ["sys/mcu_stm32f427", "mcu_stm32f4"]
@@ -26,7 +27,7 @@ mcu_stm32u5g = ["sys/mcu_stm32u5g", "mcu_stm32u5"]
 mcu_stm32u5a = ["sys/mcu_stm32u5a", "mcu_stm32u5"]
 
 # --------------------------------------------------------------------------
-# Privilege mode features
+# Privilege mode
 # --------------------------------------------------------------------------
 
 kernel_mode = ["sys/kernel_mode"]
@@ -37,15 +38,15 @@ secure_mode = ["sys/secure_mode"]
 # --------------------------------------------------------------------------
 
 backup_ram = []
+boot_ucb = ["sys/boot_ucb", "crypto/sphincsplus"]
 bootloader_devel = []
-boot_ucb = ["sys/boot_ucb", "rtl/sphincsplus"]
 consumption_mask = []
 emulator = ["sys/emulator"]
 hash_processor = []
 hw_revision = []
 iwdg = []
 lockable_bootloader = ["sys/lockable_bootloader"]
-mcu_attestation = ["rtl/mldsa"]
+mcu_attestation = ["crypto/mldsa"]
 nrf_auth = []
 optiga = ["sys/i2c_bus", "time_estimate"]
 optiga_testing = []
@@ -63,6 +64,10 @@ time_estimate = []
 tropic = []
 trustzone = ["sys/trustzone"]
 
+# --------------------------------------------------------------------------
+# Unit test configuration
+# --------------------------------------------------------------------------
+
 test = [
     "mcu_stm32u5g",
     "models/model_t3w1",
@@ -79,5 +84,3 @@ test = [
 mcu_stm32u5 = ["mcu_stm32"]
 mcu_stm32f4 = ["mcu_stm32"]
 mcu_stm32 = []
-
-

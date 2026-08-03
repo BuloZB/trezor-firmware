@@ -18,12 +18,14 @@ from __future__ import annotations
 
 import typing as t
 from itertools import product
+from pathlib import Path
 
 import pytest
 
 from trezorlib import ethereum, exceptions, messages, models
 from trezorlib.debuglink import DebugSession as Session
 from trezorlib.debuglink import message_filters
+from trezorlib.definitions import FilesystemSource
 from trezorlib.exceptions import TrezorFailure
 from trezorlib.protobuf import MessageType
 from trezorlib.tools import parse_path, unharden
@@ -108,7 +110,56 @@ def _do_test_signtx(
         )
 
     expected_v = 2 * parameters["chain_id"] + 35
-    assert sig_v in (expected_v, expected_v + 1)
+    assert sig_v in (
+        expected_v,
+        expected_v + 1,
+    )  # 'y-coordinate' sign bit encodes chain_id: EIP-155
+    assert sig_r.hex() == result["sig_r"]
+    assert sig_s.hex() == result["sig_s"]
+    assert sig_v == result["sig_v"]
+
+
+# Directory of dev-signed Ethereum definitions (network / token / clear-signing
+# display formats), laid out as eth/chain-id/<n>/... exactly like the deploy
+# tarball you would pass to `trezorctl ethereum --definitions <dir> sign-tx ...`.
+# Curated to only the definitions the cases below actually pull; drop more .dat
+# files in to clear-sign more contracts/functions.
+_DEFINITIONS_DIR = Path(__file__).parent / "definitions"
+_DEFINITIONS_SOURCE = FilesystemSource(_DEFINITIONS_DIR)
+
+
+@parametrize_using_common_fixtures("ethereum/sign_tx_external_definitions.json")
+@pytest.mark.models("core")
+def test_signtx_external_definitions(
+    session: Session, parameters: dict, result: dict
+) -> None:
+    chain_id = parameters["chain_id"]
+    with session.test_ctx as client:
+        client.set_input_flow(InputFlowConfirmAllWarnings(session).get())
+        sig_v, sig_r, sig_s = ethereum.sign_tx(
+            session,
+            n=parse_path(parameters["path"]),
+            nonce=int(parameters["nonce"], 16),
+            gas_price=int(parameters["gas_price"], 16),
+            gas_limit=int(parameters["gas_limit"], 16),
+            to=parameters["to_address"],
+            chain_id=chain_id,
+            value=int(parameters["value"], 16),
+            tx_type=parameters["tx_type"],
+            data=bytes.fromhex(parameters["data"]),
+            definitions=messages.EthereumDefinitions(
+                encoded_network=_DEFINITIONS_SOURCE.get_eth_network(chain_id)
+            ),
+            supports_definition_request=True,
+            definition_source=_DEFINITIONS_SOURCE,
+            chunkify=True,
+        )
+
+    expected_v = 2 * chain_id + 35
+    assert sig_v in (
+        expected_v,
+        expected_v + 1,
+    )  # 'y-coordinate' sign bit encodes chain_id: EIP-155
     assert sig_r.hex() == result["sig_r"]
     assert sig_s.hex() == result["sig_s"]
     assert sig_v == result["sig_v"]
@@ -537,30 +588,32 @@ def test_signtx_data_pagination(session: Session, scroll: bool, size: int):
 
 
 def test_signtx_data_bad_init(session: Session):
-    DATA = b"A" * 256
+    def _sign_calldata(data: bytes) -> None:
+        with session.test_ctx as client:
 
-    with session.test_ctx as client:
+            def _filter(msg: MessageType) -> MessageType:
+                req = messages.EthereumSignTx.ensure_isinstance(msg)
+                assert req.data_initial_chunk is not None
+                req.data_initial_chunk += b"EXTRA"
+                return req
 
-        def _filter(msg: MessageType) -> MessageType:
-            req = messages.EthereumSignTx.ensure_isinstance(msg)
-            assert req.data_initial_chunk is not None
-            req.data_initial_chunk += b"EXTRA"
-            return req
+            client.set_filter(message_type=messages.EthereumSignTx, callback=_filter)
+            with pytest.raises(TrezorFailure, match="Invalid size of initial chunk"):
+                ethereum.sign_tx(
+                    session,
+                    n=parse_path("m/44h/60h/0h/0/0"),
+                    nonce=0x0,
+                    gas_price=0x14,
+                    gas_limit=0x14,
+                    to="0x1d1c328764a41bda0492b66baa30c4a339ff85ef",
+                    chain_id=1,
+                    value=0xA,
+                    tx_type=None,
+                    data=data,
+                )
 
-        client.set_filter(message_type=messages.EthereumSignTx, callback=_filter)
-        with pytest.raises(TrezorFailure, match="Invalid size of initial chunk"):
-            ethereum.sign_tx(
-                session,
-                n=parse_path("m/44h/60h/0h/0/0"),
-                nonce=0x0,
-                gas_price=0x14,
-                gas_limit=0x14,
-                to="0x1d1c328764a41bda0492b66baa30c4a339ff85ef",
-                chain_id=1,
-                value=0xA,
-                tx_type=None,
-                data=DATA,
-            )
+    _sign_calldata(b"A" * 256)
+    _sign_calldata(b"")
 
 
 def test_signtx_data_bad_ack(session: Session):

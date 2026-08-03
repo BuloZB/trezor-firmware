@@ -11,12 +11,13 @@ from .clear_signing import (
     parse_uint256,
 )
 
-# https://github.com/LedgerHQ/clear-signing-erc7730-registry/blob/master/ercs/calldata-erc20-tokens.json#L27
+# https://github.com/ethereum/clear-signing-erc7730-registry/blob/master/ercs/calldata-erc20-tokens.json#L27
 
 APPROVE_DISPLAY_FORMAT = DisplayFormat(
     binding_context=None,
     func_sig=b"\x09\x5e\xa7\xb3",  # approve(address,uint256)
     intent="Approve",
+    provider_name=None,
     parameter_definitions=[
         Atomic(parse_address),  # _spender
         Atomic(parse_uint256),  # _value
@@ -38,6 +39,7 @@ TRANSFER_DISPLAY_FORMAT = DisplayFormat(
     binding_context=None,
     func_sig=b"\xa9\x05\x9c\xbb",  # transfer(address,uint256)
     intent="Send",
+    provider_name=None,
     parameter_definitions=[
         Atomic(parse_address),  # _to
         Atomic(parse_uint256),  # _value
@@ -53,30 +55,31 @@ TRANSFER_DISPLAY_FORMAT = DisplayFormat(
 
 def all_display_formats() -> Generator[DisplayFormat, None, None]:
 
-    from ubinascii import unhexlify
-
     from .clear_signing import (
         AmountFormatter,
         Array,
         BindingContext,
         DateFormatter,
-        Dynamic,
+        DynamicLeaf,
         RawFormatter,
         Tuple,
         UnitFormatter,
+        make_fixed_bytes_parser,
+        make_uint_parser,
         parse_bool,
         parse_bytes,
-        parse_bytes32,
         parse_string,
-        parse_uint24,
-        parse_uint160,
     )
+
+    parse_bytes32 = make_fixed_bytes_parser(32)
+    parse_uint24 = make_uint_parser(24)
+    parse_uint160 = make_uint_parser(160)
 
     yield APPROVE_DISPLAY_FORMAT
     yield TRANSFER_DISPLAY_FORMAT
 
-    # https://github.com/LedgerHQ/clear-signing-erc7730-registry/blob/master/registry/1inch/calldata-AggregationRouterV6.json#L9
-    ONEINCH_ADDRESS = unhexlify("111111125421cA6dc452d289314280a0f8842A65")
+    # https://github.com/ethereum/clear-signing-erc7730-registry/blob/master/registry/1inch/calldata-AggregationRouterV6.json#L9
+    ONEINCH_ADDRESS = b"\x11\x11\x11\x12\x54\x21\xca\x6d\xc4\x52\xd2\x89\x31\x42\x80\xa0\xf8\x84\x2a\x65"
     ONEINCH_CHAINS = [
         1,
         10,
@@ -95,8 +98,8 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
 
     # $.metadata.constants.addressAsEth and addressAsNull from common-AggregationRouterV6.json
     ONEINCH_NATIVE_CURRENCY_ADDRESSES = [
-        unhexlify("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"),
-        unhexlify("0000000000000000000000000000000000000000"),
+        b"\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee",
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
     ]
 
     ONEINCH_CONTEXT = BindingContext(
@@ -113,12 +116,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
     # omit the field rather than display a bare, tokenless integer. (`swap` keeps
     # its minReturnAmount because its dstToken is available.)
 
-    _FUNC_SIG = unhexlify("07ed2379")
+    _FUNC_SIG = b"\x07\xed\x23\x79"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_address),  # executor
                 Tuple(
@@ -133,7 +137,7 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
                     ),
                     is_dynamic=False,
                 ),  # desc
-                Dynamic(parse_bytes),  # data
+                DynamicLeaf(parse_bytes),  # data
             ],
             field_definitions=[
                 FieldDefinition(
@@ -159,12 +163,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("83800a8e")
+    _FUNC_SIG = b"\x83\x80\x0a\x8e"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # token
                 Atomic(parse_uint256),  # amount
@@ -194,12 +199,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("e2c95c82")
+    _FUNC_SIG = b"\xe2\xc9\x5c\x82"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # to
                 Atomic(parse_bytes32),  # token
@@ -230,12 +236,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("8770ba91")
+    _FUNC_SIG = b"\x87\x70\xba\x91"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # token
                 Atomic(parse_uint256),  # amount
@@ -266,12 +273,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("19367472")
+    _FUNC_SIG = b"\x19\x36\x74\x72"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # token
                 Atomic(parse_uint256),  # amount
@@ -303,12 +311,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("ea76dddf")
+    _FUNC_SIG = b"\xea\x76\xdd\xdf"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # to
                 Atomic(parse_bytes32),  # token
@@ -340,12 +349,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("f7a70056")
+    _FUNC_SIG = b"\xf7\xa7\x00\x56"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # to
                 Atomic(parse_bytes32),  # token
@@ -378,12 +388,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("a76dfc3b")
+    _FUNC_SIG = b"\xa7\x6d\xfc\x3b"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_uint256),  # minReturn
                 Atomic(parse_bytes32),  # dex
@@ -408,12 +419,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("89af926a")
+    _FUNC_SIG = b"\x89\xaf\x92\x6a"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_uint256),  # minReturn
                 Atomic(parse_uint256),  # dex
@@ -439,12 +451,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("188ac35d")
+    _FUNC_SIG = b"\x18\x8a\xc3\x5d"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_uint256),  # minReturn
                 Atomic(parse_uint256),  # dex
@@ -471,12 +484,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("175accdc")
+    _FUNC_SIG = b"\x17\x5a\xcc\xdc"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # to
                 Atomic(parse_uint256),  # minReturn
@@ -502,12 +516,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("0f449d71")
+    _FUNC_SIG = b"\x0f\x44\x9d\x71"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # to
                 Atomic(parse_uint256),  # minReturn
@@ -534,12 +549,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("493189f0")
+    _FUNC_SIG = b"\x49\x31\x89\xf0"
     yield (
         DisplayFormat(
             binding_context=ONEINCH_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="1inch Aggregation Router V6",
             parameter_definitions=[
                 Atomic(parse_bytes32),  # to
                 Atomic(parse_uint256),  # minReturn
@@ -567,417 +583,23 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    # https://github.com/LedgerHQ/clear-signing-erc7730-registry/blob/master/registry/lifi/calldata-LIFIDiamond.json
-    LIFI_ADDRESS = unhexlify("1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE")
-    # Chains where the LiFi diamond is deployed at the canonical LIFI_ADDRESS.
-    LIFI_CHAINS = [
-        1,
-        10,
-        25,
-        56,
-        100,
-        106,
-        122,
-        137,
-        204,
-        250,
-        252,
-        288,
-        1284,
-        1285,
-        5000,
-        8453,
-        9001,
-        34443,
-        42161,
-        42170,
-        42220,
-        43114,
-        81457,
-        534352,
-        1313161554,
-        1666600000,
-    ]
-    # Chains where the LiFi diamond is deployed at a non-canonical address.
-    LIFI_ALT_DEPLOYMENTS = [
-        (324, unhexlify("341e94069f53234fe6dabef707ad424830525715")),  # zkSync Era
-        (1088, unhexlify("24ca98fb6972f5ee05f0db00595c7f68d9fafd68")),  # Metis
-        (59144, unhexlify("de1e598b81620773454588b85d6b5d4eec32573e")),  # Linea
-        (167004, unhexlify("3a9a5dba8fe1c4da98187ce4755701bca182f63b")),
-    ]
-
-    LIFI_CONTEXT = BindingContext(
-        [(chain, LIFI_ADDRESS) for chain in LIFI_CHAINS] + LIFI_ALT_DEPLOYMENTS,
-    )
-
-    LIFI_NATIVE_CURRENCY_ADDRESSES = [
-        unhexlify("EeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"),
-        unhexlify("0000000000000000000000000000000000000000"),
-    ]
-
-    _FUNC_SIG = unhexlify("5fd9ae2e")
-    yield (
-        DisplayFormat(
-            binding_context=LIFI_CONTEXT,
-            func_sig=_FUNC_SIG,
-            intent="Swap",
-            parameter_definitions=[
-                Atomic(parse_bytes),  # _transactionId
-                Dynamic(parse_string),  # _integrator
-                Dynamic(parse_string),  # _referrer
-                Atomic(parse_address),  # _receiver
-                Atomic(parse_uint256),  # _minAmountOut
-                Array(
-                    Tuple(
-                        (
-                            parse_address,  # callTo
-                            parse_address,  # approveTo
-                            parse_address,  # sendingAssetId
-                            parse_address,  # receivingAssetId
-                            parse_uint256,  # fromAmount
-                            parse_bytes,  # callData
-                            parse_bool,  # requiresDeposit
-                        ),
-                        is_dynamic=False,
-                    )
-                ),  # _swapData
-            ],
-            field_definitions=[
-                FieldDefinition(
-                    (5, 0, 4),  # _swapData.[0].fromAmount
-                    "Amount to Send",
-                    TokenAmountFormatter(
-                        token_path=(5, 0, 2),  # _swapData.[0].sendingAssetId
-                    ),
-                ),
-                FieldDefinition(
-                    (4,),  # _minAmountOut
-                    "Minimum to Receive",
-                    TokenAmountFormatter(
-                        token_path=(5, -1, 3),  # _swapData.[-1].receivingAssetId
-                    ),
-                ),
-                FieldDefinition(
-                    (3,),  # _receiver
-                    "Recipient",
-                    AddressNameFormatter,
-                ),
-            ],
-        )
-    )
-
-    _FUNC_SIG = unhexlify("2c57e884")
-    yield (
-        DisplayFormat(
-            binding_context=LIFI_CONTEXT,
-            func_sig=_FUNC_SIG,
-            intent="Swap",
-            parameter_definitions=[
-                Atomic(parse_bytes),  # _transactionId
-                Dynamic(parse_string),  # _integrator
-                Dynamic(parse_string),  # _referrer
-                Atomic(parse_address),  # _receiver
-                Atomic(parse_uint256),  # _minAmountOut
-                Array(
-                    Tuple(
-                        (
-                            parse_address,  # callTo
-                            parse_address,  # approveTo
-                            parse_address,  # sendingAssetId
-                            parse_address,  # receivingAssetId
-                            parse_uint256,  # fromAmount
-                            parse_bytes,  # callData
-                            parse_bool,  # requiresDeposit
-                        ),
-                        is_dynamic=False,
-                    )
-                ),  # _swapData
-            ],
-            field_definitions=[
-                FieldDefinition(
-                    (5, 0, 4),  # _swapData.[0].fromAmount
-                    "Amount to Send",
-                    TokenAmountFormatter(
-                        token_path=(5, 0, 2),  # _swapData.[0].sendingAssetId
-                    ),
-                ),
-                FieldDefinition(
-                    (4,),  # _minAmountOut
-                    "Minimum Amount to receive",
-                    AmountFormatter,
-                ),
-                FieldDefinition(
-                    (3,),  # _receiver
-                    "Receiver",
-                    AddressNameFormatter,
-                ),
-            ],
-        )
-    )
-
-    _FUNC_SIG = unhexlify("736eac0b")
-    yield (
-        DisplayFormat(
-            binding_context=LIFI_CONTEXT,
-            func_sig=_FUNC_SIG,
-            intent="Swap",
-            parameter_definitions=[
-                Atomic(parse_bytes),  # _transactionId
-                Dynamic(parse_string),  # _integrator
-                Dynamic(parse_string),  # _referrer
-                Atomic(parse_address),  # _receiver
-                Atomic(parse_uint256),  # _minAmountOut
-                Array(
-                    Tuple(
-                        (
-                            parse_address,  # callTo
-                            parse_address,  # approveTo
-                            parse_address,  # sendingAssetId
-                            parse_address,  # receivingAssetId
-                            parse_uint256,  # fromAmount
-                            parse_bytes,  # callData
-                            parse_bool,  # requiresDeposit
-                        ),
-                        is_dynamic=False,
-                    )
-                ),  # _swapData
-            ],
-            field_definitions=[
-                FieldDefinition(
-                    ContainerPath.Value,  # @.value
-                    "Amount to send",
-                    AmountFormatter,
-                ),
-                FieldDefinition(
-                    (4,),  # _minAmountOut
-                    "Minimum to Receive",
-                    TokenAmountFormatter(
-                        token_path=(5, -1, 3),  # _swapData.[-1].receivingAssetId
-                    ),
-                ),
-                FieldDefinition(
-                    (3,),  # _receiver
-                    "Recipient",
-                    AddressNameFormatter,
-                ),
-            ],
-        )
-    )
-
-    _FUNC_SIG = unhexlify("4666fc80")
-    yield (
-        DisplayFormat(
-            binding_context=LIFI_CONTEXT,
-            func_sig=_FUNC_SIG,
-            intent="Swap",
-            parameter_definitions=[
-                Atomic(parse_bytes),  # _transactionId
-                Dynamic(parse_string),  # _integrator
-                Dynamic(parse_string),  # _referrer
-                Atomic(parse_address),  # _receiver
-                Atomic(parse_uint256),  # _minAmountOut
-                Tuple(
-                    (
-                        parse_address,  # callTo
-                        parse_address,  # approveTo
-                        parse_address,  # sendingAssetId
-                        parse_address,  # receivingAssetId
-                        parse_uint256,  # fromAmount
-                        parse_bytes,  # callData
-                        parse_bool,  # requiresDeposit
-                    ),
-                    is_dynamic=True,
-                ),  # _swapData
-            ],
-            field_definitions=[
-                FieldDefinition(
-                    (5, 4),  # _swapData.fromAmount
-                    "Amount to Send",
-                    TokenAmountFormatter(token_path=(5, 2)),  # _swapData.sendingAssetId
-                ),
-                FieldDefinition(
-                    (4,),  # _minAmountOut
-                    "Minimum to Receive",
-                    TokenAmountFormatter(
-                        token_path=(5, 3)
-                    ),  # _swapData.receivingAssetId
-                ),
-                FieldDefinition(
-                    (3,),  # _receiver
-                    "Recipient",
-                    AddressNameFormatter,
-                ),
-            ],
-        )
-    )
-
-    _FUNC_SIG = unhexlify("733214a3")
-    yield (
-        DisplayFormat(
-            binding_context=LIFI_CONTEXT,
-            func_sig=_FUNC_SIG,
-            intent="Swap",
-            parameter_definitions=[
-                Atomic(parse_bytes),  # _transactionId
-                Dynamic(parse_string),  # _integrator
-                Dynamic(parse_string),  # _referrer
-                Atomic(parse_address),  # _receiver
-                Atomic(parse_uint256),  # _minAmountOut
-                Tuple(
-                    (
-                        parse_address,  # callTo
-                        parse_address,  # approveTo
-                        parse_address,  # sendingAssetId
-                        parse_address,  # receivingAssetId
-                        parse_uint256,  # fromAmount
-                        parse_bytes,  # callData
-                        parse_bool,  # requiresDeposit
-                    ),
-                    is_dynamic=True,
-                ),  # _swapData
-            ],
-            field_definitions=[
-                FieldDefinition(
-                    (5, 4),  # _swapData.fromAmount
-                    "Amount to Send",
-                    TokenAmountFormatter(
-                        token_path=(5, 2),  # _swapData.sendingAssetId
-                    ),
-                ),
-                FieldDefinition(
-                    (4,),  # _minAmountOut
-                    "Minimum Amount to receive",
-                    AmountFormatter,
-                ),
-                FieldDefinition(
-                    (3,),  # _receiver
-                    "Receiver",
-                    AddressNameFormatter,
-                ),
-            ],
-        )
-    )
-
-    _FUNC_SIG = unhexlify("af7060fd")
-    yield (
-        DisplayFormat(
-            binding_context=LIFI_CONTEXT,
-            func_sig=_FUNC_SIG,
-            intent="Swap",
-            parameter_definitions=[
-                Atomic(parse_bytes),  # _transactionId
-                Dynamic(parse_string),  # _integrator
-                Dynamic(parse_string),  # _referrer
-                Atomic(parse_address),  # _receiver
-                Atomic(parse_uint256),  # _minAmountOut
-                Tuple(
-                    (
-                        parse_address,  # callTo
-                        parse_address,  # approveTo
-                        parse_address,  # sendingAssetId
-                        parse_address,  # receivingAssetId
-                        parse_uint256,  # fromAmount
-                        parse_bytes,  # callData
-                        parse_bool,  # requiresDeposit
-                    ),
-                    is_dynamic=True,
-                ),  # _swapData
-            ],
-            field_definitions=[
-                FieldDefinition(
-                    ContainerPath.Value,  # @.value
-                    "Amount to send",
-                    AmountFormatter,
-                ),
-                FieldDefinition(
-                    (4,),  # _minAmountOut
-                    "Minimum to Receive",
-                    TokenAmountFormatter(
-                        token_path=(5, 3),  # _swapData.receivingAssetId
-                    ),
-                ),
-                FieldDefinition(
-                    (3,),  # _receiver
-                    "Recipient",
-                    AddressNameFormatter,
-                ),
-            ],
-        )
-    )
-
-    _FUNC_SIG = unhexlify("4630a0d8")
-    yield (
-        DisplayFormat(
-            binding_context=LIFI_CONTEXT,
-            func_sig=_FUNC_SIG,
-            intent="Swap",
-            parameter_definitions=[
-                Atomic(parse_bytes),  # _transactionId
-                Dynamic(parse_string),  # _integrator
-                Dynamic(parse_string),  # _referrer
-                Atomic(parse_address),  # _receiver
-                Atomic(parse_uint256),  # _minAmount
-                Array(
-                    Tuple(
-                        (
-                            parse_address,  # callTo
-                            parse_address,  # approveTo
-                            parse_address,  # sendingAssetId
-                            parse_address,  # receivingAssetId
-                            parse_uint256,  # fromAmount
-                            parse_bytes,  # callData
-                            parse_bool,  # requiresDeposit
-                        ),
-                        is_dynamic=False,
-                    )
-                ),  # _swapData
-            ],
-            field_definitions=[
-                FieldDefinition(
-                    (
-                        5,
-                        0,
-                        4,
-                    ),  # _swapData.[0].fromAmount
-                    "Amount to Send",
-                    TokenAmountFormatter(
-                        token_path=(5, 0, 2),  # _swapData.[0].sendingAssetId
-                        native_currency_address=LIFI_NATIVE_CURRENCY_ADDRESSES,
-                    ),
-                ),
-                FieldDefinition(
-                    (4,),  # _minAmount,
-                    "Minimum to Receive",
-                    TokenAmountFormatter(
-                        token_path=(5, -1, 3),  # # _swapData.[-1].receivingAssetId
-                        native_currency_address=LIFI_NATIVE_CURRENCY_ADDRESSES,
-                    ),
-                ),
-                FieldDefinition(
-                    (3,),  # receiver
-                    "Recipient",
-                    AddressNameFormatter,
-                ),
-            ],
-        )
-    )
-
-    # https://github.com/LedgerHQ/clear-signing-erc7730-registry/blob/master/registry/uniswap/calldata-UniswapV3Router02.json#L6
-    UNISWAP_V3_ROUTER_ADDRESS = unhexlify("68b3465833fb72A70ecDF485E0e4C7bD8665Fc45")
+    # https://github.com/ethereum/clear-signing-erc7730-registry/blob/master/registry/uniswap/calldata-UniswapV3Router02.json#L6
+    UNISWAP_V3_ROUTER_ADDRESS = b"\x68\xb3\x46\x58\x33\xfb\x72\xa7\x0e\xcd\xf4\x85\xe0\xe4\xc7\xbd\x86\x65\xfc\x45"
     UNISWAP_V3_ROUTER_CHAINS = [1]
 
-    # https://github.com/LedgerHQ/clear-signing-erc7730-registry/blob/master/registry/uniswap/calldata-UniswapV3Router02.json
+    # https://github.com/ethereum/clear-signing-erc7730-registry/blob/master/registry/uniswap/calldata-UniswapV3Router02.json
 
     UNISWAP_CONTEXT = BindingContext(
         [(chain, UNISWAP_V3_ROUTER_ADDRESS) for chain in UNISWAP_V3_ROUTER_CHAINS],
     )
 
-    _FUNC_SIG = unhexlify("b858183f")
+    _FUNC_SIG = b"\xb8\x58\x18\x3f"
     yield (
         DisplayFormat(
             binding_context=UNISWAP_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="Uniswap V3 Router",
             parameter_definitions=[
                 Tuple(
                     (
@@ -1013,12 +635,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("04e45aaf")
+    _FUNC_SIG = b"\x04\xe4\x5a\xaf"
     yield (
         DisplayFormat(
             binding_context=UNISWAP_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="Uniswap V3 Router",
             parameter_definitions=[
                 Tuple(
                     (
@@ -1062,12 +685,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("09b81346")
+    _FUNC_SIG = b"\x09\xb8\x13\x46"
     yield (
         DisplayFormat(
             binding_context=UNISWAP_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="Uniswap V3 Router",
             parameter_definitions=[
                 Tuple(
                     (
@@ -1103,12 +727,13 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
-    _FUNC_SIG = unhexlify("5023b4df")
+    _FUNC_SIG = b"\x50\x23\xb4\xdf"
     yield (
         DisplayFormat(
             binding_context=UNISWAP_CONTEXT,
             func_sig=_FUNC_SIG,
             intent="Swap",
+            provider_name="Uniswap V3 Router",
             parameter_definitions=[
                 Tuple(
                     (
@@ -1152,6 +777,48 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         )
     )
 
+    # Canonical WETH (Wrapped Ether) contracts holding the chain's native currency.
+    # Wrapping is 1:1 and reversible, so the amounts are rendered with the native
+    # currency formatter: deposit() wraps the transaction value into WETH and
+    # withdraw(wad) unwraps the same amount of WETH back to the native currency.
+    # https://github.com/trezor/trezor-firmware/issues/7252
+    # The deployments list is generated from `sc_constants.py.mako`.
+    from .sc_constants import weth_deployments
+
+    WETH_CONTEXT = BindingContext(tuple(weth_deployments()))
+
+    yield DisplayFormat(
+        binding_context=WETH_CONTEXT,
+        func_sig=b"\xd0\xe3\x0d\xb0",  # deposit()
+        intent="Wrap ETH to WETH",
+        provider_name=None,
+        parameter_definitions=[],  # no arguments, the amount is the tx value
+        field_definitions=[
+            FieldDefinition(
+                ContainerPath.Value,  # @.value
+                "Amount",
+                AmountFormatter,
+            ),
+        ],
+    )
+
+    yield DisplayFormat(
+        binding_context=WETH_CONTEXT,
+        func_sig=b"\x2e\x1a\x7d\x4d",  # withdraw(uint256)
+        intent="Unwrap WETH to ETH",
+        provider_name=None,
+        parameter_definitions=[
+            Atomic(parse_uint256),  # wad
+        ],
+        field_definitions=[
+            FieldDefinition(
+                (0,),  # wad
+                "Amount",
+                AmountFormatter,
+            ),
+        ],
+    )
+
     if __debug__:
 
         # One contract to test it all would have been easier. But Caesar has a paragraph limit.
@@ -1160,9 +827,9 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         #   * TREZOR_TEST_ARRAYS_DESCRIPTOR   - multi-value arrays
         #   * TREZOR_TEST_PATHS_DESCRIPTOR    - composite path styles (slices + nested)
         TREZOR_TEST_CHAIN_ID = 1
-        TREZOR_TEST_ADDRESS = unhexlify("dddddddddddddddddddddddddddddddddddddddd")
-        TREZOR_TEST_CONST_TOKEN = unhexlify("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
-        TREZOR_TEST_NATIVE = unhexlify("0000000000000000000000000000000000000000")
+        TREZOR_TEST_ADDRESS = b"\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd"
+        TREZOR_TEST_CONST_TOKEN = b"\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee"
+        TREZOR_TEST_NATIVE = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 
         TREZOR_TEST_CONTEXT = BindingContext(
             [(TREZOR_TEST_CHAIN_ID, TREZOR_TEST_ADDRESS)]
@@ -1171,8 +838,9 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         # --- 1) scalar / atomic formatters ---
         yield DisplayFormat(
             binding_context=TREZOR_TEST_CONTEXT,
-            func_sig=unhexlify("7e577e01"),  # synthetic selector (dummy contract)
+            func_sig=b"\x7e\x57\x7e\x01",  # synthetic selector (dummy contract)
             intent="Trezor Test Scalars. DO NOT USE",
+            provider_name="Trezor Test. DO NOT USE",
             parameter_definitions=[
                 Atomic(parse_address),  # 0 recipient
                 Atomic(parse_uint256),  # 1 nativeAmount
@@ -1182,8 +850,8 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
                 Atomic(parse_bytes32),  # 5 hashBytes32
                 Atomic(parse_bool),  # 6 flagBool
                 Atomic(parse_uint160),  # 7 sizedUint
-                Dynamic(parse_string),  # 8 note
-                Dynamic(parse_bytes),  # 9 payload
+                DynamicLeaf(parse_string),  # 8 note
+                DynamicLeaf(parse_bytes),  # 9 payload
             ],
             field_definitions=[
                 FieldDefinition((0,), "Recipient", AddressNameFormatter),
@@ -1206,8 +874,9 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         # --- 2) token-amount resolution: via token_path and via constant address ---
         yield DisplayFormat(
             binding_context=TREZOR_TEST_CONTEXT,
-            func_sig=unhexlify("7e577e02"),  # synthetic selector (dummy contract)
+            func_sig=b"\x7e\x57\x7e\x02",  # synthetic selector (dummy contract)
             intent="Trezor Test Token. DO NOT USE",
+            provider_name="Trezor Test. DO NOT USE",
             parameter_definitions=[
                 Atomic(parse_address),  # 0 token (target of token_path below)
                 Atomic(parse_uint256),  # 1 tokenAmount
@@ -1228,8 +897,9 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         # --- 3) multi-value arrays ---
         yield DisplayFormat(
             binding_context=TREZOR_TEST_CONTEXT,
-            func_sig=unhexlify("7e577e03"),  # synthetic selector (dummy contract)
+            func_sig=b"\x7e\x57\x7e\x03",  # synthetic selector (dummy contract)
             intent="Trezor Test Arrays. DO NOT USE",
+            provider_name="Trezor Test. DO NOT USE",
             parameter_definitions=[
                 Array(Atomic(parse_uint256)),  # 0 amounts (multi-value array)
                 Array(
@@ -1256,11 +926,12 @@ def all_display_formats() -> Generator[DisplayFormat, None, None]:
         # --- 4) composite path styles: bytes slicing + nested array-of-structs ---
         yield DisplayFormat(
             binding_context=TREZOR_TEST_CONTEXT,
-            func_sig=unhexlify("7e577e04"),  # synthetic selector (dummy contract)
+            func_sig=b"\x7e\x57\x7e\x04",  # synthetic selector (dummy contract)
             intent="Trezor Test Paths. DO NOT USE",
+            provider_name="Trezor Test. DO NOT USE",
             parameter_definitions=[
                 Atomic(parse_uint256),  # 0 amount (reused by both slice fields)
-                Dynamic(parse_bytes),  # 1 packedPath (sliced for token addresses)
+                DynamicLeaf(parse_bytes),  # 1 packedPath (sliced for token addresses)
                 Array(  # 2 swapData: (sendingAssetId, receivingAssetId, fromAmount)[]
                     Tuple(
                         (parse_address, parse_address, parse_uint256),

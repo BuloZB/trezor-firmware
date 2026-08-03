@@ -68,8 +68,13 @@ if TYPE_CHECKING:
     from trezor.enums import SafetyCheckLevel  # noqa: F401
     from trezor.enums import SdProtectOperationType  # noqa: F401
     from trezor.enums import StellarAssetType  # noqa: F401
+    from trezor.enums import StellarHostFunctionType  # noqa: F401
     from trezor.enums import StellarMemoType  # noqa: F401
+    from trezor.enums import StellarSCValType  # noqa: F401
     from trezor.enums import StellarSignerType  # noqa: F401
+    from trezor.enums import StellarSorobanAuthorizationEnvelopeType  # noqa: F401
+    from trezor.enums import StellarSorobanAuthorizedFunctionType  # noqa: F401
+    from trezor.enums import StellarSorobanCredentialsType  # noqa: F401
     from trezor.enums import TezosBallotType  # noqa: F401
     from trezor.enums import TezosContractType  # noqa: F401
     from trezor.enums import ThpMessageType  # noqa: F401
@@ -3370,6 +3375,8 @@ if TYPE_CHECKING:
         path: "list[int]"
         container_path: "EthereumERC7730ContainerPath | None"
         const_value: "str | None"
+        slice_start: "int | None"
+        slice_end: "int | None"
 
         def __init__(
             self,
@@ -3377,6 +3384,8 @@ if TYPE_CHECKING:
             path: "list[int] | None" = None,
             container_path: "EthereumERC7730ContainerPath | None" = None,
             const_value: "str | None" = None,
+            slice_start: "int | None" = None,
+            slice_end: "int | None" = None,
         ) -> None:
             pass
 
@@ -3394,6 +3403,9 @@ if TYPE_CHECKING:
         base: "str | None"
         prefix: "bool | None"
         const_token_address: "AnyBytes | None"
+        callee_path: "EthereumERC7730Path | None"
+        selector: "AnyBytes | None"
+        enum_values: "list[EthereumERC7730EnumEntry]"
 
         def __init__(
             self,
@@ -3401,17 +3413,36 @@ if TYPE_CHECKING:
             path: "EthereumERC7730Path",
             label: "str",
             formatter: "EthereumERC7730FieldFormatterType",
+            enum_values: "list[EthereumERC7730EnumEntry] | None" = None,
             token_path: "EthereumERC7730Path | None" = None,
             threshold: "AnyBytes | None" = None,
             decimals: "int | None" = None,
             base: "str | None" = None,
             prefix: "bool | None" = None,
             const_token_address: "AnyBytes | None" = None,
+            callee_path: "EthereumERC7730Path | None" = None,
+            selector: "AnyBytes | None" = None,
         ) -> None:
             pass
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["EthereumERC7730FieldInfo"]:
+            return isinstance(msg, cls)
+
+    class EthereumERC7730EnumEntry(protobuf.MessageType):
+        key: "int"
+        value: "str"
+
+        def __init__(
+            self,
+            *,
+            key: "int",
+            value: "str",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EthereumERC7730EnumEntry"]:
             return isinstance(msg, cls)
 
     class EthereumDisplayFormatInfo(protobuf.MessageType):
@@ -3421,6 +3452,7 @@ if TYPE_CHECKING:
         intent: "str"
         parameter_definitions: "list[EthereumABIValueInfo]"
         field_definitions: "list[EthereumERC7730FieldInfo]"
+        provider_name: "str | None"
 
         def __init__(
             self,
@@ -3431,6 +3463,7 @@ if TYPE_CHECKING:
             intent: "str",
             parameter_definitions: "list[EthereumABIValueInfo] | None" = None,
             field_definitions: "list[EthereumERC7730FieldInfo] | None" = None,
+            provider_name: "str | None" = None,
         ) -> None:
             pass
 
@@ -4297,6 +4330,7 @@ if TYPE_CHECKING:
         chain_id: "int"
         delegate: "str"
         nonce: "int"
+        definitions: "EthereumDefinitions | None"
 
         def __init__(
             self,
@@ -4305,6 +4339,7 @@ if TYPE_CHECKING:
             delegate: "str",
             nonce: "int",
             address_n: "list[int] | None" = None,
+            definitions: "EthereumDefinitions | None" = None,
         ) -> None:
             pass
 
@@ -6102,15 +6137,31 @@ if TYPE_CHECKING:
         def is_type_of(cls, msg: Any) -> TypeGuard["SolanaTxSignature"]:
             return isinstance(msg, cls)
 
-    class SolanaSignMessage(protobuf.MessageType):
-        address_n: "list[int]"
-        message: "AnyBytes"
-        chunkify: "bool | None"
+    class SolanaOffchainMessageV1(protobuf.MessageType):
+        message: "str"
+        signers: "list[AnyBytes]"
 
         def __init__(
             self,
             *,
-            message: "AnyBytes",
+            message: "str",
+            signers: "list[AnyBytes] | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["SolanaOffchainMessageV1"]:
+            return isinstance(msg, cls)
+
+    class SolanaSignMessage(protobuf.MessageType):
+        address_n: "list[int]"
+        chunkify: "bool | None"
+        message: "SolanaOffchainMessageV1"
+
+        def __init__(
+            self,
+            *,
+            message: "SolanaOffchainMessageV1",
             address_n: "list[int] | None" = None,
             chunkify: "bool | None" = None,
         ) -> None:
@@ -6122,11 +6173,13 @@ if TYPE_CHECKING:
 
     class SolanaMessageSignature(protobuf.MessageType):
         signature: "AnyBytes"
+        signed_data: "AnyBytes | None"
 
         def __init__(
             self,
             *,
             signature: "AnyBytes",
+            signed_data: "AnyBytes | None" = None,
         ) -> None:
             pass
 
@@ -6135,13 +6188,15 @@ if TYPE_CHECKING:
             return isinstance(msg, cls)
 
     class SolanaVerifyMessage(protobuf.MessageType):
-        envelope: "AnyBytes"
         chunkify: "bool | None"
+        message: "SolanaOffchainMessageV1"
+        signatures: "list[AnyBytes]"
 
         def __init__(
             self,
             *,
-            envelope: "AnyBytes",
+            message: "SolanaOffchainMessageV1",
+            signatures: "list[AnyBytes] | None" = None,
             chunkify: "bool | None" = None,
         ) -> None:
             pass
@@ -6568,6 +6623,356 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["StellarSignedTx"]:
+            return isinstance(msg, cls)
+
+    class StellarSCVal(protobuf.MessageType):
+        type: "StellarSCValType"
+        b: "bool | None"
+        u32: "int | None"
+        i32: "int | None"
+        u64: "int | None"
+        i64: "int | None"
+        timepoint: "int | None"
+        duration: "int | None"
+        u128: "StellarUInt128Parts | None"
+        i128: "StellarInt128Parts | None"
+        u256: "StellarUInt256Parts | None"
+        i256: "StellarInt256Parts | None"
+        bytes: "AnyBytes | None"
+        string: "AnyBytes | None"
+        symbol: "str | None"
+        vec: "list[StellarSCVal]"
+        map: "list[StellarSCValMapEntry]"
+        address: "str | None"
+
+        def __init__(
+            self,
+            *,
+            type: "StellarSCValType",
+            vec: "list[StellarSCVal] | None" = None,
+            map: "list[StellarSCValMapEntry] | None" = None,
+            b: "bool | None" = None,
+            u32: "int | None" = None,
+            i32: "int | None" = None,
+            u64: "int | None" = None,
+            i64: "int | None" = None,
+            timepoint: "int | None" = None,
+            duration: "int | None" = None,
+            u128: "StellarUInt128Parts | None" = None,
+            i128: "StellarInt128Parts | None" = None,
+            u256: "StellarUInt256Parts | None" = None,
+            i256: "StellarInt256Parts | None" = None,
+            bytes: "AnyBytes | None" = None,
+            string: "AnyBytes | None" = None,
+            symbol: "str | None" = None,
+            address: "str | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSCVal"]:
+            return isinstance(msg, cls)
+
+    class StellarInvokeContractArgs(protobuf.MessageType):
+        contract_address: "str"
+        function_name: "str"
+        args: "list[StellarSCVal]"
+
+        def __init__(
+            self,
+            *,
+            contract_address: "str",
+            function_name: "str",
+            args: "list[StellarSCVal] | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarInvokeContractArgs"]:
+            return isinstance(msg, cls)
+
+    class StellarSorobanAuthorizedFunction(protobuf.MessageType):
+        type: "StellarSorobanAuthorizedFunctionType"
+        contract_fn: "StellarInvokeContractArgs | None"
+
+        def __init__(
+            self,
+            *,
+            type: "StellarSorobanAuthorizedFunctionType",
+            contract_fn: "StellarInvokeContractArgs | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSorobanAuthorizedFunction"]:
+            return isinstance(msg, cls)
+
+    class StellarSorobanAuthorizedInvocation(protobuf.MessageType):
+        function: "StellarSorobanAuthorizedFunction"
+        sub_invocations: "list[StellarSorobanAuthorizedInvocation]"
+
+        def __init__(
+            self,
+            *,
+            function: "StellarSorobanAuthorizedFunction",
+            sub_invocations: "list[StellarSorobanAuthorizedInvocation] | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSorobanAuthorizedInvocation"]:
+            return isinstance(msg, cls)
+
+    class StellarHostFunction(protobuf.MessageType):
+        type: "StellarHostFunctionType"
+        invoke_contract: "StellarInvokeContractArgs | None"
+
+        def __init__(
+            self,
+            *,
+            type: "StellarHostFunctionType",
+            invoke_contract: "StellarInvokeContractArgs | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarHostFunction"]:
+            return isinstance(msg, cls)
+
+    class StellarSorobanAddressCredentials(protobuf.MessageType):
+        address: "str"
+        nonce: "int"
+        signature_expiration_ledger: "int"
+        signature: "StellarSCVal"
+
+        def __init__(
+            self,
+            *,
+            address: "str",
+            nonce: "int",
+            signature_expiration_ledger: "int",
+            signature: "StellarSCVal",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSorobanAddressCredentials"]:
+            return isinstance(msg, cls)
+
+    class StellarSorobanCredentials(protobuf.MessageType):
+        type: "StellarSorobanCredentialsType"
+        address_v2: "StellarSorobanAddressCredentials | None"
+
+        def __init__(
+            self,
+            *,
+            type: "StellarSorobanCredentialsType",
+            address_v2: "StellarSorobanAddressCredentials | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSorobanCredentials"]:
+            return isinstance(msg, cls)
+
+    class StellarSorobanAuthorizationEntry(protobuf.MessageType):
+        credentials: "StellarSorobanCredentials"
+        root_invocation: "StellarSorobanAuthorizedInvocation"
+
+        def __init__(
+            self,
+            *,
+            credentials: "StellarSorobanCredentials",
+            root_invocation: "StellarSorobanAuthorizedInvocation",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSorobanAuthorizationEntry"]:
+            return isinstance(msg, cls)
+
+    class StellarInvokeHostFunctionOp(protobuf.MessageType):
+        source_account: "str | None"
+        function: "StellarHostFunction"
+        auth: "list[StellarSorobanAuthorizationEntry]"
+
+        def __init__(
+            self,
+            *,
+            function: "StellarHostFunction",
+            auth: "list[StellarSorobanAuthorizationEntry] | None" = None,
+            source_account: "str | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarInvokeHostFunctionOp"]:
+            return isinstance(msg, cls)
+
+    class StellarSignSorobanAuthorization(protobuf.MessageType):
+        address_n: "list[int]"
+        network_passphrase: "str"
+        envelope_type: "StellarSorobanAuthorizationEnvelopeType"
+        soroban_authorization_with_address: "StellarSorobanAuthorizationWithAddress | None"
+
+        def __init__(
+            self,
+            *,
+            network_passphrase: "str",
+            envelope_type: "StellarSorobanAuthorizationEnvelopeType",
+            address_n: "list[int] | None" = None,
+            soroban_authorization_with_address: "StellarSorobanAuthorizationWithAddress | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSignSorobanAuthorization"]:
+            return isinstance(msg, cls)
+
+    class StellarSorobanAuthorizationSignature(protobuf.MessageType):
+        public_key: "AnyBytes"
+        signature: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            public_key: "AnyBytes",
+            signature: "AnyBytes",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSorobanAuthorizationSignature"]:
+            return isinstance(msg, cls)
+
+    class StellarTxExtRequest(protobuf.MessageType):
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarTxExtRequest"]:
+            return isinstance(msg, cls)
+
+    class StellarTxExt(protobuf.MessageType):
+        v: "int"
+        soroban_data: "AnyBytes | None"
+
+        def __init__(
+            self,
+            *,
+            v: "int",
+            soroban_data: "AnyBytes | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarTxExt"]:
+            return isinstance(msg, cls)
+
+    class StellarUInt128Parts(protobuf.MessageType):
+        hi: "int"
+        lo: "int"
+
+        def __init__(
+            self,
+            *,
+            hi: "int",
+            lo: "int",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarUInt128Parts"]:
+            return isinstance(msg, cls)
+
+    class StellarInt128Parts(protobuf.MessageType):
+        hi: "int"
+        lo: "int"
+
+        def __init__(
+            self,
+            *,
+            hi: "int",
+            lo: "int",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarInt128Parts"]:
+            return isinstance(msg, cls)
+
+    class StellarUInt256Parts(protobuf.MessageType):
+        hi_hi: "int"
+        hi_lo: "int"
+        lo_hi: "int"
+        lo_lo: "int"
+
+        def __init__(
+            self,
+            *,
+            hi_hi: "int",
+            hi_lo: "int",
+            lo_hi: "int",
+            lo_lo: "int",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarUInt256Parts"]:
+            return isinstance(msg, cls)
+
+    class StellarInt256Parts(protobuf.MessageType):
+        hi_hi: "int"
+        hi_lo: "int"
+        lo_hi: "int"
+        lo_lo: "int"
+
+        def __init__(
+            self,
+            *,
+            hi_hi: "int",
+            hi_lo: "int",
+            lo_hi: "int",
+            lo_lo: "int",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarInt256Parts"]:
+            return isinstance(msg, cls)
+
+    class StellarSCValMapEntry(protobuf.MessageType):
+        key: "StellarSCVal"
+        value: "StellarSCVal"
+
+        def __init__(
+            self,
+            *,
+            key: "StellarSCVal",
+            value: "StellarSCVal",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSCValMapEntry"]:
+            return isinstance(msg, cls)
+
+    class StellarSorobanAuthorizationWithAddress(protobuf.MessageType):
+        nonce: "int"
+        signature_expiration_ledger: "int"
+        address: "str"
+        invocation: "StellarSorobanAuthorizedInvocation"
+
+        def __init__(
+            self,
+            *,
+            nonce: "int",
+            signature_expiration_ledger: "int",
+            address: "str",
+            invocation: "StellarSorobanAuthorizedInvocation",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["StellarSorobanAuthorizationWithAddress"]:
             return isinstance(msg, cls)
 
     class TelemetryGet(protobuf.MessageType):
@@ -7304,6 +7709,7 @@ if TYPE_CHECKING:
         data: "AnyBytes | None"
         timestamp: "int"
         fee_limit: "int | None"
+        chunkify: "bool | None"
 
         def __init__(
             self,
@@ -7315,6 +7721,7 @@ if TYPE_CHECKING:
             address_n: "list[int] | None" = None,
             data: "AnyBytes | None" = None,
             fee_limit: "int | None" = None,
+            chunkify: "bool | None" = None,
         ) -> None:
             pass
 

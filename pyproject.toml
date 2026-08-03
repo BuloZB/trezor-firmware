@@ -32,7 +32,7 @@ dependencies = [
     "munch>=4,<5",
     "autoflake",
     "flake8-requirements>=2.1.0",
-    "pylint~=2.11",
+    "pylint~=3.3",
     "demjson3",
     "graphviz",
     "click>=8,<9",
@@ -73,7 +73,11 @@ dev = [
 [tool.uv]
 package = false
 exclude-newer = "30 days"
-exclude-newer-package = { cryptography = "2026-06-09T22:32:33.447Z" }
+# Exempt stellar-sdk from the 30-day rule so the freshly released 15.0.0
+# final (needed for Protocol 27 support, see python/pyproject.toml) can be
+# resolved in the workspace lockfile.
+# TODO: remove after 2026-08-04
+exclude-newer-package = { stellar-sdk = "2026-07-05T00:00:00Z" }
 
 [tool.uv.sources]
 trezor = { path = "./python", editable = true }

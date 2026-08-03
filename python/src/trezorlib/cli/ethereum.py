@@ -20,12 +20,22 @@ import sys
 import tarfile
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, NoReturn, Optional, TextIO, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AnyStr,
+    Dict,
+    List,
+    NoReturn,
+    Optional,
+    TextIO,
+    cast,
+)
 
 import click
 
 from .. import _rlp, definitions, ethereum, tools
-from ..messages import EthereumDefinitions
+from ..messages import EthereumAccessList, EthereumDefinitions
 from . import with_session
 
 if TYPE_CHECKING:
@@ -105,7 +115,7 @@ def _amount_to_int(
 
 def _parse_access_list(
     ctx: click.Context, param: Any, value: str
-) -> List[ethereum.messages.EthereumAccessList]:
+) -> List[EthereumAccessList]:
     try:
         return [_parse_access_list_item(val) for val in value]
 
@@ -113,14 +123,12 @@ def _parse_access_list(
         raise click.BadParameter("Access List format invalid")
 
 
-def _parse_access_list_item(value: str) -> ethereum.messages.EthereumAccessList:
+def _parse_access_list_item(value: str) -> EthereumAccessList:
     try:
         arr = value.split(":")
         address, storage_keys = arr[0], arr[1:]
         storage_keys_bytes = [ethereum.decode_hex(key) for key in storage_keys]
-        return ethereum.messages.EthereumAccessList(
-            address=address, storage_keys=storage_keys_bytes
-        )
+        return EthereumAccessList(address=address, storage_keys=storage_keys_bytes)
 
     except Exception:
         raise click.BadParameter("Access List format invalid")
@@ -155,7 +163,7 @@ def _erc20_contract(
 
 
 def _format_access_list(
-    access_list: List[ethereum.messages.EthereumAccessList],
+    access_list: List[EthereumAccessList],
 ) -> "_rlp.RLPItem":
     return [
         (ethereum.decode_hex(item.address), item.storage_keys) for item in access_list
@@ -178,6 +186,7 @@ def _hex_or_file(data: str) -> bytes:
 class CliSource(definitions.Source):
     network: Optional[bytes] = None
     token: Optional[bytes] = None
+    display_format: Optional[bytes] = None
     delegate: definitions.Source = definitions.NullSource()
 
     def get_eth_network(self, chain_id: int) -> Optional[bytes]:
@@ -194,6 +203,13 @@ class CliSource(definitions.Source):
         if self.token is not None:
             return self.token
         return self.delegate.get_eth_token(chain_id, address)
+
+    def get_eth_display_format(
+        self, chain_id: int, address: AnyStr, func_sig: bytes
+    ) -> Optional[bytes]:
+        if self.display_format is not None:
+            return self.display_format
+        return self.delegate.get_eth_display_format(chain_id, address, func_sig)
 
 
 DEFINITIONS_SOURCE = CliSource()
@@ -230,11 +246,15 @@ def _network_def_from_address_n(address_n: tools.Address) -> Optional[bytes]:
 )
 @click.option("--network", help="Network definition blob.")
 @click.option("--token", help="Token definition blob.")
+@click.option(
+    "--display-format", help="ERC-7730 clear-signing contract descriptor blob."
+)
 def cli(
     defs: Optional[str],
     auto_definitions: Optional[bool],
     network: Optional[str],
     token: Optional[str],
+    display_format: Optional[str],
 ) -> None:
     """Ethereum commands.
 
@@ -249,11 +269,11 @@ def cli(
     - HTTP or HTTPS URL
     - path to local directory
     - path to local tar archive
-    \b
 
-    For debugging purposes, it is possible to force use a specific network and token
-    definition by using the `--network` and `--token` options. These options accept
-    either a path to a file with a binary blob, or a hex-encoded string.
+    For debugging purposes, it is possible to force use a specific network, token
+    or contract descriptor definition by using the `--network`, `--token` and
+    `--display-format` options. These options accept either a path to a file with a
+    binary blob, or a hex-encoded string.
     """
     if auto_definitions:
         if defs is not None:
@@ -270,12 +290,14 @@ def cli(
         elif defs.startswith("http"):
             DEFINITIONS_SOURCE.delegate = definitions.UrlSource(defs)
         else:
-            raise click.ClickException("Unrecognized --definitions value.")
+            raise click.ClickException("Unrecognized definition source.")
 
     if network is not None:
         DEFINITIONS_SOURCE.network = _hex_or_file(network)
     if token is not None:
         DEFINITIONS_SOURCE.token = _hex_or_file(token)
+    if display_format is not None:
+        DEFINITIONS_SOURCE.display_format = _hex_or_file(display_format)
 
 
 @cli.command()
@@ -374,7 +396,7 @@ def sign_tx(
     token: Optional[str],
     max_gas_fee: Optional[int],
     max_priority_fee: Optional[int],
-    access_list: List[ethereum.messages.EthereumAccessList],
+    access_list: List[EthereumAccessList],
     eip2718_type: Optional[int],
     chunkify: bool,
 ) -> str:
@@ -473,6 +495,8 @@ def sign_tx(
             access_list=access_list,
             definitions=defs,
             chunkify=chunkify,
+            supports_definition_request=True,
+            definition_source=DEFINITIONS_SOURCE,
         )
     else:
         if gas_price is None:
@@ -491,6 +515,8 @@ def sign_tx(
             chain_id=chain_id,
             definitions=defs,
             chunkify=chunkify,
+            supports_definition_request=True,
+            definition_source=DEFINITIONS_SOURCE,
         )
 
     to = ethereum.decode_hex(to_address)
@@ -641,3 +667,40 @@ def sign_typed_data_hash(
         "signature": f"0x{ret.signature.hex()}",
     }
     return output
+
+
+@cli.command()
+@click.option("-n", "--address", required=True, help=PATH_HELP)
+@click.option(
+    "-c", "--chain-id", type=int, default=1, help="EIP-155 chain id (replay protection)"
+)
+@click.option("-i", "--nonce", type=int, required=True, help="Transaction counter")
+@click.argument("delegate_addr")
+@with_session
+def sign_auth_eip7702(
+    session: "Session",
+    address: str,
+    chain_id: int,
+    nonce: int,
+    delegate_addr: str,
+) -> dict[str, Any]:
+    """
+    Sign EIP-7702 authorization.
+
+    If DELEGATE_ADDR is 0x0000000000000000000000000000000000000000, authorization is revoked.
+    """
+    address_n = tools.parse_path(address)
+    encoded_network = DEFINITIONS_SOURCE.get_eth_network(chain_id)
+    ret = ethereum.sign_auth_eip7702(
+        session,
+        address_n,
+        delegate=delegate_addr,
+        chain_id=chain_id,
+        nonce=nonce,
+        encoded_network=encoded_network,
+    )
+    return {
+        "v": ret.signature_v,
+        "r": f"0x{ret.signature_r.hex()}",
+        "s": f"0x{ret.signature_s.hex()}",
+    }

@@ -56,6 +56,24 @@ class SigHashType(IntEnum):
         raise ValueError("Unsupported sighash type.")
 
 
+class ExternalInputType(IntEnum):
+    PRESIGNED = 0
+    HAS_OWNERSHIP_PROOF = 1
+    UNVERIFIED = 2
+
+    @classmethod
+    def from_input(cls, txi: TxInput) -> "ExternalInputType":
+        if txi.script_type != InputScriptType.EXTERNAL:
+            raise RuntimeError(
+                "ExternalInputType.from_input called on non-external input"
+            )
+        if txi.witness or txi.script_sig:
+            return cls.PRESIGNED
+        if txi.ownership_proof:
+            return cls.HAS_OWNERSHIP_PROOF
+        return cls.UNVERIFIED
+
+
 # The number of bip32 levels used in a wallet (chain and address)
 BIP32_WALLET_DEPTH = const(2)
 
@@ -184,10 +202,8 @@ def input_is_external(txi: TxInput) -> bool:
 
 def input_is_external_unverified(txi: TxInput) -> bool:
     return (
-        txi.script_type == InputScriptType.EXTERNAL
-        and txi.ownership_proof is None
-        and txi.witness is None
-        and txi.script_sig is None
+        input_is_external(txi)
+        and ExternalInputType.from_input(txi) == ExternalInputType.UNVERIFIED
     )
 
 

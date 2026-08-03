@@ -143,6 +143,7 @@ impl FirmwareUI for UIEckhart {
     fn confirm_coinjoin(
         max_rounds: TString<'static>,
         max_feerate: TString<'static>,
+        max_coordinator_fee_pct: TString<'static>,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let paragraphs = Paragraphs::new([
             Paragraph::new(&theme::TEXT_REGULAR, TR::coinjoin__max_rounds)
@@ -153,7 +154,12 @@ impl FirmwareUI for UIEckhart {
             Paragraph::new(&theme::TEXT_REGULAR, TR::coinjoin__max_mining_fee)
                 .with_bottom_padding(theme::PROP_INNER_SPACING)
                 .no_break(),
-            Paragraph::new(&theme::TEXT_MONO_LIGHT, max_feerate),
+            Paragraph::new(&theme::TEXT_MONO_LIGHT, max_feerate)
+                .with_bottom_padding(theme::PROPS_SPACING),
+            Paragraph::new(&theme::TEXT_REGULAR, TR::coinjoin__max_coordinator_fee_pct)
+                .with_bottom_padding(theme::PROP_INNER_SPACING)
+                .no_break(),
+            Paragraph::new(&theme::TEXT_MONO_LIGHT, max_coordinator_fee_pct),
         ])
         .with_placement(LinearPlacement::vertical());
 
@@ -281,6 +287,7 @@ impl FirmwareUI for UIEckhart {
             false,
             Some(TR::confirm_total__title_fee.into()),
             None,
+            false,
         )?;
         Ok(flow)
     }
@@ -381,7 +388,7 @@ impl FirmwareUI for UIEckhart {
         items: Obj,
         hold: bool,
         verb: Option<TString<'static>>,
-        _external_menu: bool,
+        external_menu: bool,
     ) -> Result<impl LayoutMaybeTrace, Error> {
         let paragraphs = PropsList::new_styled(
             items,
@@ -394,8 +401,17 @@ impl FirmwareUI for UIEckhart {
         .into_paragraphs()
         .with_placement(LinearPlacement::vertical());
 
-        let flow =
-            flow::new_confirm_with_menu(title, None, paragraphs, None, verb, hold, None, None)?;
+        let flow = flow::new_confirm_with_menu(
+            title,
+            None,
+            paragraphs,
+            None,
+            verb,
+            hold,
+            None,
+            None,
+            external_menu,
+        )?;
         Ok(flow)
     }
 
@@ -558,6 +574,7 @@ impl FirmwareUI for UIEckhart {
         subtitle: Option<TString<'static>>,
         verb: Option<TString<'static>>,
         verb_cancel: Option<TString<'static>>,
+        verb_view_all: Option<TString<'static>>,
         hold: bool,
         chunkify: bool,
     ) -> Result<Gc<LayoutObj>, Error> {
@@ -565,7 +582,7 @@ impl FirmwareUI for UIEckhart {
             title,
             subtitle,
             value,
-            TR::buttons__view_all_data.into(),
+            verb_view_all.unwrap_or(TR::buttons__view_all_data.into()),
             verb_cancel,
             verb,
             hold,
@@ -613,6 +630,7 @@ impl FirmwareUI for UIEckhart {
             false,
             verb_info,
             None,
+            false,
         )?;
         LayoutObj::new_root(flow)
     }

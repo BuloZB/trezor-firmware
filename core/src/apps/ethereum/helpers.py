@@ -15,8 +15,6 @@ if TYPE_CHECKING:
 
     from .networks import EthereumNetworkInfo
 
-    ConfirmDataFn = Callable[[AnyBytes], Awaitable[None]]
-
     # Fetch the next calldata chunk from host.
     # `data_left: int` argument is provided.
     DataChunkLoader = Callable[[int], Awaitable[AnyBytes]]
@@ -233,81 +231,98 @@ def _from_bytes_bigendian_signed(b: AnyBytes) -> int:
         return int.from_bytes(b, "big")
 
 
-def get_progress_indicator(total_len: int, progress_len: int = 0) -> ConfirmDataFn:
-    from trezor.ui.layouts.progress import progress
+class DataChunkConfirmer:
+    def __init__(self, total_len: int) -> None:
+        self.total_len = total_len
+        self.confirmed_len = 0
+        self.progress_bar = None
+        self.first: bool = True
+        self.hasher: HashWriter | None = None
 
-    def _progress_value() -> int:
-        assert 0 <= progress_len <= total_len
-        if total_len == 0:
-            return 1000
-        return (1000 * progress_len) // total_len
+    async def confirm(self, chunk: AnyBytes) -> None:
+        from trezor.enums import ButtonRequestType
+        from trezor.ui.layouts import confirm_blob_intro, confirm_blob_prefix
 
-    layout = progress(title=TR.progress__loading_transaction)
-    layout.value = _progress_value()
-
-    async def confirm_fn(chunk: AnyBytes) -> None:
-        nonlocal progress_len
-        progress_len += len(chunk)
-        layout.report(_progress_value())
-
-    return confirm_fn
-
-
-def get_data_confirmer(total_len: int) -> ConfirmDataFn:
-    from trezor.enums import ButtonRequestType
-    from trezor.ui.layouts import confirm_blob_intro, confirm_blob_prefix
-
-    confirmed_len = 0
-    progress_bar: ConfirmDataFn | None = None
-    first: bool = True
-
-    async def confirm_fn(chunk: AnyBytes) -> None:
-        nonlocal confirmed_len
-        nonlocal progress_bar
-        nonlocal first
-
-        if first:
-            first = False
+        if self.first:
+            self.first = False
             # show intro layout
             skip = await confirm_blob_intro(
                 title=TR.ethereum__title_input_data,
                 value=chunk,
-                subtitle=TR.ethereum__data_size_template.format(total_len),
+                subtitle=TR.ethereum__data_size_template.format(self.total_len),
                 verb=TR.buttons__confirm,
                 verb_cancel=TR.send__cancel_sign,
+                verb_view_all=TR.ethereum__view_data_and_hash,
                 br_name="confirm_data",
                 br_code=ButtonRequestType.SignTx,
             )
             if skip:
                 # skip following chunks confirmation - use a progress bar instead
-                progress_bar = get_progress_indicator(total_len, progress_len=0)
+                self.progress_bar = self._get_progress_indicator()
+            else:
+                # ERC-8213 calldata digest will be confirmed after all calldata is hashed
+                # https://ethereum-magicians.org/t/erc-8213-wallet-signature-and-calldata-digest-display/24295#calldata-digest
+                self.hasher = keccak256(self.total_len.to_bytes(32, "big"))
 
-        if progress_bar is not None:
-            return await progress_bar(chunk)
+        if self.hasher is not None:
+            self.hasher.extend(chunk)
+
+        if self.progress_bar is not None:
+            return self.progress_bar(chunk)
 
         # for efficient chunk slicing (see below)
         chunk = memoryview(chunk)
         while True:
-            assert 0 <= confirmed_len <= total_len
+            assert 0 <= self.confirmed_len <= self.total_len
             prefix_len = await confirm_blob_prefix(
                 data=chunk,
-                total_len=total_len,
-                confirmed_len=confirmed_len,
+                total_len=self.total_len,
+                confirmed_len=self.confirmed_len,
                 br_name="confirm_data",
                 br_code=ButtonRequestType.SignTx,
             )
             if prefix_len is None:
                 # skip this and following chunks confirmation - use a progress bar instead
-                assert progress_bar is None
-                progress_bar = get_progress_indicator(total_len, confirmed_len)
-                return await progress_bar(chunk)
+                assert self.progress_bar is None
+                self.progress_bar = self._get_progress_indicator()
+                return self.progress_bar(chunk)
             else:
-                confirmed_len += prefix_len
+                self.confirmed_len += prefix_len
                 chunk = chunk[prefix_len:]
                 if not chunk:
                     return
 
-    return confirm_fn
+    def _get_progress_indicator(self) -> Callable[[AnyBytes], None]:
+        from trezor.ui.layouts.progress import progress
+
+        def _progress_value() -> int:
+            assert 0 <= self.confirmed_len <= self.total_len
+            if self.total_len == 0:
+                return 1000
+            return (1000 * self.confirmed_len) // self.total_len
+
+        layout = progress(title=TR.progress__loading_transaction)
+        layout.value = _progress_value()
+
+        def confirm_fn(chunk: AnyBytes) -> None:
+            self.confirmed_len += len(chunk)
+            layout.report(_progress_value())
+
+        return confirm_fn
+
+    async def confirm_digest(self) -> None:
+        if self.hasher is None:
+            return
+
+        if self.confirmed_len != self.total_len:
+            from trezor.wire import ProcessError
+
+            raise ProcessError("Missing calldata")
+
+        from trezor.ui.layouts import confirm_calldata_digest
+
+        # TODO: missing on Bolt & Caesar
+        return await confirm_calldata_digest(self.hasher.get_digest(), self.total_len)
 
 
 def keccak256(data: AnyBytes | None = None) -> HashWriter:

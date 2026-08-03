@@ -6,7 +6,8 @@ from trezor import TR, ui, utils
 from trezor.enums import ButtonRequestType, RecoveryType
 from trezor.wire import ActionCancelled
 
-from ..common import draw_simple, interact, raise_if_not_confirmed, with_info
+from ..common import interact, interact_simple, raise_if_not_confirmed, with_info
+from ..properties import with_colon
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes, StrOrBytes
@@ -727,6 +728,7 @@ async def confirm_blob_intro(
     subtitle: str,
     verb: str,
     verb_cancel: str,
+    verb_view_all: str,
     br_name: str,
     br_code: ButtonRequestType = BR_CODE_OTHER,
 ) -> bool:
@@ -834,7 +836,7 @@ def confirm_amount(
     br_name: str = "confirm_amount",
     br_code: ButtonRequestType = BR_CODE_OTHER,
 ) -> Awaitable[None]:
-    description = description or f"{TR.words__amount}:"  # def_arg
+    description = description or with_colon(TR.words__amount)  # def_arg
     return confirm_value(
         title,
         amount,
@@ -906,7 +908,6 @@ async def confirm_properties(
     br_code: ButtonRequestType = ButtonRequestType.ConfirmOutput,
     verb: str | None = None,
 ) -> None:
-    from ..properties import with_colon
 
     items = with_colon(
         (
@@ -1081,6 +1082,9 @@ if not utils.BITCOIN_ONLY:
             return len(prefix)
         return None
 
+    async def confirm_calldata_digest(digest: AnyBytes, size: int) -> None:
+        pass
+
     def confirm_ethereum_unknown_contract_warning(
         _title: str | None,
     ) -> Awaitable[None]:
@@ -1109,9 +1113,11 @@ if not utils.BITCOIN_ONLY:
             total_amount = f"{total_amount}\n{native_amount}"
 
         if is_send:
-            description = f"{TR.words__recipient}:"
+            description = with_colon(TR.words__recipient)
         else:
-            description = f"{TR.ethereum__interaction_contract}:" if recipient else None
+            description = (
+                with_colon(TR.ethereum__interaction_contract) if recipient else None
+            )
 
         address_ctx = trezorui_api.confirm_value(
             title=TR.words__address,
@@ -1138,9 +1144,9 @@ if not utils.BITCOIN_ONLY:
 
         total_ctx = trezorui_api.confirm_summary(
             amount=total_amount,
-            amount_label=f"{TR.words__amount}:",
+            amount_label=with_colon(TR.words__amount),
             fee=maximum_fee,
-            fee_label=f"{TR.send__maximum_fee}:",
+            fee_label=with_colon(TR.send__maximum_fee),
             title=TR.words__title_summary,
             extra_items=extra_items,  # used so that info button is shown
             extra_title=TR.confirm_total__title_fee,
@@ -1277,7 +1283,7 @@ if not utils.BITCOIN_ONLY:
 
         await _confirm_summary(
             native_amount,
-            f"{TR.words__amount}:" if native_amount else None,
+            TR.words__amount if native_amount else None,
             maximum_fee,
             TR.send__maximum_fee,
             TR.words__title_summary,
@@ -1498,6 +1504,96 @@ if not utils.BITCOIN_ONLY:
             br_code=br_code,
         )
 
+    async def confirm_ethereum_eip7702_auth(
+        delegate_name: str,
+        delegate_addr: str,
+        network_item: StrPropertyType,
+        account: str,
+        account_path: str,
+        nonce: int,
+    ) -> None:
+        with trezorui_api.show_warning(
+            title=TR.words__warning,
+            button=TR.buttons__confirm,
+            description=TR.ethereum__auth_warn,
+            allow_cancel=True,
+            danger=True,
+        ) as layout:
+            await raise_if_not_confirmed(layout, "ethereum/auth7702/warn")
+
+        main_ctx = trezorui_api.confirm_properties(
+            title=TR.ethereum__auth_title,
+            items=with_colon(
+                (
+                    (TR.ethereum__delegating, account, False),
+                    (TR.ethereum__to, delegate_name, False),
+                    network_item,
+                )
+            ),
+            hold=True,
+            external_menu=True,
+        )
+        menu_ctx = trezorui_api.show_info_with_cancel(
+            title="",
+            items=with_colon(
+                (
+                    (TR.words__account, account, False),
+                    (TR.address_details__derivation_path, account_path, False),
+                    (TR.ethereum__smart_info, delegate_addr, False),
+                    # TODO: switch to non-Cardano specific string
+                    (TR.cardano__nonce, str(nonce), False),
+                )
+            ),
+        )
+        with main_ctx as main, menu_ctx as menu:
+            await with_info(
+                main, menu, "ethereum/auth7702/details", ButtonRequestType.SignTx
+            )
+
+    async def confirm_ethereum_eip7702_revoke(
+        network_item: StrPropertyType,
+        account: str,
+        account_path: str,
+        nonce: int,
+    ) -> None:
+        with trezorui_api.confirm_action(
+            title=TR.ethereum__revoke_title,
+            description=None,
+            action=TR.ethereum__revoke_warn.format(account),
+            verb=TR.buttons__continue,
+        ) as layout:
+            await raise_if_not_confirmed(
+                layout, "ethereum/revoke7702/intro", ButtonRequestType.SignTx
+            )
+
+        main_ctx = trezorui_api.confirm_properties(
+            title=TR.ethereum__revoke_title,
+            items=with_colon(
+                (
+                    (TR.ethereum__approve_revoke_from, account, False),
+                    network_item,
+                )
+            ),
+            verb=TR.buttons__confirm,
+            hold=True,
+            external_menu=True,
+        )
+        menu_ctx = trezorui_api.show_info_with_cancel(
+            title="",
+            items=with_colon(
+                (
+                    (TR.words__account, account, False),
+                    (TR.address_details__derivation_path, account_path, False),
+                    # TODO: switch to non-Cardano specific string
+                    (TR.cardano__nonce, str(nonce), False),
+                )
+            ),
+        )
+        with main_ctx as main, menu_ctx as menu:
+            await with_info(
+                main, menu, "ethereum/revoke7702/details", ButtonRequestType.SignTx
+            )
+
     def confirm_solana_unknown_token_warning() -> Awaitable[None]:
         return show_danger(
             "unknown_token_warning", content=TR.solana__unknown_token_address
@@ -1570,7 +1666,7 @@ if not utils.BITCOIN_ONLY:
         confirm_ctx = trezorui_api.confirm_value(
             title=title,
             description=description,
-            extra=f"{TR.words__provider}:" if vote_account else None,
+            extra=with_colon(TR.words__provider) if vote_account else None,
             value=vote_account,
             verb=TR.buttons__continue,
             info=True,
@@ -1775,7 +1871,7 @@ if not utils.BITCOIN_ONLY:
         fee: str | None,
         account_details: tuple[str | None, str],
         address: str,
-        chunkify: bool = True,
+        chunkify: bool = False,
     ) -> None:
         await confirm_address(
             title=TR.words__send,
@@ -1866,7 +1962,7 @@ if not utils.BITCOIN_ONLY:
         recipient_addr: str,
         amount_str: str,
         maximum_fee: str,
-        chunkify: bool = True,
+        chunkify: bool = False,
     ) -> None:
         br_name = "tron/transfer"
         title = TR.words__send
@@ -2044,10 +2140,13 @@ async def confirm_modify_fee(
         )
 
 
-async def confirm_coinjoin(max_rounds: int, max_fee_per_vbyte: str) -> None:
+async def confirm_coinjoin(
+    max_rounds: int, max_fee_per_vbyte: str, max_coordinator_fee_pct: str
+) -> None:
     with trezorui_api.confirm_coinjoin(
         max_rounds=str(max_rounds),
         max_feerate=max_fee_per_vbyte,
+        max_coordinator_fee_pct=max_coordinator_fee_pct,
     ) as layout:
         return await raise_if_not_confirmed(layout, "coinjoin_final", BR_CODE_OTHER)
 
@@ -2188,8 +2287,9 @@ def error_popup(
     return layout
 
 
-def request_passphrase_on_host() -> None:
-    draw_simple(trezorui_api.show_simple(title=None, text=TR.passphrase__please_enter))
+async def request_passphrase_on_host() -> None:
+    ctx = trezorui_api.show_simple(title=None, text=TR.passphrase__please_enter)
+    await interact_simple(ctx)
 
 
 async def request_passphrase_on_device(max_len: int) -> str:

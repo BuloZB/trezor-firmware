@@ -5,6 +5,7 @@ from trezor.wire import ProcessError
 
 from .transaction import Transaction
 from .transaction.instructions import (
+    _STAKE_PROGRAM_ID,
     _SYSTEM_PROGRAM_ID,
     AssociatedTokenAccountProgramCreateInstruction,
     Instruction,
@@ -104,6 +105,11 @@ def is_predefined_token_transfer(
     owner = transfer_token_instructions[0].owner[0]
 
     for transfer_token_instruction in transfer_token_instructions:
+        if is_address_reference(transfer_token_instruction.destination_account):
+            # ALT-referenced destination can't be resolved on-device, fall back
+            # to the generic reference-aware display instead of showing the
+            # lookup table address as the recipient.
+            return False
         if (
             transfer_token_instruction.program_id != token_program
             or transfer_token_instruction.token_mint[0] != token_mint
@@ -298,6 +304,9 @@ async def try_confirm_staking_transaction(
         from .layout import confirm_stake_transaction, confirm_stake_withdrawer
 
         create, init, delegate = instructions
+        if base58.encode(create.owner) != _STAKE_PROGRAM_ID:
+            return False
+
         if signer_public_key != create.funding_account[0]:
             return False
         if signer_public_key != create.base:
@@ -349,14 +358,18 @@ async def try_confirm_staking_transaction(
         from .layout import confirm_claim_recipient, confirm_claim_transaction
 
         total_amount = 0
+        recipient = instructions[0].recipient_account[0]
         for withdraw in instructions:
             if signer_public_key != withdraw.withdrawal_authority[0]:
                 return False
             if is_address_reference(withdraw.recipient_account):
                 return False
-            if signer_public_key != withdraw.recipient_account[0]:
-                await confirm_claim_recipient(withdraw.recipient_account[0], chunkify)
+            if recipient != withdraw.recipient_account[0]:
+                return False
             total_amount += withdraw.lamports
+
+        if recipient != signer_public_key:
+            await confirm_claim_recipient(recipient, chunkify)
 
         await confirm_claim_transaction(
             fee=fee,
