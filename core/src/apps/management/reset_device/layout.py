@@ -1,5 +1,5 @@
 from micropython import const
-from typing import TYPE_CHECKING, Iterable, Protocol, Sequence
+from typing import TYPE_CHECKING, Protocol
 
 from trezor import utils
 from trezor.ui.layouts.reset import (  # noqa: F401
@@ -12,6 +12,8 @@ from trezor.ui.layouts.reset import (  # noqa: F401
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
     from trezor.messages import BackupMethod
 
 _NUM_OF_CHOICES = const(3)
@@ -28,7 +30,8 @@ async def _confirm_word(
     from trezor.ui.layouts.reset import select_word
 
     # remove duplicates
-    non_duplicates = list(set(share_words))
+    # sort list to make UI tests independent on micropython hash function
+    non_duplicates = sorted(set(share_words))
     # shuffle list
     random.shuffle(non_duplicates)
     # take top _NUM_OF_CHOICES words
@@ -198,7 +201,7 @@ class _DisplayBackup:
 async def choose_backup_handler(method: BackupMethod | None) -> BackupHandler:
     from trezor.enums import BackupMethod
 
-    if utils.USE_N4W1:
+    if utils.USE_N1W1:
         if method is None:
             from trezor.ui.layouts.recovery import choose_method
 
@@ -207,8 +210,8 @@ async def choose_backup_handler(method: BackupMethod | None) -> BackupHandler:
                 TR.backup__type_create,
             )
 
-        if method is BackupMethod.N4W1:
-            return _N4W1Backup()
+        if method is BackupMethod.N1W1:
+            return _N1W1Backup()
 
     if method not in (None, BackupMethod.Display):
         from trezor import log
@@ -219,48 +222,48 @@ async def choose_backup_handler(method: BackupMethod | None) -> BackupHandler:
     return _DisplayBackup()
 
 
-if utils.USE_N4W1:
+if utils.USE_N1W1:
 
     from trezor import TR
 
     if TYPE_CHECKING:
         from buffer_types import AnyBytes
 
-        from apps.debug.n4w1_mock import N4W1Context
+        from apps.debug.n1w1_mock import N1W1Context
 
     class RetryWrite(Exception):
         def __init__(self, msg: str) -> None:
             self.msg = msg
 
-    class _N4W1Backup:
+    class _N1W1Backup:
 
         async def intro(self, num_of_words: int | None = None) -> None:
-            # TODO(N4W1): design/copy
+            # TODO(N1W1): design/copy
             pass
 
         async def backup(self, iter_shares: Iterable[ShareInfo]) -> None:
-            # TODO(N4W1): warn user about safety
+            # TODO(N1W1): warn user about safety
 
             # backup all shares
             for share in iter_shares:
                 await self._backup_share(share)
 
         async def _backup_share(self, share: ShareInfo) -> None:
-            from apps.debug import n4w1_mock
+            from apps.debug import n1w1_mock
 
-            # TODO(N4W1): use protobuf?
+            # TODO(N1W1): use protobuf?
             blob = " ".join(share.words).encode()
 
             if share.index == 0 or share.num_of_shares is None:
-                description, button = TR.n4w1__hold_first, TR.n4w1__footer_first
+                description, button = TR.n1w1__hold_first, TR.n1w1__footer_first
             elif share.index == share.num_of_shares - 1:
-                description, button = TR.n4w1__hold_last, TR.n4w1__footer_last
+                description, button = TR.n1w1__hold_last, TR.n1w1__footer_last
             else:
-                description, button = TR.n4w1__hold_next, TR.n4w1__footer_next
+                description, button = TR.n1w1__hold_next, TR.n1w1__footer_next
 
             while True:
                 try:
-                    with n4w1_mock.ctx as ctx:
+                    with n1w1_mock.ctx as ctx:
                         return await _write_share(ctx, description, button, blob)
                 except RetryWrite as exc:
                     import trezorui_api
@@ -273,11 +276,11 @@ if utils.USE_N4W1:
                         danger=True,
                     ) as layout:
                         await raise_if_not_confirmed(layout, br_name="backup_retry")
-                    # wait for a new N4W1 tag
+                    # wait for a new N1W1 tag
                     continue
 
     async def _write_share(
-        ctx: N4W1Context, description: str, button: str, blob: AnyBytes
+        ctx: N1W1Context, description: str, button: str, blob: AnyBytes
     ) -> None:
         from trezor.ui.layouts.progress import progress
 
@@ -287,17 +290,17 @@ if utils.USE_N4W1:
             button=button,
             br_name="backup_write",
         )
-        # continue N4W1 communication (the tag is connected)
+        # continue N1W1 communication (the tag is connected)
         result = await ctx.read(key="mnemonic")
         if result is not None:
-            raise RetryWrite(TR.n4w1__err_nonempty)
+            raise RetryWrite(TR.n1w1__err_nonempty)
 
-        progress_obj = progress(description=TR.n4w1__writing)
+        progress_obj = progress(description=TR.n1w1__writing)
         progress_obj.start()
         progress_obj.report(100)
         try:
             await ctx.write(key="mnemonic", value=blob)
-            # TODO(N4W1): animate during I/O?
+            # TODO(N1W1): animate during I/O?
             progress_obj.report(1000)
         finally:
             progress_obj.stop()

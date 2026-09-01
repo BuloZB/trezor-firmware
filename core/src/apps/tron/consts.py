@@ -4,7 +4,7 @@ from trezor.enums import MessageType
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes
-    from typing import Iterator, Tuple
+    from collections.abc import Iterator
 
 TYPE_URL_TEMPLATE = "type.googleapis.com/protocol."
 
@@ -16,6 +16,8 @@ CONTRACT_TYPES = (
     MessageType.TronUnfreezeBalanceV2Contract,
     MessageType.TronWithdrawUnfreeze,
     MessageType.TronWithdrawBalance,
+    MessageType.TronDelegateResourceContract,
+    MessageType.TronUnDelegateResourceContract,
 )
 
 # https://github.com/tronprotocol/protocol/blob/37bb922a9967bbbef1e84de1c9e5cda56a2d7998/core/Tron.proto#L339-L379
@@ -27,6 +29,8 @@ CONTRACT_TYPE_NAMES = {
     54: "FreezeBalanceV2Contract",
     55: "UnfreezeBalanceV2Contract",
     56: "WithdrawExpireUnfreezeContract",
+    57: "DelegateResourceContract",
+    58: "UnDelegateResourceContract",
 }
 
 
@@ -58,7 +62,7 @@ _STRX_ADDRESS = b"\x41\xc6\x4e\x69\xac\xde\x1c\x7b\x16\xc2\xa3\xef\xcd\xbb\xda\x
 _KLEVER_ADDRESS = b"\x41\xd8\xb8\x08\x98\x56\xce\xd3\x03\x86\x01\xcb\xeb\x1e\x3f\x76\x5c\xab\xc1\x2a\x41"
 
 
-def token_iterator() -> Iterator[Tuple[AnyBytes, int, str]]:
+def token_iterator() -> Iterator[tuple[AnyBytes, int, str]]:
     yield (_SHASTA_USDT_ADDRESS, 6, "tUSDT")
     yield (_USDT_ADDRESS, 6, "USDT")
     yield (_USDD_ADDRESS, 18, "USDD")

@@ -23,11 +23,11 @@ if TYPE_CHECKING:
 
 
 def decode_definition(definition: AnyBytes, expected_type: type[DefType]) -> DefType:
-    from trezor.crypto.cosi import verify as cosi_verify
     from trezor.crypto.hashlib import sha256
     from trezor.enums import DefinitionType
     from trezor.protobuf import decode as protobuf_decode
     from trezor.utils import BufferReader
+    from trezordefinitions import verify
 
     from apps.common import readers
 
@@ -46,15 +46,20 @@ def decode_definition(definition: AnyBytes, expected_type: type[DefType]) -> Def
         expected_type_number = DefinitionType.ETHEREUM_DISPLAY_FORMAT
 
     try:
-        # first check format version
-        if r.read_memoryview(len(consts.FORMAT_VERSION)) != consts.FORMAT_VERSION:
+        # first check magic
+        if r.read_memoryview(len(consts.MAGIC)) != consts.MAGIC:
             raise DataError("Invalid definition")
 
-        # second check the type of the data
+        # second check the format version
+        format_version = r.read_memoryview(1)
+        if format_version not in consts.SUPPORTED_FORMAT_VERSIONS:
+            raise DataError("Invalid definition")
+
+        # third check the type of the data
         if r.get() != expected_type_number:
             raise DataError("Definition type mismatch")
 
-        # third check data version
+        # fourth check data version
         if readers.read_uint32_le(r) < consts.MIN_DATA_VERSION:
             raise DataError("Definition is outdated")
 
@@ -87,13 +92,9 @@ def decode_definition(definition: AnyBytes, expected_type: type[DefType]) -> Def
         raise DataError("Invalid definition")
 
     # verify signature
-    result = cosi_verify(signature, hash, consts.THRESHOLD, consts.PUBLIC_KEYS, sigmask)
-    if __debug__:
-        debug_result = cosi_verify(
-            signature, hash, consts.THRESHOLD, consts.DEV_PUBLIC_KEYS, sigmask
-        )
-        result = result or debug_result
-    if not result:
+    try:
+        verify(hash, signature, sigmask, format_version[0])
+    except ValueError:
         raise DataError("Invalid definition signature")
 
     # decode it if it's OK

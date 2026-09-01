@@ -14,8 +14,6 @@ if TYPE_CHECKING:
     *[PATTERN], slip44_id=SLIP44_ID, curve=CURVE, slip21_namespaces=[[b"SLIP-0024"]]
 )
 async def sign_tx(msg: StellarSignTx, keychain: Slip21Keychain) -> StellarSignedTx:
-    from ubinascii import hexlify
-
     from trezor import TR
     from trezor.crypto.curve import ed25519
     from trezor.crypto.hashlib import sha256
@@ -105,7 +103,7 @@ async def sign_tx(msg: StellarSignTx, keychain: Slip21Keychain) -> StellarSigned
         if msg.memo_hash is None:
             raise DataError("Stellar: Missing memo hash")
         writers.write_bytes_fixed(w, bytearray(msg.memo_hash), 32)
-        memo_confirm_text = hexlify(msg.memo_hash).decode()
+        memo_confirm_text = msg.memo_hash.hex()
     else:
         raise ProcessError("Stellar invalid memo type")
 
@@ -146,7 +144,14 @@ async def sign_tx(msg: StellarSignTx, keychain: Slip21Keychain) -> StellarSigned
             # Soroban transactions do not support memos
             await layout.require_confirm_memo(memo_type, memo_confirm_text)
 
-        await process_operation(w, op, current_output_index, verifier)  # type: ignore [Argument of type "StellarInvokeHostFunctionOp | MessageType" cannot be assigned to parameter "op" of type "StellarMessageType" in function "process_operation"]
+        await process_operation(
+            w,
+            op,  # type: ignore [Argument of type "StellarInvokeHostFunctionOp | MessageType" cannot be assigned to parameter "op" of type "StellarMessageType" in function "process_operation"]
+            current_output_index,
+            verifier,
+            msg.source_account,
+            network_passphrase_hash,
+        )
 
         if msg.payment_req:
             assert verifier is not None

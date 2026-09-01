@@ -1,7 +1,5 @@
-from ubinascii import unhexlify  # noqa: F401
-
+import cosi_helpers as cosi
 from trezor import messages, protobuf
-from trezor.crypto import cosi
 from trezor.crypto.curve import ed25519
 from trezor.crypto.hashlib import sha256
 from trezor.enums import DefinitionType
@@ -48,7 +46,8 @@ def make_solana_token(
 
 
 def make_payload(
-    prefix: bytes = b"trzd1",
+    magic: bytes = b"trzd",
+    format_version: bytes = b"1",
     data_type: DefinitionType = DefinitionType.ETHEREUM_NETWORK,
     timestamp: int = 0xFFFF_FFFF,
     message: (
@@ -58,7 +57,8 @@ def make_payload(
         | bytes
     ) = make_eth_network(),
 ) -> bytes:
-    payload = prefix
+    payload = magic
+    payload += format_version
     payload += data_type.to_bytes(1, "little")
     payload += timestamp.to_bytes(4, "little")
     if isinstance(message, bytes):

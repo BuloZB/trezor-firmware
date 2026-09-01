@@ -27,7 +27,8 @@ from .helpers.utils import (
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes
-    from typing import Callable, Iterable, Literal
+    from collections.abc import Callable, Iterable
+    from typing import Literal
 
     from trezor import messages
     from trezor.enums import CardanoNativeScriptHashDisplayFormat
@@ -626,7 +627,7 @@ async def confirm_tx(
     total_amount = format_coin_amount(spending, network_id)
     fee_amount = format_coin_amount(fee, network_id)
     items: Iterable[StrPropertyType] = (
-        (TR.cardano__network, protocol_magics.to_ui_string(protocol_magic), True),
+        (TR.words__network, protocol_magics.to_ui_string(protocol_magic), True),
         (
             TR.cardano__valid_since,
             format_optional_int(validity_interval_start),
@@ -676,7 +677,7 @@ async def confirm_tx_details(
     if is_network_id_verifiable:
         append(
             (
-                TR.cardano__network,
+                TR.words__network,
                 protocol_magics.to_ui_string(protocol_magic),
                 None,
             )
@@ -866,7 +867,7 @@ async def confirm_stake_pool_registration_final(
         TR.cardano__confirm_transaction,
         (
             (None, TR.cardano__confirm_signing_stake_pool, None),
-            (TR.cardano__network, protocol_magics.to_ui_string(protocol_magic), True),
+            (TR.words__network, protocol_magics.to_ui_string(protocol_magic), True),
             (
                 TR.cardano__valid_since,
                 format_optional_int(validity_interval_start),
@@ -990,7 +991,7 @@ async def confirm_cvote_registration_delegation(
         (TR.cardano__delegating_to, public_key, True),
     ]
     if weight is not None:
-        props.append((TR.cardano__weight, str(weight), True))
+        props.append((TR.words__weight, str(weight), True))
 
     await confirm_properties(
         "confirm_cvote_registration_delegation",

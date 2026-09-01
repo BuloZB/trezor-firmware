@@ -1,4 +1,6 @@
 #![no_std]
 #![no_main]
 
-use trezor_lib as _;
+// force pull in Rust generated symbols (incl. the panic handler)
+use io as _;
+use sys as _;

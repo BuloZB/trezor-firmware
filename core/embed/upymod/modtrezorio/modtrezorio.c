@@ -37,8 +37,6 @@
 
 #include <io/usb.h>
 
-uint32_t last_touch_sample_time = 0;
-
 #define CHECK_PARAM_RANGE(value, minimum, maximum) \
   if (value < minimum || value > maximum) {        \
     const char *msg = (#value " is out of range"); \
@@ -103,7 +101,7 @@ uint32_t last_touch_sample_time = 0;
 /// USBIF_DEBUG: int  # interface id of the USB debug interface
 /// USBIF_WEBAUTHN: int  # interface id of the USB WebAuthn
 
-STATIC const mp_rom_map_elem_t mp_module_trezorio_globals_table[] = {
+static const mp_rom_map_elem_t mp_module_trezorio_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_trezorio)},
 
 #ifdef USE_SD_CARD
@@ -157,7 +155,7 @@ STATIC const mp_rom_map_elem_t mp_module_trezorio_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_USB_EVENT), MP_ROM_INT(SYSHANDLE_USB)},
 };
 
-STATIC MP_DEFINE_CONST_DICT(mp_module_trezorio_globals,
+static MP_DEFINE_CONST_DICT(mp_module_trezorio_globals,
                             mp_module_trezorio_globals_table);
 
 const mp_obj_module_t mp_module_trezorio = {

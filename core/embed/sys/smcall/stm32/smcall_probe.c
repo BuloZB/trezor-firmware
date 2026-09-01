@@ -29,8 +29,13 @@
 #ifdef SECMON
 
 bool probe_read_access(const void *addr, size_t len) {
+  // NULL is not a valid non-secure address. Rejected explicitly so that this
+  // function enforces the rule, instead of inheriting it from the range check
+  // below. Smcall arguments that are optional by contract must use
+  // `probe_read_access_opt()` or the corresponding
+  // `_opt_const_size` variant instead.
   if (addr == NULL) {
-    return true;
+    return false;
   }
 
   // Address overflow check
@@ -47,8 +52,13 @@ bool probe_read_access(const void *addr, size_t len) {
 }
 
 bool probe_write_access(void *addr, size_t len) {
+  // NULL is not a valid non-secure address. Rejected explicitly so that this
+  // function enforces the rule, instead of inheriting it from the range check
+  // below. Smcall arguments that are optional by contract must use
+  // `probe_write_access_opt()` or the corresponding
+  // `_opt_const_size` variant instead.
   if (addr == NULL) {
-    return true;
+    return false;
   }
 
   // Address overflow check
@@ -65,8 +75,11 @@ bool probe_write_access(void *addr, size_t len) {
 }
 
 bool probe_execute_access(const void *addr) {
+  // NULL is not a valid non-secure address. Rejected explicitly, as in the read
+  // and write probes, so that all three state the same rule. Smcall arguments
+  // that accept NULL by contract must use `probe_execute_access_opt()` instead.
   if (addr == NULL) {
-    return true;
+    return false;
   }
 
   // Just check if the address is in non-secure address range

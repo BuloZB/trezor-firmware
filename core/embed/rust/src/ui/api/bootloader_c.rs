@@ -1,14 +1,14 @@
+use rtl::CSlice;
+
 use crate::strutil::hexlify;
 use crate::ui::ui_bootloader::BootloaderUI;
 use crate::ui::ModelUI;
-use crate::util::{from_c_array, from_c_str};
 
 #[no_mangle]
-extern "C" fn screen_welcome(ui_action_result: *mut u32) -> u32 {
+unsafe extern "C" fn screen_welcome(ui_action_result: *mut u32) -> u32 {
     let (res, ui_res) = ModelUI::screen_welcome();
-    unsafe {
-        *ui_action_result = ui_res;
-    }
+    // SAFETY: caller should provide a valid pointer
+    unsafe { *ui_action_result = ui_res };
     res
 }
 
@@ -27,7 +27,7 @@ extern "C" fn screen_install_fail() {
 }
 
 #[no_mangle]
-extern "C" fn screen_install_confirm(
+unsafe extern "C" fn screen_install_confirm(
     vendor_str: *const cty::c_char,
     vendor_str_len: u8,
     version: *const cty::c_char,
@@ -37,8 +37,9 @@ extern "C" fn screen_install_confirm(
     is_newinstall: bool,
     version_cmp: cty::c_int,
 ) -> u32 {
-    let text = unwrap!(unsafe { from_c_array(vendor_str, vendor_str_len as usize) });
-    let version = unwrap!(unsafe { from_c_str(version) });
+    // SAFETY: caller should provide valid pointers
+    let text = unsafe { CSlice::from_ptr_and_len(vendor_str, vendor_str_len as usize) };
+    let version = unsafe { CSlice::from_c_str(version) };
 
     let mut fingerprint_buffer: [u8; 64] = [0; 64];
     let fingerprint_str = unsafe {
@@ -48,8 +49,8 @@ extern "C" fn screen_install_confirm(
     };
 
     ModelUI::screen_install_confirm(
-        text,
-        version,
+        unwrap!(text.as_ascii_str()),
+        unwrap!(version.as_ascii_str()),
         fingerprint_str,
         should_keep_seed,
         is_newvendor,
@@ -74,31 +75,36 @@ extern "C" fn screen_unlock_bootloader_success() {
 }
 
 #[no_mangle]
-extern "C" fn screen_menu(
+unsafe extern "C" fn screen_menu(
     initial_setup: bool,
     communication: bool,
     ui_action_result: *mut u32,
 ) -> u32 {
     let (res, ui_res) = ModelUI::screen_menu(initial_setup, communication);
-    unsafe {
-        *ui_action_result = ui_res;
-    }
+    // SAFETY: caller should provide a valid pointer
+    unsafe { *ui_action_result = ui_res };
     res
 }
 
 #[no_mangle]
-extern "C" fn screen_intro(
+unsafe extern "C" fn screen_intro(
     bld_version: *const cty::c_char,
     vendor_str: *const cty::c_char,
     vendor_str_len: u8,
     version: *const cty::c_char,
     fw_ok: bool,
 ) -> u32 {
-    let vendor = unwrap!(unsafe { from_c_array(vendor_str, vendor_str_len as usize) });
-    let version = unwrap!(unsafe { from_c_str(version) });
-    let bld_version = unwrap!(unsafe { from_c_str(bld_version) });
+    // SAFETY: caller should provide valid pointers
+    let vendor = unsafe { CSlice::from_ptr_and_len(vendor_str, vendor_str_len as usize) };
+    let version = unsafe { CSlice::from_c_str(version) };
+    let bld_version = unsafe { CSlice::from_c_str(bld_version) };
 
-    ModelUI::screen_intro(bld_version, vendor, version, fw_ok)
+    ModelUI::screen_intro(
+        unwrap!(bld_version.as_ascii_str()),
+        unwrap!(vendor.as_ascii_str()),
+        unwrap!(version.as_ascii_str()),
+        fw_ok,
+    )
 }
 
 #[no_mangle]
@@ -112,7 +118,7 @@ extern "C" fn screen_boot_empty() {
 }
 
 #[no_mangle]
-extern "C" fn screen_boot(
+unsafe extern "C" fn screen_boot(
     warning: bool,
     vendor_str: *const cty::c_char,
     vendor_str_len: usize,
@@ -121,15 +127,21 @@ extern "C" fn screen_boot(
     vendor_img_len: usize,
     wait: i32,
 ) {
-    let vendor_str = unsafe { from_c_array(vendor_str, vendor_str_len) };
-    let vendor_img =
-        unsafe { core::slice::from_raw_parts(vendor_img as *const u8, vendor_img_len) };
+    // SAFETY: caller should provide valid pointers
+    let vendor_str = unsafe { CSlice::from_ptr_and_len(vendor_str, vendor_str_len) };
+    let vendor_img = unsafe { CSlice::from_ptr_and_len(vendor_img as *const u8, vendor_img_len) };
 
     // Splits a version stored as a u32 into four numbers
     // starting with the major version.
     let version = version.to_le_bytes();
 
-    ModelUI::screen_boot(warning, vendor_str, version, vendor_img, wait);
+    ModelUI::screen_boot(
+        warning,
+        vendor_str.as_ascii_str(),
+        version,
+        vendor_img.as_slice().unwrap_or_default(),
+        wait,
+    )
 }
 
 #[no_mangle]
@@ -154,9 +166,8 @@ extern "C" fn screen_connect(
     ui_action_result: *mut u32,
 ) -> u32 {
     let (res, ui_res) = ModelUI::screen_connect(initial_setup, show_menu);
-    unsafe {
-        *ui_action_result = ui_res;
-    }
+    // SAFETY: caller should provide a valid pointer
+    unsafe { *ui_action_result = ui_res };
     res
 }
 
@@ -178,34 +189,35 @@ extern "C" fn screen_confirm_pairing(code: u32, initial_setup: bool) -> u32 {
 
 #[cfg(feature = "ble")]
 #[no_mangle]
-extern "C" fn screen_pairing_mode(
+unsafe extern "C" fn screen_pairing_mode(
     initial_setup: bool,
     name: *const cty::c_char,
     name_len: usize,
     ui_action_result: *mut u32,
 ) -> u32 {
-    let name = unsafe { from_c_array(name, name_len).unwrap_or("") };
+    // SAFETY: caller should provide a valid string
+    let name = unsafe { CSlice::from_ptr_and_len(name, name_len) };
 
-    let (res, ui_res) = ModelUI::screen_pairing_mode(initial_setup, name);
-    unsafe {
-        *ui_action_result = ui_res;
-    }
+    let (res, ui_res) =
+        ModelUI::screen_pairing_mode(initial_setup, name.as_ascii_str().unwrap_or_default());
+    // SAFETY: caller should provide a valid pointer
+    unsafe { *ui_action_result = ui_res };
     res
 }
 
 #[cfg(feature = "ble")]
 #[no_mangle]
-extern "C" fn screen_wireless_setup(
+unsafe extern "C" fn screen_wireless_setup(
     name: *const cty::c_char,
     name_len: usize,
     ui_action_result: *mut u32,
 ) -> u32 {
-    let name = unsafe { from_c_array(name, name_len).unwrap_or("") };
+    // SAFETY: caller should provide a valid string
+    let name = unsafe { CSlice::from_ptr_and_len(name, name_len) };
 
-    let (res, ui_res) = ModelUI::screen_wireless_setup(name);
-    unsafe {
-        *ui_action_result = ui_res;
-    }
+    let (res, ui_res) = ModelUI::screen_wireless_setup(name.as_ascii_str().unwrap_or_default());
+    // SAFETY: caller should provide a valid pointer
+    unsafe { *ui_action_result = ui_res };
     res
 }
 

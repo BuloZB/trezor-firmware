@@ -14,7 +14,7 @@
 # You should have received a copy of the License along with this library.
 # If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
 
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 from mnemonic import Mnemonic
@@ -25,6 +25,7 @@ from trezorlib.btc import get_public_node
 from trezorlib.debuglink import DebugLink
 from trezorlib.debuglink import DebugSession as Session
 from trezorlib.debuglink import TrezorTestContext
+from trezorlib.exceptions import TrezorFailure
 from trezorlib.testing.common import BRGeneratorType
 from trezorlib.tools import parse_path
 
@@ -339,6 +340,29 @@ def test_entropy_check(session: Session):
             passphrase_protection=False,
             _get_entropy=MOCK_GET_ENTROPY,
         )
+
+
+@pytest.mark.setup_client(uninitialized=True)
+@pytest.mark.parametrize("entropy_check", [True, False])
+def test_insufficient_external_entropy(session: Session, entropy_check: bool):
+    strength = 128
+    with session.test_ctx:
+        session.call(
+            messages.ResetDevice(
+                strength=strength,
+                pin_protection=False,
+                passphrase_protection=False,
+                skip_backup=True,
+                backup_type=messages.BackupType.Bip39,
+                entropy_check=entropy_check,
+            ),
+            expect=messages.EntropyRequest,
+        )
+
+        # Provide external entropy that is one byte short of the required strength.
+        ext_entropy = EXTERNAL_ENTROPY[: strength // 8 - 1]
+        with pytest.raises(TrezorFailure, match="Insufficient external entropy"):
+            session.call(messages.EntropyAck(entropy=ext_entropy))
 
 
 @pytest.mark.setup_client(uninitialized=True)

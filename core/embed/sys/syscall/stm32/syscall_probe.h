@@ -30,15 +30,69 @@
 
 // Checks if the current application task has read access to the
 // given memory range.
+//
+// `addr` must point inside the task's memory. NULL is always rejected.
+// For optional arguments, use `probe_read_access_opt()` if NULL implies
+// zero length, or `probe_read_access_opt_const_size()` if NULL is allowed
+// regardless of the length.
 bool probe_read_access(const void *addr, size_t len);
 
 // Checks if the current application task has write access to the
 // given memory range.
+//
+// `addr` must point inside the task's memory. NULL is always rejected.
+// For optional arguments, use `probe_write_access_opt()` if NULL implies
+// zero length, or `probe_write_access_opt_const_size()` if NULL is allowed
+// regardless of the length.
 bool probe_write_access(void *addr, size_t len);
 
 // Checks if the current application task can execute code at the
 // given address.
+//
+// NULL is rejected. Use `probe_execute_access_opt()` for optional arguments.
 bool probe_execute_access(const void *addr);
+
+// Variants for syscall arguments that are optional by contract, i.e. where
+// NULL and len == 0 is a meaningful value passed on to the syscall
+// implementation.
+//
+// These functions are used where the length is explicit and passed as a
+// separate argument.
+
+static inline bool probe_read_access_opt(const void *addr, size_t len) {
+  if (addr == NULL) {
+    return len == 0;
+  }
+
+  return probe_read_access(addr, len);
+}
+
+static inline bool probe_write_access_opt(void *addr, size_t len) {
+  if (addr == NULL) {
+    return len == 0;
+  }
+
+  return probe_write_access(addr, len);
+}
+
+static inline bool probe_execute_access_opt(const void *addr) {
+  return (addr == NULL) || probe_execute_access(addr);
+}
+
+// Variants for syscall arguments that are optional by contract, i.e. where
+// NULL is a meaningful value passed on to the syscall implementation.
+//
+// These functions are used for arguments whose length is implicit
+// (i.e. by the type of the argument) and is always constant.
+
+static inline bool probe_write_access_opt_const_size(void *addr, size_t len) {
+  return (addr == NULL) || probe_write_access(addr, len);
+}
+
+static inline bool probe_read_access_opt_const_size(const void *addr,
+                                                    size_t len) {
+  return (addr == NULL) || probe_read_access(addr, len);
+}
 
 // Handles access violation by exiting the current application task
 // with a fatal error and the message "Access violation".

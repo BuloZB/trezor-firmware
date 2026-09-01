@@ -35,7 +35,8 @@
 
 void bootargs_set__verified(boot_command_t command, const void *args,
                             size_t args_size) {
-  if (!probe_read_access(args, args_size)) {
+  // args are optional, so we allow NULL with size 0
+  if (!probe_read_access_opt(args, args_size)) {
     goto access_violation;
   }
 
@@ -65,11 +66,15 @@ bool boot_image_check__verified(const boot_image_t *image) {
     goto access_violation;
   }
 
-  if (!probe_read_access(image->image_ptr, image->image_size)) {
+  // Work on a copy so that the verified fields cannot differ from
+  // the ones the implementation uses.
+  boot_image_t image_copy = *image;
+
+  if (!probe_read_access(image_copy.image_ptr, image_copy.image_size)) {
     goto access_violation;
   }
 
-  return boot_image_check(image);
+  return boot_image_check(&image_copy);
 
 access_violation:
   apptask_access_violation();
@@ -81,11 +86,15 @@ void boot_image_replace__verified(const boot_image_t *image) {
     goto access_violation;
   }
 
-  if (!probe_read_access(image->image_ptr, image->image_size)) {
+  // Work on a copy so that the verified fields cannot differ from
+  // the ones the implementation uses.
+  boot_image_t image_copy = *image;
+
+  if (!probe_read_access(image_copy.image_ptr, image_copy.image_size)) {
     goto access_violation;
   }
 
-  boot_image_replace(image);
+  boot_image_replace(&image_copy);
   return;
 
 access_violation:
@@ -307,7 +316,8 @@ static secbool storage_callback_wrapper(uint32_t wait, uint32_t progress,
 }
 
 void storage_setup__verified(PIN_UI_WAIT_CALLBACK callback) {
-  if (!probe_execute_access(callback)) {
+  // NULL callback is allowed and disables the UI progress callback
+  if (!probe_execute_access_opt(callback)) {
     goto access_violation;
   }
 
@@ -323,11 +333,13 @@ access_violation:
 storage_unlock_result_t storage_unlock__verified(const uint8_t *pin,
                                                  size_t pin_len,
                                                  const uint8_t *ext_salt) {
-  if (!probe_read_access(pin, pin_len)) {
+  // `storage_unlock()` accepts a NULL pin and returns an error code
+  if (!probe_read_access_opt(pin, pin_len)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(ext_salt, EXTERNAL_SALT_SIZE)) {
+  // NULL ext_salt is allowed and means no external salt is used
+  if (!probe_read_access_opt_const_size(ext_salt, EXTERNAL_SALT_SIZE)) {
     goto access_violation;
   }
 
@@ -340,11 +352,13 @@ access_violation:
 
 storage_pin_change_result_t storage_change_pin__verified(
     const uint8_t *newpin, size_t newpin_len, const uint8_t *new_ext_salt) {
-  if (!probe_read_access(newpin, newpin_len)) {
+  // `storage_change_pin()` accepts a NULL newpin and returns an error code
+  if (!probe_read_access_opt(newpin, newpin_len)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(new_ext_salt, EXTERNAL_SALT_SIZE)) {
+  // NULL new_ext_salt is allowed and means no external salt is used
+  if (!probe_read_access_opt_const_size(new_ext_salt, EXTERNAL_SALT_SIZE)) {
     goto access_violation;
   }
 
@@ -372,15 +386,18 @@ secbool storage_change_wipe_code__verified(const uint8_t *pin, size_t pin_len,
                                            const uint8_t *ext_salt,
                                            const uint8_t *wipe_code,
                                            size_t wipe_code_len) {
-  if (!probe_read_access(pin, pin_len)) {
+  // `storage_change_wipe_code()` accepts a NULL pin and returns secfalse
+  if (!probe_read_access_opt(pin, pin_len)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(ext_salt, EXTERNAL_SALT_SIZE)) {
+  // NULL ext_salt is allowed and means no external salt is used
+  if (!probe_read_access_opt_const_size(ext_salt, EXTERNAL_SALT_SIZE)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(wipe_code, wipe_code_len)) {
+  // `storage_change_wipe_code()` accepts a NULL wipe_code and returns secfalse
+  if (!probe_read_access_opt(wipe_code, wipe_code_len)) {
     goto access_violation;
   }
 
@@ -394,7 +411,8 @@ access_violation:
 
 secbool storage_get__verified(const uint16_t key, void *val,
                               const uint16_t max_len, uint16_t *len) {
-  if (!probe_write_access(val, max_len)) {
+  // NULL val and max_len 0 is allowed and queries the value length only
+  if (!probe_write_access_opt(val, max_len)) {
     goto access_violation;
   }
 
@@ -411,7 +429,8 @@ access_violation:
 
 secbool storage_set__verified(const uint16_t key, const void *val,
                               const uint16_t len) {
-  if (!probe_read_access(val, len)) {
+  // NULL is allowed for a zero-length value.
+  if (!probe_read_access_opt(val, len)) {
     goto access_violation;
   }
 
@@ -450,23 +469,24 @@ access_violation:
   apptask_access_violation();
 }
 
-bool rng_fill_buffer_strong__verified(void *buffer, size_t buffer_size) {
+void rng_fill_buffer_strong__verified(void *buffer, size_t buffer_size) {
   if (!probe_write_access(buffer, buffer_size)) {
     goto access_violation;
   }
 
-  return rng_fill_buffer_strong(buffer, buffer_size);
+  rng_fill_buffer_strong(buffer, buffer_size);
+  return;
 
 access_violation:
   apptask_access_violation();
-  return false;
 }
 
 // ---------------------------------------------------------------------
 
 int firmware_hash_start__verified(const uint8_t *challenge,
                                   size_t challenge_len) {
-  if (!probe_read_access(challenge, challenge_len)) {
+  // challenge is optional, so we allow NULL with size 0
+  if (!probe_read_access_opt(challenge, challenge_len)) {
     goto access_violation;
   }
 
@@ -565,11 +585,14 @@ access_violation:
 
 bool backup_ram_read__verified(uint16_t key, void *buffer, size_t buffer_size,
                                size_t *data_size) {
-  if (!probe_write_access(buffer, buffer_size)) {
+  // When buffer is NULL, buffer_size must be 0, and we only query the size
+  // of the data
+  if (!probe_write_access_opt(buffer, buffer_size)) {
     goto access_violation;
   }
 
-  if (!probe_write_access(data_size, sizeof(*data_size))) {
+  // NULL data_size is allowed and skips reporting it
+  if (!probe_write_access_opt_const_size(data_size, sizeof(*data_size))) {
     goto access_violation;
   }
 
@@ -626,7 +649,8 @@ access_violation:
 #include <sec/telemetry.h>
 
 bool telemetry_get__verified(telemetry_data_t *out) {
-  if (out != NULL && !probe_write_access(out, sizeof(*out))) {
+  // NULL out is allowed and only queries whether telemetry is available
+  if (!probe_write_access_opt_const_size(out, sizeof(*out))) {
     goto access_violation;
   }
 

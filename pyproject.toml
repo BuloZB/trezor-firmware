@@ -7,7 +7,6 @@ requires-python = ">=3.10,<4"
 dependencies = [
     "trezor",
     "tvl",
-    "scons",
     "protobuf==6.33.5",  # minor needs to be >= than version in shell.nix
     "nanopb>=0.4.3,<0.5",
     "pytest>=9.0.3,<10",
@@ -73,11 +72,6 @@ dev = [
 [tool.uv]
 package = false
 exclude-newer = "30 days"
-# Exempt stellar-sdk from the 30-day rule so the freshly released 15.0.0
-# final (needed for Protocol 27 support, see python/pyproject.toml) can be
-# resolved in the workspace lockfile.
-# TODO: remove after 2026-08-04
-exclude-newer-package = { stellar-sdk = "2026-07-05T00:00:00Z" }
 
 [tool.uv.sources]
 trezor = { path = "./python", editable = true }
@@ -91,16 +85,39 @@ profile = "black"
 extra_standard_library = [
   "buffer_types",
   "micropython",
-  "ubinascii",
-  "ustruct",
   "uctypes",
   "utime",
-  "utimeq",
+  "timeq",
   "trezorio",
   "trezorui",
   "trezorutils",
   "trezorconfig",
   "trezorcrypto",
+  "vfs",
 ]
 known_first_party = ["trezorlib", "apps", "coin_info", "marketcap", "ui_tests"]
 known_third_party = ["trezor", "storage"]
+
+# Ruff is used as a PEP 585 linter only; all other Python style checks are
+# handled by flake8 / isort / black / pylint.  The set of files to lint is not
+# configured here -- the Makefiles pass it in, so that ruff covers exactly what
+# every other style tool covers (tools/style.py.include, python/Makefile).
+[tool.ruff]
+target-version = "py310"
+# `python` is a published library that still supports 3.9 (see python/pyproject.toml)
+per-file-target-version = { "python/**/*.py" = "py39" }
+
+[tool.ruff.lint]
+select = [
+  # PEP 585
+  "UP006",  # non-pep585-annotation: typing.Tuple -> tuple, typing.Type -> type, ...
+  "UP035",  # deprecated-import: typing.Sequence -> collections.abc.Sequence, ...
+
+  # PEP 604 (used in /core only)
+  "UP007",  # non-pep604-annotation-union: Union[int, str] -> int | str
+  "UP045",  # non-pep604-annotation-optional: Optional[str] -> str | None
+]
+
+[tool.ruff.lint.per-file-ignores]
+# PEP 604 syntax needs Python 3.10 - cannot be enforced e.g. in /python as it still supports Python 3.9.
+"!core/**/*.py" = ["UP007", "UP045"]

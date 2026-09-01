@@ -10,7 +10,7 @@ use crate::micropython::module::Module;
 use crate::micropython::obj::Obj;
 use crate::micropython::qstr::Qstr;
 use crate::micropython::simple_type::SimpleTypeObj;
-use crate::micropython::typ::Type;
+use crate::micropython::typ::FullType;
 use crate::micropython::{ffi, util};
 use crate::trezorhal::translations;
 
@@ -37,7 +37,7 @@ unsafe extern "C" fn tr_attr_fn(_self_in: Obj, attr: ffi::qstr, dest: *mut Obj) 
     unsafe { util::try_or_raise(block) }
 }
 
-static TR_TYPE: Type = obj_type! {
+static TR_TYPE: FullType = obj_type! {
     name: Qstr::MP_QSTR_TR,
     attr_fn: tr_attr_fn,
 };
@@ -85,7 +85,7 @@ pub extern "C" fn translations_header_from_flash(_cls_in: Obj) -> Obj {
     unsafe { util::try_or_raise(block) }
 }
 
-static TRANSLATIONS_HEADER_TYPE: Type = obj_type! {
+static TRANSLATIONS_HEADER_TYPE: FullType = obj_type! {
     name: Qstr::MP_QSTR_TranslationsHeader,
     locals: &obj_dict!(obj_map! {
         Qstr::MP_QSTR_load_from_flash => obj_fn_1!(translations_header_from_flash).as_obj(),
@@ -155,6 +155,17 @@ extern "C" fn verify(data: Obj) -> Obj {
     unsafe { util::try_or_raise(block) }
 }
 
+extern "C" fn version_matches_firmware(translations_version: Obj, firmware_version: Obj) -> Obj {
+    let block = || {
+        let tver: [u8; 4] = util::iter_into_array(translations_version)?;
+        let fver: [u8; 4] = util::iter_into_array(firmware_version)?;
+        let matches = tver[..3] == fver[..3];
+        Ok(matches.into())
+    };
+
+    unsafe { util::try_or_raise(block) }
+}
+
 #[no_mangle]
 #[rustfmt::skip]
 pub static mp_module_trezortranslate: Module = obj_module! {
@@ -196,6 +207,10 @@ pub static mp_module_trezortranslate: Module = obj_module! {
     /// def verify(data: AnyBytes) -> None:
     ///     """Verify the translations blob."""
     Qstr::MP_QSTR_verify => obj_fn_1!(verify).as_obj(),
+
+    /// def version_matches_firmware(translations_version: tuple[int, int, int, int], firmware_version: tuple[int, int, int, int]) -> bool:
+    ///     """Returns true if translations version and firmware version are compatible."""
+    Qstr::MP_QSTR_version_matches_firmware => obj_fn_2!(version_matches_firmware).as_obj(),
 
     /// class TranslationsHeader:
     ///     """Metadata about the translations blob."""

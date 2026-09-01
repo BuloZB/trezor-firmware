@@ -93,7 +93,7 @@ def _do_test_signtx(
     with session.test_ctx as client:
         if input_flow:
             client.set_input_flow(input_flow)
-        sig_v, sig_r, sig_s = ethereum.sign_tx(
+        sig = ethereum.sign_tx(
             session,
             n=parse_path(parameters["path"]),
             nonce=int(parameters["nonce"], 16),
@@ -110,13 +110,13 @@ def _do_test_signtx(
         )
 
     expected_v = 2 * parameters["chain_id"] + 35
-    assert sig_v in (
+    assert sig.v in (
         expected_v,
         expected_v + 1,
     )  # 'y-coordinate' sign bit encodes chain_id: EIP-155
-    assert sig_r.hex() == result["sig_r"]
-    assert sig_s.hex() == result["sig_s"]
-    assert sig_v == result["sig_v"]
+    assert sig.r.hex() == result["sig_r"]
+    assert sig.s.hex() == result["sig_s"]
+    assert sig.v == result["sig_v"]
 
 
 # Directory of dev-signed Ethereum definitions (network / token / clear-signing
@@ -136,7 +136,7 @@ def test_signtx_external_definitions(
     chain_id = parameters["chain_id"]
     with session.test_ctx as client:
         client.set_input_flow(InputFlowConfirmAllWarnings(session).get())
-        sig_v, sig_r, sig_s = ethereum.sign_tx(
+        sig = ethereum.sign_tx(
             session,
             n=parse_path(parameters["path"]),
             nonce=int(parameters["nonce"], 16),
@@ -156,13 +156,13 @@ def test_signtx_external_definitions(
         )
 
     expected_v = 2 * chain_id + 35
-    assert sig_v in (
+    assert sig.v in (
         expected_v,
         expected_v + 1,
     )  # 'y-coordinate' sign bit encodes chain_id: EIP-155
-    assert sig_r.hex() == result["sig_r"]
-    assert sig_s.hex() == result["sig_s"]
-    assert sig_v == result["sig_v"]
+    assert sig.r.hex() == result["sig_r"]
+    assert sig.s.hex() == result["sig_s"]
+    assert sig.v == result["sig_v"]
 
 
 # Data taken from sign_tx_eip1559.json["tests"][0]
@@ -217,10 +217,25 @@ example_input_data_too_long_value = {
         "tx_type": None,
         "data": "",
     },
+    "result": {},
+}
+
+example_input_data_erc20_swap = {
+    "parameters": {
+        "chain_id": 1,
+        "path": "m/44'/60'/0'/0/0",
+        "nonce": "0x0",
+        "gas_price": "0x4a817c800",
+        "gas_limit": "0x125208",
+        "value": "0x59b09a229d59205d2",  # 103,405,359,019,777.459666 USDC - a value that will not fit in 8 bytes, but ETH allows 32 bytes
+        "to_address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "tx_type": None,
+        "data": "a9059cbb000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB480000000000000000000000000000000000000000000000059b09a229d59205d2",
+    },
     "result": {
         "sig_v": 37,
-        "sig_r": "e398a281bab316c5d0192b8e1f6d7a9f1698f6ba2ada4efd8337d4dd2ac7fca4",
-        "sig_s": "5e5caa4a8b51bd5d9b4d7ad4c2c5a62875fbbbf9dc71eb1fb2f76807e5aa23db",
+        "sig_r": "20eeb99fc658d369a4df773ba5c330c452dbe48a98fec2b9d8479426ac84bdda",
+        "sig_s": "51a0346d880088915c354b62a86740673c338c371f6ac96e960bf940b8e76a56",
     },
 }
 
@@ -255,7 +270,7 @@ def test_signtx_eip1559(
     with session.test_ctx as client:
         if not session.debug.legacy_debug:
             client.set_input_flow(InputFlowConfirmAllWarnings(session).get())
-        sig_v, sig_r, sig_s = ethereum.sign_tx_eip1559(
+        sig = ethereum.sign_tx_eip1559(
             session,
             n=parse_path(parameters["path"]),
             nonce=int(parameters["nonce"], 16),
@@ -270,9 +285,9 @@ def test_signtx_eip1559(
             chunkify=chunkify,
         )
 
-    assert sig_r.hex() == result["sig_r"]
-    assert sig_s.hex() == result["sig_s"]
-    assert sig_v == result["sig_v"]
+    assert sig.r.hex() == result["sig_r"]
+    assert sig.s.hex() == result["sig_s"]
+    assert sig.v == result["sig_v"]
 
 
 def test_sanity_checks(session: Session):
@@ -468,7 +483,7 @@ def test_signtx_eip1559_access_list(
     expected_sig: tuple[int, str, str] | None,
 ):
     with session.test_ctx:
-        sig_v, sig_r, sig_s = ethereum.sign_tx_eip1559(
+        sig = ethereum.sign_tx_eip1559(
             session,
             n=parse_path("m/44h/60h/0h/0/100"),
             nonce=0,
@@ -482,7 +497,7 @@ def test_signtx_eip1559_access_list(
         )
 
     if expected_sig is not None:
-        assert (sig_v, sig_r.hex(), sig_s.hex()) == expected_sig
+        assert (sig.v, sig.r.hex(), sig.s.hex()) == expected_sig
 
 
 def test_sanity_checks_eip1559(session: Session):
@@ -682,7 +697,7 @@ def test_signtx_error(session: Session, parameters: dict, result: dict):
 @parametrize_using_common_fixtures("ethereum/sign_tx_staking_eip1559.json")
 def test_signtx_staking_eip1559(session: Session, parameters: dict, result: dict):
     with session.test_ctx:
-        sig_v, sig_r, sig_s = ethereum.sign_tx_eip1559(
+        sig = ethereum.sign_tx_eip1559(
             session,
             n=parse_path(parameters["path"]),
             nonce=int(parameters["nonce"], 16),
@@ -696,9 +711,9 @@ def test_signtx_staking_eip1559(session: Session, parameters: dict, result: dict
             definitions=None,
             chunkify=True,
         )
-    assert sig_r.hex() == result["sig_r"]
-    assert sig_s.hex() == result["sig_s"]
-    assert sig_v == result["sig_v"]
+    assert sig.r.hex() == result["sig_r"]
+    assert sig.s.hex() == result["sig_s"]
+    assert sig.v == result["sig_v"]
 
 
 @pytest.mark.models("core")
@@ -759,7 +774,6 @@ def test_signtx_payment_req(
 
     params = dict(example_input_data["parameters"])
     params["payment_req"] = make_payment_request(
-        session,
         recipient_name="trezor.io",
         slip44=60,
         outputs=[(int(params["value"], 16), params["to_address"])],
@@ -775,10 +789,9 @@ def test_signtx_payment_req(
     )
 
 
-@pytest.mark.models("core")
-def test_signtx_payment_req_long_value(
-    session: Session,
-):
+def _create_payment_request(
+    session: Session, params: dict, *, amount_size_bytes: int = 32
+) -> messages.PaymentRequest:
     from trezorlib import btc, misc
 
     from ..payment_req import CoinPurchaseMemo, make_payment_request
@@ -797,38 +810,46 @@ def test_signtx_payment_req_long_value(
 
     nonce = misc.get_nonce(session)
 
-    params = dict(example_input_data_long_value["parameters"])
-    params["payment_req"] = make_payment_request(
-        session,
+    return make_payment_request(
         recipient_name="trezor.io",
         slip44=60,
         outputs=[(int(params["value"], 16), params["to_address"])],
         memos=memos,
         nonce=nonce,
-        amount_size_bytes=32,
+        amount_size_bytes=amount_size_bytes,
     )
 
+
+@pytest.mark.models("core")
+def test_signtx_payment_req_long_value(session: Session):
+    params = example_input_data_long_value["parameters"]
     _do_test_signtx(
         session,
-        params,
+        params | dict(payment_req=_create_payment_request(session, params)),
         example_input_data_long_value["result"],
     )
 
-    params = dict(example_input_data_too_long_value["parameters"])
-    params["payment_req"] = make_payment_request(
-        session,
-        recipient_name="trezor.io",
-        slip44=60,
-        outputs=[(int(params["value"], 16), params["to_address"])],
-        memos=memos,
-        nonce=nonce,
-        amount_size_bytes=64,
-    )
-
-    with pytest.raises(exceptions.TrezorFailure) as e:
+    params = example_input_data_too_long_value["parameters"]
+    with pytest.raises(
+        TrezorFailure, match="DataError: amount must be exactly 32 bytes"
+    ):
+        invalid_req = _create_payment_request(session, params, amount_size_bytes=64)
         _do_test_signtx(
             session,
-            params,
-            example_input_data_long_value["result"],
+            params | dict(payment_req=invalid_req),
+            result={},
         )
-    assert str(e.value.message) == "amount must be exactly 32 bytes"
+
+
+@pytest.mark.models("core")
+def test_signtx_payment_req_erc20_swap(session: Session):
+    params = example_input_data_erc20_swap["parameters"]
+    params = params | dict(
+        payment_req=_create_payment_request(session, params),
+        value="0x0",  # ETH is not sent
+    )
+    _do_test_signtx(
+        session,
+        params,
+        example_input_data_erc20_swap["result"],
+    )

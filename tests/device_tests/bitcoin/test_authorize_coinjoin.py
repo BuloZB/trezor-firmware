@@ -624,6 +624,78 @@ def test_wrong_account_type(session: Session):
     )
 
 
+def test_wrong_coin_name(session: Session):
+    # Ensure that an authorization granted for one coin cannot be used to sign a
+    # coinjoin transaction on another coin.
+
+    inputs = [
+        messages.TxInputType(
+            address_n=parse_path("m/10025h/1h/0h/1h/1/0"),
+            amount=7_289_000,
+            prev_hash=FAKE_TXHASH_f982c0,
+            prev_index=1,
+            script_type=messages.InputScriptType.SPENDTAPROOT,
+        ),
+    ]
+
+    input_script_pubkeys = [
+        bytes.fromhex(
+            "51202f436892d90fb2665519efa3d9f0f5182859124f179486862c2cd7a78ea9ac19"
+        ),
+    ]
+
+    outputs = [
+        # Our change output.
+        messages.TxOutputType(
+            # tb1pchruvduckkwuzm5hmytqz85emften5dnmkqu9uhfxwfywaqhuu0qjggqyp
+            address_n=parse_path("m/10025h/1h/0h/1h/1/2"),
+            amount=7_289_000 - 490,
+            script_type=messages.OutputScriptType.PAYTOTAPROOT,
+        ),
+    ]
+
+    output_script_pubkeys = [
+        bytes.fromhex(
+            "5120c5c7c63798b59dc16e97d916011e99da5799d1b3dd81c2f2e93392477417e71e"
+        ),
+    ]
+
+    coinjoin_req = make_coinjoin_request(
+        "www.example.com",
+        inputs,
+        input_script_pubkeys,
+        outputs,
+        output_script_pubkeys,
+        no_fee_indices=[],
+    )
+
+    btc.authorize_coinjoin(
+        session,
+        coordinator="www.example.com",
+        max_rounds=10,
+        max_coordinator_fee_rate=500_000,  # 0.5 %
+        max_fee_per_kvbyte=3500,
+        n=parse_path("m/10025h/1h/0h/1h"),
+        coin_name="Testnet",
+        script_type=messages.InputScriptType.SPENDTAPROOT,
+    )
+
+    # Legacy rejects the coin name up front in SignTx. Core never unlocks the Testnet
+    # SLIP-25 path for a Bitcoin keychain, so it rejects the input path instead.
+    expected = "Forbidden key path" if is_core(session) else "Unauthorized operation"
+
+    with pytest.raises(TrezorFailure, match=expected):
+        btc.sign_tx(
+            session,
+            "Bitcoin",
+            inputs,
+            outputs,
+            prev_txes=TX_CACHE_MAINNET,
+            coinjoin_request=coinjoin_req,
+            preauthorized=True,
+        )
+
+
 def test_cancel_authorization(session: Session):
     # Ensure that a preauthorized GetOwnershipProof fails if the commitment_data doesn't match the coordinator.
 
@@ -649,6 +721,33 @@ def test_cancel_authorization(session: Session):
             user_confirmation=True,
             commitment_data=b"\x0fwww.example.com" + (1).to_bytes(ROUND_ID_LEN, "big"),
             preauthorized=True,
+        )
+
+
+def test_preauthorized_message_type(session: Session):
+    # Ensure that a preauthorization cannot be used by a message type that it wasn't granted for.
+
+    btc.authorize_coinjoin(
+        session,
+        coordinator="www.example.com",
+        max_rounds=10,
+        max_coordinator_fee_rate=500_000,  # 0.5 %
+        max_fee_per_kvbyte=3500,
+        n=parse_path("m/10025h/1h/0h/1h"),
+        coin_name="Testnet",
+        script_type=messages.InputScriptType.SPENDTAPROOT,
+    )
+
+    # Only SignTx and GetOwnershipProof may use the preauthorization, so GetAddress must
+    # not gain access to the SLIP-25 account without going through UnlockPath.
+    session.call(messages.DoPreauthorized(), expect=messages.PreauthorizedRequest)
+
+    with pytest.raises(TrezorFailure, match="Forbidden key path"):
+        btc.get_address(
+            session,
+            "Testnet",
+            parse_path("m/10025h/1h/0h/1h/0/0"),
+            script_type=messages.InputScriptType.SPENDTAPROOT,
         )
 
 

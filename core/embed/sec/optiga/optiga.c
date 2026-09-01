@@ -28,6 +28,7 @@
 #include <sec/rng_strong.h>
 #include <sec/secret_keys.h>
 #include <sec/storage.h>
+#include <sys/rng_use_flags.h>
 #include "ecdsa.h"
 #include "hash_to_curve.h"
 #include "hmac.h"
@@ -138,6 +139,11 @@ optiga_sign_result optiga_sign(uint8_t index, const uint8_t *digest,
     digest = masked_digest;
   }
 #endif  // SECRET_KEY_MASKING
+
+  if (max_der_signature_size < 2) {
+    ret = OPTIGA_SIGN_ERROR;
+    goto cleanup;
+  }
 
   optiga_result res = optiga_calc_sign(
       OPTIGA_OID_ECC_KEY + index, digest, digest_size, &der_signature[2],
@@ -251,22 +257,26 @@ void optiga_set_sec_max(void) {
 }
 
 bool optiga_random_buffer(uint8_t *dest, size_t size) {
-  while (size > OPTIGA_RANDOM_MAX_SIZE) {
-    if (optiga_get_random(dest, OPTIGA_RANDOM_MAX_SIZE) != OPTIGA_SUCCESS) {
+  while (size >= OPTIGA_RANDOM_MIN_SIZE) {
+    size_t chunk = MIN(size, OPTIGA_RANDOM_MAX_SIZE);
+    if (optiga_get_random(dest, chunk) != OPTIGA_SUCCESS) {
       return false;
     }
-    dest += OPTIGA_RANDOM_MAX_SIZE;
-    size -= OPTIGA_RANDOM_MAX_SIZE;
+    dest += chunk;
+    size -= chunk;
   }
 
-  if (size < OPTIGA_RANDOM_MIN_SIZE) {
-    static uint8_t buffer[OPTIGA_RANDOM_MIN_SIZE] = {0};
-    optiga_result ret = optiga_get_random(buffer, OPTIGA_RANDOM_MIN_SIZE);
+  if (size > 0) {
+    uint8_t buffer[OPTIGA_RANDOM_MIN_SIZE] = {0};
+    if (optiga_get_random(buffer, OPTIGA_RANDOM_MIN_SIZE) != OPTIGA_SUCCESS) {
+      return false;
+    }
     memcpy(dest, buffer, size);
-    return ret == OPTIGA_SUCCESS;
+    memzero(buffer, sizeof(buffer));
   }
 
-  return optiga_get_random(dest, size) == OPTIGA_SUCCESS;
+  rng_use_flag_set(RNG_TYPE_OPTIGA);
+  return true;
 }
 
 void optiga_random_buffer_time(uint32_t *time_ms) {
@@ -275,6 +285,7 @@ void optiga_random_buffer_time(uint32_t *time_ms) {
 }
 
 static bool read_metadata(uint16_t oid, optiga_metadata *metadata) {
+  // Must be static: the parsed metadata items point into this buffer
   static uint8_t serialized[OPTIGA_MAX_METADATA_SIZE] = {0};
   size_t size = 0;
   if (optiga_get_data_object(oid, true, serialized, sizeof(serialized),
@@ -754,11 +765,8 @@ bool optiga_pin_set(
   bool ret = true;
 
   uint8_t hmac_stretching_secret[OPTIGA_PIN_SECRET_SIZE] = {0};
-  if (!rng_fill_buffer_strong(hmac_stretching_secret,
-                              sizeof(hmac_stretching_secret))) {
-    ret = false;
-    goto end;
-  }
+  rng_fill_buffer_strong(hmac_stretching_secret,
+                         sizeof(hmac_stretching_secret));
 
   for (int i = 0; i < STRETCHED_PIN_COUNT; i++) {
     optiga_pin_stretch_hmac_offline(hmac_stretching_secret, stretched_pins[i]);
@@ -766,10 +774,7 @@ bool optiga_pin_set(
 
   // Generate and store the counter-protected PIN secret.
   uint8_t pin_secret[OPTIGA_PIN_SECRET_SIZE] = {0};
-  if (!rng_fill_buffer_strong(pin_secret, sizeof(pin_secret))) {
-    ret = false;
-    goto end;
-  }
+  rng_fill_buffer_strong(pin_secret, sizeof(pin_secret));
 
   if (optiga_set_data_object(OID_PIN_SECRET, false, pin_secret,
                              sizeof(pin_secret)) != OPTIGA_SUCCESS) {

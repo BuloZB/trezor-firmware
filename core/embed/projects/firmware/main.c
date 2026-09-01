@@ -147,13 +147,12 @@ int main_func(uint32_t cmd, void *arg) {
   // Interpreter init
   LOG_INF("Starting interpreter");
   mp_init();
-  mp_obj_list_init(mp_sys_argv, 0);
   mp_obj_list_init(mp_sys_path, 0);
   mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR__dot_frozen));
 
   // Execute the main script
   LOG_INF("Executing main script");
-  pyexec_frozen_module("main.py");
+  pyexec_frozen_module("main.py", false);
 
   // Clean up
   LOG_INF("Main script finished, cleaning up");

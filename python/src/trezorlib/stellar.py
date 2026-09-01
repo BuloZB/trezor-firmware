@@ -14,17 +14,19 @@
 # You should have received a copy of the License along with this library.
 # If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
 
-from decimal import Decimal
-from typing import TYPE_CHECKING, Any, List, Tuple, Union
+from __future__ import annotations
+
+import typing as t
+from collections.abc import Iterable, Iterator
 
 from . import exceptions, messages
 from .tools import workflow
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from .client import Session
     from .tools import Address
 
-    StellarMessageType = Union[
+    StellarMessageType = t.Union[
         messages.StellarAccountMergeOp,
         messages.StellarAllowTrustOp,
         messages.StellarBumpSequenceOp,
@@ -67,7 +69,6 @@ try:
         PathPaymentStrictReceive,
         PathPaymentStrictSend,
         Payment,
-        Price,
         ReturnHashMemo,
         SetOptions,
         TextMemo,
@@ -94,14 +95,21 @@ DEFAULT_BIP32_PATH = "m/44h/148h/0h"
 
 
 def from_envelope(
-    envelope: "TransactionEnvelope",
-) -> Tuple[messages.StellarSignTx, List["StellarMessageType"], messages.StellarTxExt]:
+    envelope: TransactionEnvelope,
+    asset_hints: Iterable[Asset] = (),
+) -> tuple[messages.StellarSignTx, list[StellarMessageType], messages.StellarTxExt]:
     """Parse a transaction envelope into a tuple of:
 
     tx - a StellarSignTx describing the transaction header
     operations - a list of protobuf messages, one per operation
     tx_ext - a StellarTxExt describing the transaction extension: v=1 carrying
         the Soroban data for Soroban transactions, otherwise v=0
+
+    Each asset in `asset_hints` is attached to the contract invocations that
+    target its Stellar Asset Contract, letting the device present them as token
+    operations. Hints matching no invocation are ignored. The device re-derives
+    the address before using a hint and falls back to the raw contract UI if it
+    does not match.
     """
     if not HAVE_STELLAR_SDK:
         raise RuntimeError("Stellar SDK not available")
@@ -149,6 +157,13 @@ def from_envelope(
 
     operations = [_read_operation(op) for op in parsed_tx.operations]
 
+    asset_hints = list(asset_hints)
+    if asset_hints:
+        sacs = _sac_addresses(asset_hints, envelope.network_passphrase)
+        for op in operations:
+            for args in _operation_contract_args(op):
+                args.asset_hint = sacs.get(args.contract_address)
+
     if parsed_tx.soroban_data:
         tx_ext = messages.StellarTxExt(
             v=1,
@@ -161,13 +176,18 @@ def from_envelope(
 
 
 def from_authorization_entry(
-    entry: "xdr.SorobanAuthorizationEntry",
+    entry: xdr.SorobanAuthorizationEntry,
+    network_passphrase: str | None = None,
+    asset_hints: Iterable[Asset] = (),
 ) -> messages.StellarSorobanAuthorizationWithAddress:
     """Translate a Soroban authorization entry into its signing request payload.
 
     The resulting message carries exactly the fields committed into the
     entry's authorization payload (the WITH_ADDRESS preimage of Protocol 27).
     Only SOROBAN_CREDENTIALS_ADDRESS_V2 entries are supported.
+
+    See `from_envelope` for `asset_hints`. Matching them needs the network the
+    entry is signed for, so `network_passphrase` is required alongside them.
     """
     if not HAVE_STELLAR_SDK:
         raise RuntimeError("Stellar SDK not available")
@@ -180,15 +200,58 @@ def from_authorization_entry(
         )
     credentials = entry.credentials.address_v2
     assert credentials is not None
+
+    invocation = _read_authorized_invocation(entry.root_invocation)
+    asset_hints = list(asset_hints)
+    if asset_hints:
+        if network_passphrase is None:
+            raise ValueError("network_passphrase is required to match asset hints")
+        sacs = _sac_addresses(asset_hints, network_passphrase)
+        for args in _invocation_contract_args(invocation):
+            args.asset_hint = sacs.get(args.contract_address)
+
     return messages.StellarSorobanAuthorizationWithAddress(
         nonce=credentials.nonce.int64,
         signature_expiration_ledger=credentials.signature_expiration_ledger.uint32,
         address=_read_sc_address(credentials.address),
-        invocation=_read_authorized_invocation(entry.root_invocation),
+        invocation=invocation,
     )
 
 
-def _read_operation(op: "Operation") -> "StellarMessageType":
+def _sac_addresses(
+    asset_hints: Iterable[Asset], network_passphrase: str
+) -> dict[str, messages.StellarAsset]:
+    """Index the hinted assets by the address of their Stellar Asset Contract."""
+    return {
+        asset.contract_id(network_passphrase): _read_asset(asset)
+        for asset in asset_hints
+    }
+
+
+def _invocation_contract_args(
+    invocation: messages.StellarSorobanAuthorizedInvocation,
+) -> Iterator[messages.StellarInvokeContractArgs]:
+    """Walk the contract invocations of an authorized invocation tree."""
+    if invocation.function.contract_fn is not None:
+        yield invocation.function.contract_fn
+    for sub in invocation.sub_invocations:
+        yield from _invocation_contract_args(sub)
+
+
+def _operation_contract_args(
+    op: StellarMessageType,
+) -> Iterator[messages.StellarInvokeContractArgs]:
+    """Walk the contract invocations an operation displays: the host function
+    it invokes and the authorization trees it carries."""
+    if not isinstance(op, messages.StellarInvokeHostFunctionOp):
+        return
+    if op.function.invoke_contract is not None:
+        yield op.function.invoke_contract
+    for entry in op.auth:
+        yield from _invocation_contract_args(entry.root_invocation)
+
+
+def _read_operation(op: Operation) -> StellarMessageType:
     # TODO: Let's add muxed account support later.
     if op.source:
         _raise_if_account_muxed_id_exists(op.source)
@@ -221,25 +284,23 @@ def _read_operation(op: "Operation") -> "StellarMessageType":
             paths=[_read_asset(asset) for asset in op.path],
         )
     if isinstance(op, ManageSellOffer):
-        price = _read_price(op.price)
         return messages.StellarManageSellOfferOp(
             source_account=source_account,
             selling_asset=_read_asset(op.selling),
             buying_asset=_read_asset(op.buying),
             amount=_read_amount(op.amount),
-            price_n=price.n,
-            price_d=price.d,
+            price_n=op.price.n,
+            price_d=op.price.d,
             offer_id=op.offer_id,
         )
     if isinstance(op, CreatePassiveSellOffer):
-        price = _read_price(op.price)
         return messages.StellarCreatePassiveSellOfferOp(
             source_account=source_account,
             selling_asset=_read_asset(op.selling),
             buying_asset=_read_asset(op.buying),
             amount=_read_amount(op.amount),
-            price_n=price.n,
-            price_d=price.d,
+            price_n=op.price.n,
+            price_d=op.price.d,
         )
     if isinstance(op, SetOptions):
         operation = messages.StellarSetOptionsOp(
@@ -303,14 +364,13 @@ def _read_operation(op: "Operation") -> "StellarMessageType":
             source_account=source_account, bump_to=op.bump_to
         )
     if isinstance(op, ManageBuyOffer):
-        price = _read_price(op.price)
         return messages.StellarManageBuyOfferOp(
             source_account=source_account,
             selling_asset=_read_asset(op.selling),
             buying_asset=_read_asset(op.buying),
             amount=_read_amount(op.amount),
-            price_n=price.n,
-            price_d=price.d,
+            price_n=op.price.n,
+            price_d=op.price.d,
             offer_id=op.offer_id,
         )
     if isinstance(op, PathPaymentStrictSend):
@@ -338,7 +398,7 @@ def _read_operation(op: "Operation") -> "StellarMessageType":
     raise ValueError(f"Unknown operation type: {op.__class__.__name__}")
 
 
-def _raise_if_account_muxed_id_exists(account: "MuxedAccount") -> None:
+def _raise_if_account_muxed_id_exists(account: MuxedAccount) -> None:
     # Currently Trezor firmware does not support MuxedAccount,
     # so we throw an exception here.
     if account.account_muxed_id is not None:
@@ -349,15 +409,7 @@ def _read_amount(amount: str) -> int:
     return Operation.to_xdr_amount(amount)
 
 
-def _read_price(price: Union["Price", str, Decimal]) -> "Price":
-    # In the coming stellar-sdk 6.x, the type of price must be Price,
-    # at that time we can remove this function
-    if isinstance(price, Price):
-        return price
-    return Price.from_raw_price(price)
-
-
-def _read_asset(asset: "Asset") -> messages.StellarAsset:
+def _read_asset(asset: Asset) -> messages.StellarAsset:
     """Reads a stellar Asset from unpacker"""
     if asset.is_native():
         return messages.StellarAsset(type=messages.StellarAssetType.NATIVE)
@@ -379,14 +431,14 @@ def _read_asset(asset: "Asset") -> messages.StellarAsset:
 # ====== Client functions ====== #
 
 
-def get_address(*args: Any, **kwargs: Any) -> str:
+def get_address(*args: t.Any, **kwargs: t.Any) -> str:
     return get_authenticated_address(*args, **kwargs).address
 
 
 @workflow(capability=messages.Capability.Stellar)
 def get_authenticated_address(
-    session: "Session",
-    address_n: "Address",
+    session: Session,
+    address_n: Address,
     show_display: bool = False,
     chunkify: bool = False,
 ) -> messages.StellarAddress:
@@ -400,11 +452,11 @@ def get_authenticated_address(
 
 @workflow(capability=messages.Capability.Stellar)
 def sign_tx(
-    session: "Session",
+    session: Session,
     tx: messages.StellarSignTx,
-    operations: List["StellarMessageType"],
+    operations: list[StellarMessageType],
     tx_ext: messages.StellarTxExt,
-    address_n: "Address",
+    address_n: Address,
     network_passphrase: str = DEFAULT_NETWORK_PASSPHRASE,
 ) -> messages.StellarSignedTx:
     tx.network_passphrase = network_passphrase
@@ -444,8 +496,8 @@ def sign_tx(
 
 @workflow(capability=messages.Capability.Stellar)
 def sign_soroban_authorization(
-    session: "Session",
-    address_n: "Address",
+    session: Session,
+    address_n: Address,
     network_passphrase: str,
     authorization: messages.StellarSorobanAuthorizationWithAddress,
 ) -> messages.StellarSorobanAuthorizationSignature:
@@ -461,13 +513,13 @@ def sign_soroban_authorization(
     )
 
 
-def _read_sc_address(address: "xdr.SCAddress") -> str:
+def _read_sc_address(address: xdr.SCAddress) -> str:
     """Read an SCAddress from XDR."""
     addr = StellarAddress.from_xdr_sc_address(address)
     return addr.address
 
 
-def _read_sc_val(val: "xdr.SCVal") -> messages.StellarSCVal:
+def _read_sc_val(val: xdr.SCVal) -> messages.StellarSCVal:
     """Read an SCVal from XDR."""
     if val.type == xdr.SCValType.SCV_BOOL:
         return messages.StellarSCVal(type=messages.StellarSCValType.SCV_BOOL, b=val.b)
@@ -581,7 +633,7 @@ def _read_sc_val(val: "xdr.SCVal") -> messages.StellarSCVal:
 
 
 def _read_invoke_contract_args(
-    data: "xdr.InvokeContractArgs",
+    data: xdr.InvokeContractArgs,
 ) -> messages.StellarInvokeContractArgs:
     """Read InvokeContractArgs from XDR."""
     return messages.StellarInvokeContractArgs(
@@ -592,7 +644,7 @@ def _read_invoke_contract_args(
 
 
 def _read_authorized_function(
-    function: "xdr.SorobanAuthorizedFunction",
+    function: xdr.SorobanAuthorizedFunction,
 ) -> messages.StellarSorobanAuthorizedFunction:
     """Read SorobanAuthorizedFunction from XDR."""
     if (
@@ -608,7 +660,7 @@ def _read_authorized_function(
 
 
 def _read_address_credentials(
-    address_credentials: "xdr.SorobanAddressCredentials",
+    address_credentials: xdr.SorobanAddressCredentials,
 ) -> messages.StellarSorobanAddressCredentials:
     """Read SorobanAddressCredentials from XDR."""
     return messages.StellarSorobanAddressCredentials(
@@ -620,7 +672,7 @@ def _read_address_credentials(
 
 
 def _read_credentials(
-    credentials: "xdr.SorobanCredentials",
+    credentials: xdr.SorobanCredentials,
 ) -> messages.StellarSorobanCredentials:
     """Read SorobanCredentials from XDR."""
     if (
@@ -646,7 +698,7 @@ def _read_credentials(
 
 
 def _read_authorized_invocation(
-    invocation: "xdr.SorobanAuthorizedInvocation",
+    invocation: xdr.SorobanAuthorizedInvocation,
 ) -> messages.StellarSorobanAuthorizedInvocation:
     """Read SorobanAuthorizedInvocation from XDR."""
     return messages.StellarSorobanAuthorizedInvocation(
@@ -658,7 +710,7 @@ def _read_authorized_invocation(
 
 
 def _read_authorization_entry(
-    entry: "xdr.SorobanAuthorizationEntry",
+    entry: xdr.SorobanAuthorizationEntry,
 ) -> messages.StellarSorobanAuthorizationEntry:
     """Read SorobanAuthorizationEntry from XDR."""
     return messages.StellarSorobanAuthorizationEntry(
@@ -668,7 +720,7 @@ def _read_authorization_entry(
 
 
 def _read_host_function(
-    host_function: "xdr.HostFunction",
+    host_function: xdr.HostFunction,
 ) -> messages.StellarHostFunction:
     """Read HostFunction from XDR."""
     if host_function.type != xdr.HostFunctionType.HOST_FUNCTION_TYPE_INVOKE_CONTRACT:

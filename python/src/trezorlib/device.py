@@ -23,15 +23,8 @@ import random
 import secrets
 import time
 import warnings
-from typing import (
-    TYPE_CHECKING,
-    Callable,
-    Iterable,
-    Optional,
-    Sequence,
-    Tuple,
-    overload,
-)
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Callable, Optional, overload
 
 from slip10 import SLIP10
 
@@ -47,6 +40,7 @@ RECOVERY_BACK = "\x08"  # backspace character, sent literally
 
 SLIP39_EXTENDABLE_MIN_VERSION = (2, 7, 1)
 ENTROPY_CHECK_MIN_VERSION = (2, 8, 7)
+ENTROPY_CHECK_MIN_VERSION_T1 = (1, 13, 1)
 HOMESCREEN_STREAMING_MIN_VERSION = (2, 8, 11)
 
 
@@ -320,8 +314,11 @@ def reset(
     )
 
 
+ENTROPY_SIZE = 32
+
+
 def _get_external_entropy() -> bytes:
-    return secrets.token_bytes(32)
+    return secrets.token_bytes(ENTROPY_SIZE)
 
 
 @workflow(refresh_features=True)
@@ -340,7 +337,7 @@ def setup(
     entropy_check_count: Optional[int] = None,
     paths: Iterable[Address] = [],
     _get_entropy: Callable[[], bytes] = _get_external_entropy,
-) -> Iterable[Tuple[Address, str]]:
+) -> Iterable[tuple[Address, str]]:
     """Create a new wallet on device.
 
     On supporting devices, automatically performs the entropy check: for N rounds, ask
@@ -361,8 +358,9 @@ def setup(
     Returned XPUBs are in the form of tuples (derivation path, xpub).
 
     Specifying an entropy check count other than 0 on devices that don't support it,
-    such as Trezor Model One, will result in an error. If not specified, a random value
-    between 2 and 8 is chosen on supporting devices.
+    i.e. firmware older than 1.13.1 for Trezor Model One or older than 2.8.7 for the
+    core family, will result in an error. If not specified, a random value between 2 and
+    8 is chosen on supporting devices.
 
     Args:
      * client: TrezorClient instance.
@@ -405,8 +403,11 @@ def setup(
         paths = [parse_path("m/84h/0h/0h"), parse_path("m/44h/60h/0h")]
 
     if entropy_check_count is None:
-        if session.version < ENTROPY_CHECK_MIN_VERSION:
-            # includes Trezor One 1.x.x
+        if session.features.model == "1":
+            min_version = ENTROPY_CHECK_MIN_VERSION_T1
+        else:
+            min_version = ENTROPY_CHECK_MIN_VERSION
+        if session.version < min_version:
             entropy_check_count = 0
         else:
             entropy_check_count = random.randint(2, 8)
@@ -449,7 +450,12 @@ def _reset_no_entropycheck(
     """
     assert msg.entropy_check is False
     session.call(msg, expect=messages.EntropyRequest)
-    session.call(messages.EntropyAck(entropy=get_entropy()), expect=messages.Success)
+    external_entropy = get_entropy()
+    if len(external_entropy) < ENTROPY_SIZE:
+        raise ValueError(
+            f"External entropy must be at least {ENTROPY_SIZE} bytes, got {len(external_entropy)}"
+        )
+    session.call(messages.EntropyAck(entropy=external_entropy), expect=messages.Success)
 
 
 def _reset_with_entropycheck(
@@ -497,12 +503,22 @@ def _reset_with_entropycheck(
 
     def verify_entropy_commitment(
         internal_entropy: bytes | None,
+        prev_internal_entropy: bytes | None,
         external_entropy: bytes,
         entropy_commitment: bytes | None,
         xpubs: list[tuple[Address, str]],
     ) -> None:
         if internal_entropy is None or entropy_commitment is None:
             raise TrezorException("Invalid entropy check response.")
+        # Sanity-check the internal entropy the device revealed.
+        if len(internal_entropy) != ENTROPY_SIZE:
+            raise TrezorException(
+                f"Internal entropy must be {ENTROPY_SIZE} bytes, got {len(internal_entropy)}."
+            )
+        if internal_entropy == internal_entropy[:1] * ENTROPY_SIZE:
+            raise TrezorException("Internal entropy is a constant byte pattern.")
+        if internal_entropy == prev_internal_entropy:
+            raise TrezorException("Internal entropy is a repeat of the previous round.")
         calculated_commitment = hmac.HMAC(
             key=internal_entropy, msg=b"", digestmod=hashlib.sha256
         ).digest()
@@ -520,10 +536,15 @@ def _reset_with_entropycheck(
     xpubs = []
     resp = session.call(reset_msg, expect=messages.EntropyRequest)
     entropy_commitment = resp.entropy_commitment
+    prev_internal_entropy = None
 
     while True:
         # provide external entropy for this round
         external_entropy = get_entropy()
+        if len(external_entropy) < ENTROPY_SIZE:
+            raise ValueError(
+                f"External entropy must be at least {ENTROPY_SIZE} bytes, got {len(external_entropy)}"
+            )
         session.call(
             messages.EntropyAck(entropy=external_entropy),
             expect=messages.EntropyCheckReady,
@@ -550,10 +571,15 @@ def _reset_with_entropycheck(
 
         # Check the entropy commitment from the previous round.
         verify_entropy_commitment(
-            resp.prev_entropy, external_entropy, entropy_commitment, xpubs
+            resp.prev_entropy,
+            prev_internal_entropy,
+            external_entropy,
+            entropy_commitment,
+            xpubs,
         )
         # Update the entropy commitment for the next round.
         entropy_commitment = resp.entropy_commitment
+        prev_internal_entropy = resp.prev_entropy
 
     # TODO when we grow an API for auto-opening an empty passphrase session,
     # we should run the following piece:

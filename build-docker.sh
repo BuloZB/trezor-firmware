@@ -353,6 +353,9 @@ for TREZOR_MODEL in ${MODELS[@]}; do
       $GIT_CLEAN_REPO
       rm -rf /build/*
       uv run make clean vendor $MAKE_TARGETS QUIET_MODE=1
+      for binary in build-xtask/artifacts/$TREZOR_MODEL/*.bin; do
+        uv run ../tools/check-insecure-prng.py --absent "\$binary"
+      done
       for item in bootloader secmon kernel firmware prodtest; do
         # Append the labeled fingerprint, preceded by '# <artifact name>'.
         if [ "\$item" != kernel ] && [ -s build-xtask/artifacts/$TREZOR_MODEL/\$item.bin ]; then
@@ -367,10 +370,13 @@ for TREZOR_MODEL in ${MODELS[@]}; do
         fi
         if [ -f build-xtask/artifacts/$TREZOR_MODEL/\$item.elf ]; then
           # copy only the artifacts to the build output directory
-          mkdir /build/\$item/
+          mkdir -p /build/\$item/
           gzip build-xtask/artifacts/$TREZOR_MODEL/\$item.elf
           cp -v build-xtask/artifacts/$TREZOR_MODEL/\$item* /build/\$item/
-          cp -v build-xtask/artifacts/pub/\$item-$TREZOR_MODEL-*.bin /build/\$item/ || true  # n/a for kernel
+          pub_bin=(build-xtask/artifacts/pub/\$item-$TREZOR_MODEL-*.bin)
+          if [ -f "\$pub_bin" ]; then
+            cp -v "\${pub_bin[@]}" /build/\$item/
+          fi  # no pub bin for kernel, or for secmon when built only as a dependency
         fi
       done
       chown -R $USER:$GROUP /build

@@ -20,17 +20,7 @@ import sys
 import tarfile
 from decimal import Decimal
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    AnyStr,
-    Dict,
-    List,
-    NoReturn,
-    Optional,
-    TextIO,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, AnyStr, NoReturn, Optional, TextIO, cast
 
 import click
 
@@ -115,7 +105,7 @@ def _amount_to_int(
 
 def _parse_access_list(
     ctx: click.Context, param: Any, value: str
-) -> List[EthereumAccessList]:
+) -> list[EthereumAccessList]:
     try:
         return [_parse_access_list_item(val) for val in value]
 
@@ -163,7 +153,7 @@ def _erc20_contract(
 
 
 def _format_access_list(
-    access_list: List[EthereumAccessList],
+    access_list: list[EthereumAccessList],
 ) -> "_rlp.RLPItem":
     return [
         (ethereum.decode_hex(item.address), item.storage_keys) for item in access_list
@@ -396,7 +386,7 @@ def sign_tx(
     token: Optional[str],
     max_gas_fee: Optional[int],
     max_priority_fee: Optional[int],
-    access_list: List[EthereumAccessList],
+    access_list: list[EthereumAccessList],
     eip2718_type: Optional[int],
     chunkify: bool,
 ) -> str:
@@ -519,6 +509,8 @@ def sign_tx(
             definition_source=DEFINITIONS_SOURCE,
         )
 
+    sig = (sig.v, sig.r, sig.s)
+
     to = ethereum.decode_hex(to_address)
 
     if is_eip1559:
@@ -569,7 +561,7 @@ def sign_tx(
 @with_session
 def sign_message(
     session: "Session", address: str, message: str, chunkify: bool
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Sign message with Ethereum address."""
     address_n = tools.parse_path(address)
     network = _network_def_from_address_n(address_n)
@@ -593,7 +585,7 @@ def sign_message(
 @with_session
 def sign_typed_data(
     session: "Session", address: str, metamask_v4_compat: bool, file: TextIO
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Sign typed data (EIP-712) with Ethereum address.
 
     Currently NOT supported:
@@ -645,7 +637,7 @@ def verify_message(
 @with_session
 def sign_typed_data_hash(
     session: "Session", address: str, domain_hash_hex: str, message_hash_hex: str
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Sign hash of typed data (EIP-712) with Ethereum address.
 
@@ -667,40 +659,3 @@ def sign_typed_data_hash(
         "signature": f"0x{ret.signature.hex()}",
     }
     return output
-
-
-@cli.command()
-@click.option("-n", "--address", required=True, help=PATH_HELP)
-@click.option(
-    "-c", "--chain-id", type=int, default=1, help="EIP-155 chain id (replay protection)"
-)
-@click.option("-i", "--nonce", type=int, required=True, help="Transaction counter")
-@click.argument("delegate_addr")
-@with_session
-def sign_auth_eip7702(
-    session: "Session",
-    address: str,
-    chain_id: int,
-    nonce: int,
-    delegate_addr: str,
-) -> dict[str, Any]:
-    """
-    Sign EIP-7702 authorization.
-
-    If DELEGATE_ADDR is 0x0000000000000000000000000000000000000000, authorization is revoked.
-    """
-    address_n = tools.parse_path(address)
-    encoded_network = DEFINITIONS_SOURCE.get_eth_network(chain_id)
-    ret = ethereum.sign_auth_eip7702(
-        session,
-        address_n,
-        delegate=delegate_addr,
-        chain_id=chain_id,
-        nonce=nonce,
-        encoded_network=encoded_network,
-    )
-    return {
-        "v": ret.signature_v,
-        "r": f"0x{ret.signature_r.hex()}",
-        "s": f"0x{ret.signature_s.hex()}",
-    }

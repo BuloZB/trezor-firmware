@@ -1,22 +1,18 @@
-use std::process;
-
 use anyhow::{Result, anyhow};
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use serde::Deserialize;
 
 pub use crate::model::Model;
+use crate::options::BuildOptions;
 
-pub struct ResolvedBuild {
-    pub features: Vec<String>,
-    pub target_triple: Option<&'static str>,
-    pub board_header: String,
-}
-
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(ValueEnum, Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Project {
     Bootloader,
     Boardloader,
     #[value(name = "bootloader_ci")]
     BootloaderCi,
+    #[default]
     Firmware,
     Prodtest,
     Kernel,
@@ -109,8 +105,12 @@ impl Project {
     }
 }
 
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(ValueEnum, Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ConsoleType {
+    /// No debug console
+    #[default]
+    None,
     Vcp,
     Swo,
     SystemView,
@@ -148,6 +148,8 @@ pub enum Cmd {
     Upload(UploadArgs),
     /// Combine multiple firmware projects into a single binary for flashing
     Combine(CombineArgs),
+    /// Print current version of specified project
+    PrintVersion(PrintVersionArgs),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -163,137 +165,12 @@ pub struct BuildArgs {
     #[arg(long, short = 'e')]
     pub emulator: bool,
 
-    /// Enable debug build
-    #[arg(long, short = 'd', num_args = 0..=1, default_missing_value = "true")]
-    pub debug: Option<bool>,
+    /// Build preset
+    #[arg(long, short = 'p')]
+    pub preset: Option<String>,
 
-    /// Debug console backend
-    #[arg(long)]
-    pub dbg_console: Option<ConsoleType>,
-
-    /// Build Bitcoin-only firmware
-    #[arg(long)]
-    pub btc_only: bool,
-
-    /// Enable production build
-    #[arg(long)]
-    pub production: bool,
-
-    /// Force bootloader upgrade
-    #[arg(long)]
-    pub force_bootloader_upgrade: bool,
-
-    /// Use dev bootloader
-    #[arg(long)]
-    pub bootloader_devel: bool,
-
-    /// Enable unsafe firmware features
-    #[arg(long)]
-    pub unsafe_fw: bool,
-
-    /// Embed frozen MicroPython modules
-    #[arg(long)]
-    pub frozen: bool,
-
-    /// Include MicroPython source lines
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub source_lines: Option<bool>,
-
-    /// Optimize MicroPython bytecode
-    #[arg(long, num_args = 0..=1, default_missing_value = "true", overrides_with = "pyopt")]
-    pub pyopt: Option<bool>,
-
-    /// Enable Micropython memory performance measurements
-    #[arg(long)]
-    pub mem_perf: bool,
-
-    /// Enable debug link
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub debug_link: Option<bool>,
-
-    /// Enable N4W1 support
-    #[arg(long)]
-    pub n4w1: bool,
-
-    /// Disable UI animations
-    #[arg(long)]
-    pub disable_animation: bool,
-
-    /// Show UI perf overlay
-    #[arg(long)]
-    pub perf_overlay: bool,
-
-    /// Include crypto benchmarks
-    #[arg(long)]
-    pub benchmark: bool,
-
-    /// Log stack usage
-    #[arg(long)]
-    pub log_stack_usage: bool,
-
-    /// Use blocking VCP writes, in order to allow reliable debug data
-    /// transmission over VCP. Disabled by default, to prevent debug
-    /// firmware from getting stuck while writing log messages (if the host
-    /// is not reading them).
-    #[arg(long)]
-    pub block_on_vcp: bool,
-
-    /// Enable Address Sanitizer (ASAN) instrumentation
-    #[arg(long)]
-    pub asan: bool,
-
-    /// Enable external app loading
-    #[arg(long)]
-    pub apps: bool,
-
-    /// Disable OPTIGA support
-    #[arg(long)]
-    pub disable_optiga: bool,
-
-    /// Board revision to build for (defaults to model's default_board)
-    #[arg(long, short = 'b')]
-    pub board: Option<String>,
-
-    /// Disable TROPIC support
-    #[arg(long)]
-    pub disable_tropic: bool,
-
-    /// Enable insecure storage test mode
-    #[arg(long)]
-    pub storage_insecure_testing_mode: bool,
-
-    /// Emits memory analysis output (type sizes and stack sizes)
-    #[arg(long)]
-    pub emit_memory_analysis: bool,
-
-    /// Output cargo timings
-    #[arg(long)]
-    pub timings: bool,
-
-    /// Enable verbose output
-    #[arg(long)]
-    pub verbose: bool,
-}
-
-impl BuildArgs {
-    /// Determines the Cargo profile to use
-    pub fn profile_name(&self) -> &'static str {
-        if self.emulator && self.debug.unwrap_or(true) {
-            "dev"
-        } else if !self.emulator && self.debug.unwrap_or(false) {
-            "debug-opt"
-        } else {
-            "release"
-        }
-    }
-
-    pub fn resolve_features(&self) -> Result<ResolvedBuild> {
-        crate::feature_resolver::resolve_features(self)
-    }
-
-    pub fn configure_cargo(&self, cmd: &mut process::Command) -> Result<()> {
-        crate::feature_resolver::configure_cargo(self, cmd)
-    }
+    #[command(flatten)]
+    pub options: BuildOptions,
 }
 
 #[derive(Args, Debug)]
@@ -354,4 +231,10 @@ pub struct CombineArgs {
     /// Target model
     #[arg(long, short = 'm', ignore_case = true)]
     pub model: Model,
+}
+
+#[derive(Args, Debug)]
+#[command(hide = true)] // Should probably go under some kind of misc subcommand.
+pub struct PrintVersionArgs {
+    pub project: Project,
 }

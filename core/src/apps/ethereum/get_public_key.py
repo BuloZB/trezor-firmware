@@ -5,8 +5,6 @@ if TYPE_CHECKING:
 
 
 async def get_public_key(msg: EthereumGetPublicKey) -> EthereumPublicKey:
-    from ubinascii import hexlify
-
     from trezor.messages import EthereumPublicKey, GetPublicKey
     from trezor.ui.layouts import show_pubkey
 
@@ -17,6 +15,9 @@ async def get_public_key(msg: EthereumGetPublicKey) -> EthereumPublicKey:
     resp = await bitcoin_get_public_key.get_public_key(btc_pubkey_msg)
 
     if msg.show_display:
-        await show_pubkey(hexlify(resp.node.public_key).decode())
+        from apps.common.paths import address_n_to_str
+
+        path = address_n_to_str(msg.address_n)
+        await show_pubkey(resp.node.public_key.hex(), path=path)
 
     return EthereumPublicKey(node=resp.node, xpub=resp.xpub)

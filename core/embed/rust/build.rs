@@ -27,6 +27,10 @@ fn main() -> Result<()> {
             // Add syscall stubs when linking in the emulator, which doesn't have a
             // real kernel to link against.
             lib.add_source("src/test_setup.c");
+        } else {
+            // Compile a dummy source file to ensure the library is created
+            // (=> metadata are passed to higher-level crates)
+            lib.add_source("_dummy.c");
         }
 
         Ok(())
@@ -40,10 +44,19 @@ fn generate_micropython_bindings(lib: &mut CLibrary) -> Result<()> {
     lib.add_rust_bindings_ex("micropython", |builder| {
         Ok(builder
             .header("micropython.h")
+            // Needed to call header statics like mp_obj_list_set_len. See also upymod/build.rs.
+            .wrap_static_fns(true)
+            //.wrap_static_fns_path(PathBuf::from(out_dir.clone()).join("bindgen-static"))
             // obj
             .new_type_alias("mp_obj_t")
             .allowlist_type("mp_obj_type_t")
             .allowlist_type("mp_obj_base_t")
+            .allowlist_type("mp_obj_full_type_t")
+            .allowlist_type("mp_attr_fun_t")
+            .allowlist_type("mp_call_fun_t")
+            .allowlist_type("mp_make_new_fun_t")
+            .allowlist_type("mp_print_fun_t")
+            .allowlist_type("mp_buffer_fun_t")
             .allowlist_function("mp_obj_new_int")
             .allowlist_function("mp_obj_new_int_from_ll")
             .allowlist_function("mp_obj_new_int_from_ull")
@@ -58,6 +71,7 @@ fn generate_micropython_bindings(lib: &mut CLibrary) -> Result<()> {
             .allowlist_function("mp_call_function_n_kw")
             .allowlist_function("trezor_obj_get_ll_checked")
             .allowlist_function("trezor_obj_str_from_rom_text")
+            .allowlist_var("MP_TYPE_FLAG_NONE")
             // buffer
             .allowlist_function("mp_obj_new_slice")
             .allowlist_function("mp_obj_subscr")
@@ -216,6 +230,7 @@ fn generate_trezorhal_bindings(lib: &mut CLibrary) -> Result<()> {
             .allowlist_function("gfx_mono8_blend_mono4")
             .allowlist_function("gfx_bitblt_wait")
             // uzlib
+            .allowlist_type("uzlib_uncomp_t")
             .allowlist_function("uzlib_uncompress_init")
             .allowlist_function("uzlib_uncompress")
             // bip39
@@ -310,11 +325,6 @@ fn generate_trezorhal_bindings(lib: &mut CLibrary) -> Result<()> {
             .allowlist_function("pm_hibernate")
             .allowlist_function("pm_charging_enable")
             .allowlist_function("pm_charging_disable")
-            // irq
-            .allowlist_function("irq_lock_fn")
-            .allowlist_function("irq_unlock_fn")
-            // nrf
-            .allowlist_function("nrf_send_uart_data")
             // c_layout
             .allowlist_type("c_layout_t")
             .allowlist_function("bootloader_process_ble")

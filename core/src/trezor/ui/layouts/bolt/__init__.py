@@ -11,9 +11,10 @@ from ..properties import with_colon
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes, StrOrBytes
-    from typing import Awaitable, Iterable, NoReturn, Sequence
+    from collections.abc import Awaitable, Iterable, Sequence
+    from typing import NoReturn
 
-    from trezor.messages import StellarAsset
+    from apps.stellar.tokens import StellarToken
 
     from ..common import ExceptionType, PropertyType, StrPropertyType
     from ..properties import AboveThreshold
@@ -532,7 +533,7 @@ async def confirm_payment_request(
         subtitle=TR.words__provider,
         value=recipient_name,
         description=None,
-        verb=TR.words__confirm,
+        verb=TR.buttons__confirm,
         verb_cancel=None,
         chunkify=False,
         info=True,
@@ -751,8 +752,8 @@ async def confirm_blob(
     chunkify: bool = False,
     prompt_screen: bool = True,
 ) -> None:
-    if description and ":" not in description:
-        description += ":"
+    if description:
+        description = with_colon(description)
 
     verb = verb or TR.buttons__confirm  # def_arg
     with trezorui_api.confirm_value(
@@ -829,24 +830,6 @@ def confirm_text(
     )
 
 
-def confirm_amount(
-    title: str,
-    amount: str,
-    description: str | None = None,
-    br_name: str = "confirm_amount",
-    br_code: ButtonRequestType = BR_CODE_OTHER,
-) -> Awaitable[None]:
-    description = description or with_colon(TR.words__amount)  # def_arg
-    return confirm_value(
-        title,
-        amount,
-        description,
-        br_name,
-        br_code,
-        verb=TR.buttons__confirm,
-    )
-
-
 async def confirm_value(
     title: str,
     value: str,
@@ -868,7 +851,7 @@ async def confirm_value(
     """General confirmation dialog, used by many other confirm_* functions."""
 
     if description and value:
-        description += ":"
+        description = with_colon(description)
 
     info_ctx = trezorui_api.show_info_with_cancel(
         title=info_title if info_title else TR.words__title_information,
@@ -1068,13 +1051,13 @@ if not utils.BITCOIN_ONLY:
         )
         confirmed_len += len(prefix)
 
-        button_text = TR.words__show_next if confirmed_len < total_len else None
+        button_text = TR.buttons__show_next if confirmed_len < total_len else None
 
         show_more = await should_show_more(
             title=TR.ethereum__title_input_data_bytes.format(confirmed_len, total_len),
             items=[(utils.hexlify_if_bytes(part), True) for part in prefix_parts],
             button_text=button_text,  # will return True
-            confirm=TR.words__confirm_all,  # will return False
+            confirm=TR.buttons__confirm_all,  # will return False
             br_name=br_name,
             br_code=br_code,
         )
@@ -1754,24 +1737,53 @@ if not utils.BITCOIN_ONLY:
             br_code=ButtonRequestType.SignTx,
         )
 
+    async def confirm_stellar_address(
+        title: str,
+        subtitle: str,
+        address: str,
+        description: str,
+        br_name: str,
+    ) -> None:
+        await confirm_address(
+            title,
+            address,
+            subtitle=subtitle or None,
+            description=description,
+            verb=TR.buttons__continue,
+            br_name=br_name,
+        )
+
+    async def confirm_stellar_valid_until(
+        title: str,
+        subtitle: str,
+        live_until_ledger: int,
+        br_name: str,
+    ) -> None:
+        await confirm_value(
+            title,
+            str(live_until_ledger),
+            TR.stellar__valid_until_ledger,
+            br_name,
+            subtitle=subtitle or None,
+            is_data=False,
+            verb=TR.buttons__continue,
+        )
+
     async def confirm_stellar_output_amount(
         title: str,
         subtitle: str,
         amount: str,
-        asset: StellarAsset,
+        token: StellarToken,
         description: str | None = None,
+        token_contract: str | None = None,
     ) -> None:
-        from trezor.enums import StellarAssetType
-
         info_items = []
-        if asset.type != StellarAssetType.NATIVE:
-            info_items = [
-                (
-                    TR.stellar__issuer_template.format(asset.code),
-                    asset.issuer or "",
-                    None,
-                )
-            ]
+        if token.issuer is not None:
+            info_items.append(
+                (TR.stellar__issuer_template.format(token.symbol), token.issuer, None)
+            )
+        if token_contract:
+            info_items.append((TR.stellar__token_contract, token_contract, None))
 
         await confirm_value(
             title,
@@ -1789,11 +1801,12 @@ if not utils.BITCOIN_ONLY:
 
     async def confirm_stellar_output(
         address: str,
-        amount: str | None,
+        amount: str,
         output_index: int,
-        asset: StellarAsset | None,
+        token: StellarToken,
         address_description: str | None = None,
         amount_description: str | None = None,
+        token_contract: str | None = None,
     ) -> None:
         await confirm_address(
             f"{TR.words__recipient} #{output_index + 1}",
@@ -1804,14 +1817,14 @@ if not utils.BITCOIN_ONLY:
             verb=TR.buttons__continue,
         )
 
-        if amount is not None and asset is not None:
-            await confirm_stellar_output_amount(
-                title=TR.words__send,
-                subtitle=f"{TR.words__recipient} #{output_index + 1}",
-                amount=amount,
-                asset=asset,
-                description=amount_description or TR.words__amount,
-            )
+        await confirm_stellar_output_amount(
+            title=TR.words__send,
+            subtitle=f"{TR.words__recipient} #{output_index + 1}",
+            amount=amount,
+            token=token,
+            description=amount_description or TR.words__amount,
+            token_contract=token_contract,
+        )
 
     async def confirm_tron_claim(
         title: str,
@@ -1899,6 +1912,7 @@ if not utils.BITCOIN_ONLY:
         amount_str: str,
         is_revoke: bool,
         maximum_fee: str,
+        native_amount_str: str | None = None,
         chunkify: bool = False,
     ) -> None:
         br_name = "tron/approve"
@@ -1949,8 +1963,8 @@ if not utils.BITCOIN_ONLY:
         )
 
         await _confirm_summary(
-            None,
-            None,
+            native_amount_str,
+            TR.words__amount if native_amount_str else None,
             maximum_fee,
             TR.words__fee_limit,
             title,
@@ -1962,6 +1976,7 @@ if not utils.BITCOIN_ONLY:
         recipient_addr: str,
         amount_str: str,
         maximum_fee: str,
+        native_amount_str: str | None = None,
         chunkify: bool = False,
     ) -> None:
         br_name = "tron/transfer"
@@ -1997,12 +2012,13 @@ if not utils.BITCOIN_ONLY:
         )
 
         await _confirm_summary(
-            None,
-            None,
-            maximum_fee,
-            TR.words__fee_limit,
-            title,
-            None,
+            amount=native_amount_str,
+            amount_label=TR.words__amount if native_amount_str else None,
+            fee=maximum_fee,
+            fee_label=TR.words__fee_limit,
+            title=title,
+            br_name=br_name,
+            br_code=ButtonRequestType.SignTx,
         )
 
     async def confirm_tron_voting(voting_list: list[tuple[int, str]]) -> None:

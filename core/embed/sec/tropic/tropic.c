@@ -23,6 +23,7 @@
 #include <sec/rng_strong.h>
 #include <sec/secret_keys.h>
 #include <sec/tropic.h>
+#include <sys/rng_use_flags.h>
 #include <sys/systick.h>
 
 #include "bignum.h"
@@ -30,6 +31,7 @@
 
 #include <libtropic.h>
 #include <libtropic/cal/trezor_crypto/libtropic_trezor_crypto.h>
+#include <lt_l3_process.h>
 
 #ifdef TREZOR_EMULATOR
 #include <arpa/inet.h>
@@ -39,6 +41,34 @@
 
 #include "ed25519-donna/ed25519.h"
 #include "memzero.h"
+
+#ifdef USE_TROPIC_LOGGING
+#include <rtl/printf.h>
+
+// CLI for libtropic's log output; non-NULL only while a caller has armed it.
+static cli_t *g_lt_log_cli = NULL;
+
+void tropic_set_log_sink(cli_t *cli) { g_lt_log_cli = cli; }
+
+#ifndef TREZOR_EMULATOR
+// Log sink called by libtropic's `LT_LOG_*()` macros. On the
+// emulator the libtropic POSIX port provides its own implementation.
+int lt_port_log(const char *format, ...) {
+  if (g_lt_log_cli == NULL) {
+    return 0;
+  }
+
+  char line[128] = {0};
+  va_list args = {0};
+  va_start(args, format);
+  int len = vsnprintf_(line, sizeof(line), format, args);
+  va_end(args);
+  line[strcspn(line, "\n")] = '\0';
+  cli_trace(g_lt_log_cli, "%s", line);
+  return len;
+}
+#endif  // TREZOR_EMULATOR
+#endif  // USE_TROPIC_LOGGING
 
 #ifdef SECURE_MODE
 
@@ -69,6 +99,10 @@ static const uint8_t TROPIC_BATCHES_V1[][LT_MEMBER_SIZE(
 // {0x19, 0x09, 0x10, 0x0b, 0x04}, {0x19, 0x0a, 0x08, 0x10, 0x10},
 // {0x19, 0x0a, 0x1f, 0x0f, 0x2c}, {0x19, 0x0c, 0x03, 0x0d, 0x38},
 // };
+
+// How long we wait after `tropic_deinit()` before calling `tropic_init()`
+// again.
+#define TROPIC_RESTART_DELAY_MS 10
 
 // clang-format off
 // Temporary address table for config objects, ordered to match lt_config_t.obj[].
@@ -152,9 +186,11 @@ static bool is_retryable(lt_ret_t ret) {
       if (!is_retryable(TROPIC_RETRY_COMMAND_res)) {                      \
         break;                                                            \
       }                                                                   \
-      tropic01_reset();                                                   \
       tropic_deinit();                                                    \
-      tropic_init(NULL);                                                  \
+      systick_delay_ms(TROPIC_RESTART_DELAY_MS);                          \
+      if (tropic_init(NULL) != LT_OK) {                                   \
+        break;                                                            \
+      }                                                                   \
       if (TROPIC_RETRY_COMMAND_session_started) {                         \
         if (tropic_custom_session_start(                                  \
                 NULL, TROPIC_RETRY_COMMAND_pairing_key_index) != LT_OK) { \
@@ -265,6 +301,12 @@ lt_ret_t tropic_session_invalidate(void) {
   }
   g_tropic_driver.session_started = false;
   return LT_OK;
+}
+
+void tropic_session_forget(void) {
+  tropic_driver_t *drv = &g_tropic_driver;
+  lt_l3_invalidate_host_session_data(&drv->handle.l3);
+  drv->session_started = false;
 }
 
 // If `TREZOR_PRODTEST` is not defined, the `cli` argument is ignored.
@@ -762,17 +804,6 @@ static bool set_backup_distribution_version_to(uint32_t distribution_version) {
   return true;
 }
 
-static secbool tropic_restart_chip(void) {
-#ifndef TREZOR_EMULATOR
-  tropic01_reset();
-#endif
-  tropic_deinit();
-  if (tropic_init(NULL) != LT_OK) {
-    return secfalse;
-  }
-  return sectrue;
-}
-
 // Applies `expected_config` and writes the new distribution version to slot 6.
 //
 // Crash-safety: the write order is designed so that a power-cut leaves slot 6
@@ -873,7 +904,14 @@ static secbool set_expected_config(
     return secfalse;
   }
 
-  return tropic_restart_chip();
+  // restart Tropic so the new config takes effect.
+  tropic_deinit();
+  systick_delay_ms(TROPIC_RESTART_DELAY_MS);
+  if (tropic_init(NULL) != LT_OK) {
+    return secfalse;
+  }
+
+  return sectrue;
 }
 
 // clang-format off
@@ -978,12 +1016,23 @@ lt_ret_t tropic_init(cli_t *cli) {
   drv->device.addr = inet_addr("127.0.0.1");
   drv->device.port = get_tropic_model_port();
   drv->handle.l2.device = &drv->device;
-#endif
+#endif  // TREZOR_EMULATOR
 
   // Initialize crypto context
   drv->handle.l3.crypto_ctx = &drv->crypto_ctx;
 
   lt_ret_t ret = lt_init(&drv->handle);
+#if !defined(TREZOR_PRODTEST) && !defined(TREZOR_EMULATOR)
+  // On HW Firmware, retry a failed init.
+  // Prodtest skips it to surface the init error.
+  // Emulator has no retry logic.
+  for (int i = 0; i < TROPIC_MAX_RETRIES - 1 && is_retryable(ret); i++) {
+    lt_deinit(&drv->handle);
+    systick_delay_ms(TROPIC_RESTART_DELAY_MS);
+    ret = lt_init(&drv->handle);
+  }
+#endif  // !TREZOR_PRODTEST && !TREZOR_EMULATOR
+
   if (ret != LT_OK) {
 #ifdef TREZOR_PRODTEST
     if (cli) {
@@ -1005,8 +1054,7 @@ void tropic_deinit(void) {
   memset(drv, 0, sizeof(*drv));
 }
 
-#ifdef TREZOR_PRODTEST
-static lt_handle_t *tropic_get_handle(void) {
+lt_handle_t *tropic_get_handle(void) {
   tropic_driver_t *drv = &g_tropic_driver;
 
   if (!drv->initialized) {
@@ -1016,6 +1064,7 @@ static lt_handle_t *tropic_get_handle(void) {
   return &drv->handle;
 }
 
+#ifdef TREZOR_PRODTEST
 lt_handle_t *tropic_prodtest_init_and_get_handle(cli_t *cli) {
   if (tropic_init(cli) != LT_OK) {
     return NULL;
@@ -1114,6 +1163,11 @@ void tropic_get_factory_privkey(curve25519_key privkey) {
   memcpy(privkey, factory_private, sizeof(curve25519_key));
 }
 
+// Gated on the same condition as the mock that replaces it, so the two halves
+// of the choice cannot drift apart: with TREZOR_EMULATOR the deterministic
+// stream in tropic/unix/tropic_mock.c provides this function instead.
+#ifndef TREZOR_EMULATOR
+
 bool tropic_random_buffer(void *buffer, size_t length) {
   tropic_driver_t *drv = &g_tropic_driver;
 
@@ -1121,12 +1175,25 @@ bool tropic_random_buffer(void *buffer, size_t length) {
     return false;
   }
 
-  if (LT_OK != lt_random_value_get(&drv->handle, buffer, length)) {
-    return false;
+  uint8_t *dst = (uint8_t *)buffer;
+  size_t remaining = length;
+
+  while (remaining > 0) {
+    // lt_random_value_get() uses uint8_t as a size parameter
+    size_t chunk = remaining > 255 ? 255 : remaining;
+    if (LT_OK != lt_random_value_get(&drv->handle, dst, chunk)) {
+      return false;
+    }
+    dst += chunk;
+    remaining -= chunk;
   }
+
+  rng_use_flag_set(RNG_TYPE_TROPIC);
 
   return true;
 }
+
+#endif  // TREZOR_EMULATOR
 
 void tropic_random_buffer_time(uint32_t *time_ms) {
   // Assuming the data size is 32 bytes
@@ -1382,9 +1449,7 @@ bool tropic_pin_set(
     goto cleanup;
   }
 
-  if (!rng_fill_buffer_strong(reset_key, TROPIC_MAC_AND_DESTROY_SIZE)) {
-    goto cleanup;
-  }
+  rng_fill_buffer_strong(reset_key, TROPIC_MAC_AND_DESTROY_SIZE);
 
   if (!update_change_pin_counter()) {
     goto cleanup;

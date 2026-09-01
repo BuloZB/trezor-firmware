@@ -12,7 +12,7 @@ input flow details.
 from __future__ import annotations
 
 import time
-from typing import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Sequence
 
 import pytest
 
@@ -41,7 +41,7 @@ from .input_flows_helpers import (
     EthereumFlow,
     PinFlow,
     RecoveryFlow,
-    n4w1_handle_write,
+    n1w1_handle_write,
 )
 
 B = messages.ButtonRequestType
@@ -1828,9 +1828,9 @@ class InputFlowBip39Backup(InputFlowBase):
             # 2. Backup warning
             yield from click_through(self.debug, screens=2, code=B.ResetDevice)
             self.mnemonic = yield from get_mnemonic(self.debug)
-        elif self.method is messages.BackupMethod.N4W1:
+        elif self.method is messages.BackupMethod.N1W1:
             assert (yield).name == "backup_write"
-            self.mnemonic = n4w1_handle_write(self.debug).decode()
+            self.mnemonic = n1w1_handle_write(self.debug).decode()
             br = yield
             assert br.name == "success_backup"
             assert br.code == B.Success
@@ -1895,14 +1895,14 @@ class InputFlowBip39ResetBackup(InputFlowBase):
 
             # mnemonic phrases and rest
             self.mnemonic = yield from get_mnemonic(self.debug)
-        elif self.method is messages.BackupMethod.N4W1:
+        elif self.method is messages.BackupMethod.N1W1:
             # 1. Confirm Reset
             # 2. Wallet created
             # 3. Backup your seed
             yield from click_through(self.debug, screens=3, code=B.ResetDevice)
-            # 4. Backup using N4W1
+            # 4. Backup using N1W1
             assert (yield).name == "backup_write"
-            self.mnemonic = n4w1_handle_write(self.debug).decode()
+            self.mnemonic = n1w1_handle_write(self.debug).decode()
             # 5. Success
             br = yield
             assert br.name == "success_backup"
@@ -2016,11 +2016,49 @@ def load_N_shares(
                 assert br.name == expected_br_name
                 debug.press_yes()
 
-        elif method is messages.BackupMethod.N4W1:
+        elif method is messages.BackupMethod.N1W1:
             assert (yield).name == "backup_write"
-            mnemonics.append(n4w1_handle_write(debug).decode())
+            mnemonics.append(n1w1_handle_write(debug).decode())
         else:
             raise RuntimeError
+
+    br = yield
+    assert br.code == B.Success
+    assert br.name == "success_backup"
+    debug.press_yes()
+
+    return mnemonics
+
+
+def load_N_groups(
+    debug: DebugLink,
+    groups: Sequence[tuple[int, int]],
+    method: messages.BackupMethod = messages.BackupMethod.Display,
+) -> Generator[None, "messages.ButtonRequest", list[list[str]]]:
+    mnemonics: list[list[str]] = []
+    expected_br_name = "success_share_confirm"
+    if debug.layout_type is LayoutType.Eckhart:
+        expected_br_name = "success_recovery"
+
+    for _member_threshold, member_count in groups:
+        group_mnemonics: list[str] = []
+        for _share in range(member_count):
+            if method is messages.BackupMethod.Display:
+                # Phrase screen
+                mnemonic = yield from read_and_confirm_mnemonic(debug)
+                assert mnemonic is not None
+                group_mnemonics.append(mnemonic)
+
+                # Confirm continue to next
+                yield from swipe_if_necessary(debug, B.Success, expected_br_name)
+                debug.press_yes()
+
+            elif method is messages.BackupMethod.N1W1:
+                assert (yield).name == "backup_write"
+                group_mnemonics.append(n1w1_handle_write(debug).decode())
+            else:
+                raise RuntimeError
+        mnemonics.append(group_mnemonics)
 
     br = yield
     assert br.code == B.Success
@@ -2135,7 +2173,7 @@ class InputFlowSlip39BasicBackup(InputFlowBase):
     def input_flow_eckhart(self) -> BRGeneratorType:
         assert self.method in (
             messages.BackupMethod.Display,
-            messages.BackupMethod.N4W1,
+            messages.BackupMethod.N1W1,
         )
         if self.repeated:
             # intro confirmation screen
@@ -2243,7 +2281,7 @@ class InputFlowSlip39BasicResetRecovery(InputFlowBase):
     def input_flow_eckhart(self) -> BRGeneratorType:
         num_screens = {
             messages.BackupMethod.Display: 10,
-            messages.BackupMethod.N4W1: 8,
+            messages.BackupMethod.N1W1: 8,
         }[self.method]
         # 1. Confirm Reset
         # 2. Wallet Created
@@ -2347,7 +2385,7 @@ class InputFlowSlip39CustomBackup(InputFlowBase):
 
             yield  # Confirm show seeds
             self.debug.press_yes()
-        elif self.backup_method is messages.BackupMethod.N4W1:
+        elif self.backup_method is messages.BackupMethod.N1W1:
             if self.share_count > 1:
                 assert (yield).name == "warning_shamir_backup"
                 self.debug.press_yes()
@@ -2357,6 +2395,47 @@ class InputFlowSlip39CustomBackup(InputFlowBase):
         # Mnemonic phrases
         self.mnemonics = yield from load_N_shares(
             self.debug, self.share_count, self.backup_method
+        )
+
+
+class InputFlowSlip39AdvancedCustomBackup(InputFlowBase):
+    def __init__(
+        self,
+        client: Client | DebugSession,
+        groups: Sequence[tuple[int, int]],
+        backup_method: messages.BackupMethod = messages.BackupMethod.Display,
+    ):
+        super().__init__(client)
+        self.mnemonics: list[list[str]] = []
+        self.groups = groups
+        self.backup_method = backup_method
+
+    def input_flow_common(self) -> BRGeneratorType:
+        # 1. Confirm multi-group backup parameters
+        assert (yield).name in (
+            "warning_shamir_backup",
+            "warning_shamir_advanced_backup",
+        )
+        self.debug.press_yes()
+
+        if len(self.groups) > 1:
+            # 2. Confirm individual groups thresholds
+            assert (yield).name == "shamir_advanced_backup_groups"
+            layout = self.debug.read_layout()
+            for _i in range(layout.page_count() - 1):
+                self.debug.press_right()
+            self.debug.press_yes()
+
+        if self.backup_method is messages.BackupMethod.Display:
+            # 3. Never make digital copies
+            yield
+            self.debug.press_yes()
+        elif self.backup_method is not messages.BackupMethod.N1W1:
+            raise RuntimeError
+
+        # Mnemonic phrases
+        self.mnemonics = yield from load_N_groups(
+            self.debug, self.groups, self.backup_method
         )
 
 
@@ -2372,9 +2451,9 @@ def load_5_groups_5_shares(
                 # Phrase screen
                 mnemonic = yield from read_and_confirm_mnemonic(debug)
                 assert mnemonic is not None
-            elif backup_method is messages.BackupMethod.N4W1:
+            elif backup_method is messages.BackupMethod.N1W1:
                 assert (yield).name == "backup_write"
-                mnemonic = n4w1_handle_write(debug).decode()
+                mnemonic = n1w1_handle_write(debug).decode()
             else:
                 raise RuntimeError
             mnemonics.append(mnemonic)
@@ -2664,7 +2743,7 @@ class InputFlowSlip39AdvancedResetRecovery(InputFlowBase):
         # 20. Confirm show seeds (only for BackupMethod.Display)
         screens = {
             messages.BackupMethod.Display: 20,
-            messages.BackupMethod.N4W1: 18,
+            messages.BackupMethod.N1W1: 18,
         }[self.method]
         yield from click_through(self.debug, screens=screens, code=B.ResetDevice)
 
@@ -3229,8 +3308,8 @@ class InputFlowConfirmAllWarnings(InputFlowBase):
             text = layout.footer().lower()
             # hi priority warning
             hi_prio = (
-                TR.words__cancel_and_exit,
-                TR.send__cancel_sign,
+                TR.buttons__cancel_and_exit,
+                TR.buttons__cancel_sign,
                 TR.send__cancel_transaction,
             )
             if any(needle.lower() in text for needle in hi_prio):
@@ -3264,8 +3343,8 @@ class InputFlowConfirmAllWarnings(InputFlowBase):
             text = layout.action_bar().lower()
             # hi priority warning
             hi_prio = (
-                TR.words__cancel_and_exit,
-                TR.send__cancel_sign,
+                TR.buttons__cancel_and_exit,
+                TR.buttons__cancel_sign,
                 TR.send__cancel_transaction,
             )
             if any(needle.lower() in text for needle in hi_prio):

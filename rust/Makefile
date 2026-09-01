@@ -1,5 +1,5 @@
 # trezor-client needs running emulator for test, handled in core.yml
-CRATES_TEST = trezor-thp trezor-tjpgdec
+CRATES_TEST = trezor-thp trezor-tjpgdec trezor-ward
 CRATES = ${CRATES_TEST} trezor-client
 
 .PHONY: check audit
@@ -38,5 +38,5 @@ audit:
 	@set -e; for D in $(CRATES); do ( \
 		echo "[AUDIT $$D]"; \
 		cd $$D; \
-		cargo audit \
+		cargo audit --deny warnings \
 	); done

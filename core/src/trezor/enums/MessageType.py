@@ -125,10 +125,10 @@ if __debug__:
     DebugLinkGetPairingInfo = 9011
     DebugLinkPairingInfo = 9012
     DebugLinkSetLogFilter = 9013
-    DebugLinkN4W1Connected = 9014
-    DebugLinkN4W1Write = 9015
-    DebugLinkN4W1Read = 9016
-    DebugLinkN4W1Response = 9017
+    DebugLinkN1W1Connected = 9014
+    DebugLinkN1W1Write = 9015
+    DebugLinkN1W1Read = 9016
+    DebugLinkN1W1Response = 9017
     DebugLinkSetBatteryState = 9018
 if utils.USE_THP:
     ThpCreateNewSession = 1000
@@ -158,8 +158,6 @@ if not utils.BITCOIN_ONLY:
     EthereumSignTypedHash = 470
     EthereumDefinitionRequest = 471
     EthereumDefinitionAck = 472
-    EthereumSignAuth7702 = 473
-    EthereumAuth7702Signature = 474
     NEMGetAddress = 67
     NEMAddress = 68
     NEMSignTx = 69
@@ -304,4 +302,6 @@ if not utils.BITCOIN_ONLY:
     TronUnfreezeBalanceV2Contract = 2208
     TronWithdrawUnfreeze = 2209
     TronVoteWitnessContract = 2210
+    TronDelegateResourceContract = 2211
+    TronUnDelegateResourceContract = 2212
     TronWithdrawBalance = 2213

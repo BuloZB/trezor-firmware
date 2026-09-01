@@ -261,8 +261,16 @@ static inline bool jpegdec_feed_fifo(jpegdec_t *dec, jpegdec_input_t *inp) {
       inp->offset += 4;
     }
     if (inp->offset < inp->size) {
-      size_t bits = (inp->size - inp->offset) * 8;
-      JPEG->DIR = *ptr & (0xFFFFFFFF >> (32 - bits));
+      // Assemble the last, possibly incomplete word byte by byte so that
+      // nothing past the end of the input buffer is read. Missing bytes stay
+      // zero.
+      const uint8_t *tail = &inp->data[inp->offset];
+      size_t remaining = inp->size - inp->offset;
+      uint32_t word = 0;
+      for (size_t i = 0; i < remaining; i++) {
+        word |= (uint32_t)tail[i] << (8 * i);
+      }
+      JPEG->DIR = word;
       inp->offset = inp->size;
     }
     return true;
@@ -289,6 +297,10 @@ jpegdec_state_t jpegdec_process(jpegdec_input_t *inp) {
     return JPEGDEC_STATE_ERROR;
   }
 
+  if (inp->offset > inp->size) {
+    return JPEGDEC_STATE_ERROR;
+  }
+
   // Check input buffer alignment
   if (inp->offset < inp->size) {
     if (!IS_ALIGNED(inp->offset, 4) ||
@@ -308,6 +320,7 @@ jpegdec_state_t jpegdec_process(jpegdec_input_t *inp) {
         return dec->state;
       }
       // pass through
+      [[fallthrough]];
     case JPEGDEC_STATE_INFO_READY:
       if (!jpegdec_start_dma_transfer(dec)) {
         dec->state = JPEGDEC_STATE_ERROR;

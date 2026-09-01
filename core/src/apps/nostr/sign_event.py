@@ -8,10 +8,26 @@ if TYPE_CHECKING:
     from apps.common.keychain import Keychain
 
 
+# NIP-01 defines canonical escaping of JSON strings
+_REPLACEMENTS = (
+    ("\x5c", "\\\\"),  # needs to be first
+    ("\x22", '\\"'),
+    ("\x0a", "\\n"),
+    ("\x0d", "\\r"),
+    ("\x09", "\\t"),
+    ("\x08", "\\b"),
+    ("\x0c", "\\f"),
+)
+
+
+def encode_str(content: str) -> str:
+    for old, new in _REPLACEMENTS:
+        content = content.replace(old, new)
+    return f'"{content}"'
+
+
 @auto_keychain(__name__)
 async def sign_event(msg: NostrSignEvent, keychain: Keychain) -> NostrEventSignature:
-    from ubinascii import hexlify
-
     from trezor import TR
     from trezor.crypto.curve import bip340
     from trezor.crypto.hashlib import sha256
@@ -37,7 +53,7 @@ async def sign_event(msg: NostrSignEvent, keychain: Keychain) -> NostrEventSigna
     # "[0,pubkey,created_at,kind,tags,content]"
     # See NIP-01: https://github.com/nostr-protocol/nips/blob/master/01.md
     serialized_tags = ",".join(
-        ["[" + ",".join(f'"{t}"' for t in tag) + "]" for tag in tags]
+        ["[" + ",".join(encode_str(t) for t in tag) + "]" for tag in tags]
     )
 
     info_items = [
@@ -46,7 +62,7 @@ async def sign_event(msg: NostrSignEvent, keychain: Keychain) -> NostrEventSigna
     ]
     await confirm_value(title, content, "", "nostr_sign_event", info_items=info_items)
 
-    serialized_event = f'[0,"{hexlify(pk).decode()}",{created_at},{kind},[{serialized_tags}],"{content}"]'
+    serialized_event = f'[0,"{pk.hex()}",{created_at},{kind},[{serialized_tags}],{encode_str(content)}]'
     event_id = sha256(serialized_event).digest()
 
     # The event signature is basically the signature of the event ID computed above

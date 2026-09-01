@@ -21,6 +21,22 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+// Guard against this file ever being compiled into a production build.
+#if defined(PRODUCTION) && PRODUCTION
+#error "Insecure PRNG must not be compiled into a production build"
+#endif
+
+// Guard against this file ever being compiled into a bare-metal build.
+_Static_assert(
+    sizeof(void *) == 8,
+    "Insecure PRNG compiled for a non 64-bit target, a device build?");
+#if !defined(__linux__) && !defined(__APPLE__) && !defined(_WIN32)
+#error "Insecure PRNG must not be compiled for a bare-metal target"
+#endif
+#if __STDC_HOSTED__ == 0
+#error "Insecure PRNG must not be compiled for a freestanding target"
+#endif
+
 #include "rand.h"
 
 #ifdef USE_INSECURE_PRNG

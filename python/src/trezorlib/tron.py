@@ -1,5 +1,5 @@
 import io
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from . import messages
 from .protobuf import load_message
@@ -16,6 +16,8 @@ if TYPE_CHECKING:
         messages.TronWithdrawUnfreeze,
         messages.TronWithdrawBalance,
         messages.TronVoteWitnessContract,
+        messages.TronDelegateResourceContract,
+        messages.TronUnDelegateResourceContract,
     ]
 
 DEFAULT_BIP32_PATH = "m/44h/195h/0h/0/0"
@@ -23,7 +25,7 @@ DEFAULT_BIP32_PATH = "m/44h/195h/0h/0/0"
 
 def from_raw_data(
     raw_data: bytes,
-) -> Tuple[messages.TronSignTx, "TronMessageType"]:
+) -> tuple[messages.TronSignTx, "TronMessageType"]:
     raw_tx = load_message(io.BytesIO(raw_data), messages.TronRawTransaction)
     tx = messages.TronSignTx(
         ref_block_bytes=raw_tx.ref_block_bytes,
@@ -59,6 +61,7 @@ def from_raw_data(
             owner_address=raw_contract.owner_address,
             contract_address=raw_contract.contract_address,
             data=raw_contract.data,
+            call_value=raw_contract.call_value,
         )
     elif contract_type == messages.TronRawContractType.FreezeBalanceV2Contract:
         raw_contract = load_message(
@@ -103,6 +106,30 @@ def from_raw_data(
         )
         contract = messages.TronVoteWitnessContract(
             owner_address=raw_contract.owner_address, votes=raw_contract.votes
+        )
+    elif contract_type == messages.TronRawContractType.DelegateResourceContract:
+        raw_contract = load_message(
+            io.BytesIO(parameter_value),
+            messages.TronDelegateResourceContract,
+        )
+        contract = messages.TronDelegateResourceContract(
+            owner_address=raw_contract.owner_address,
+            receiver_address=raw_contract.receiver_address,
+            balance=raw_contract.balance,
+            resource=raw_contract.resource,
+            lock_period=raw_contract.lock_period,
+            lock=raw_contract.lock,
+        )
+    elif contract_type == messages.TronRawContractType.UnDelegateResourceContract:
+        raw_contract = load_message(
+            io.BytesIO(parameter_value),
+            messages.TronUnDelegateResourceContract,
+        )
+        contract = messages.TronUnDelegateResourceContract(
+            owner_address=raw_contract.owner_address,
+            receiver_address=raw_contract.receiver_address,
+            balance=raw_contract.balance,
+            resource=raw_contract.resource,
         )
     else:
         raise ValueError(f"Unsupported contract type: {contract_type}")

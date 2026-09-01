@@ -67,8 +67,8 @@ endif
 ifeq ($(BOOTLOADER_DEVEL),1)
 XTASK_BUILD_OPTS += --bootloader-devel
 endif
-ifeq ($(N4W1),1)
-XTASK_BUILD_OPTS += --n4w1
+ifeq ($(N1W1),1)
+XTASK_BUILD_OPTS += --n1w1
 endif
 ifeq ($(PRODUCTION),1)
 XTASK_BUILD_OPTS += --production
@@ -79,6 +79,7 @@ else ifeq ($(PYOPT),0)
 XTASK_BUILD_OPTS += --pyopt false
 XTASK_BUILD_OPTS += --disable-animation
 XTASK_BUILD_OPTS += --dbg-console vcp
+XTASK_BUILD_OPTS += --debug-link
 endif
 ifeq ($(TREZOR_MEMPERF),1)
 XTASK_BUILD_OPTS += --mem-perf
@@ -125,6 +126,9 @@ test: ## run unit tests
 
 test_rust: ## run rs unit tests
 	xtask test crypto
+	xtask test rtl
+	xtask test sys
+	xtask test io
 	xtask test trezor_lib
 	# TODO:
 	# xtask test all
@@ -212,7 +216,7 @@ clippy:
 	xtask clippy -e -m $(TREZOR_MODEL) firmware
 
 audit_rust: ## run cargo audit on rust dependencies
-	cd embed ; cargo audit
+	cd embed ; cargo audit --deny warnings
 
 vet_rust: ## run cargo vet on rust dependencies
 	cd embed ; cargo vet --locked

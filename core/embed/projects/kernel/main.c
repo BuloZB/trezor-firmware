@@ -25,6 +25,7 @@
 #include <io/rsod.h>
 #include <sec/board_capabilities.h>
 #include <sec/boot_image.h>
+#include <sec/monoctr.h>
 #include <sec/option_bytes.h>
 #include <sec/random_delays.h>
 #include <sec/unit_properties.h>
@@ -124,6 +125,8 @@ void drivers_init() {
   UNUSED(status);
 
 #ifdef SECURE_MODE
+  monoctr_init();
+
   parse_boardloader_capabilities();
   unit_properties_init();
 
@@ -207,7 +210,7 @@ void drivers_init() {
   optiga_init_and_configure();
 #endif
 #ifdef USE_TROPIC
-  tropic_init(NULL);
+  ensure_true(tropic_init(NULL) == LT_OK, "Failed to initialize Tropic driver");
 #endif
 #endif  // SECURE_MODE
 

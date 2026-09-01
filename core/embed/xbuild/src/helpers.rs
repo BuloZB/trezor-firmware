@@ -1,10 +1,13 @@
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
+use std::sync::OnceLock;
 use std::{env, fs};
 
 use color_eyre::Result;
 use color_eyre::eyre::{WrapErr, eyre};
 use pathdiff::diff_paths;
+
+use crate::cargo_out;
 
 /// Checks if the parent directory of the given output path exists,
 /// and creates it if it doesn't.
@@ -40,6 +43,29 @@ pub fn links_name() -> Result<String> {
     env::var("CARGO_MANIFEST_LINKS").context("Failed to get CARGO_MANIFEST_LINKS")
 }
 
+/// Returns the Git revision supplied by xtask through `SCM_REVISION`.
+///
+/// Emits Cargo's environment dependency directive and validates that the value
+/// is a full SHA-1 revision.
+pub fn scm_revision() -> Result<String> {
+    cargo_out::rerun_if_env_changed("SCM_REVISION");
+
+    let revision = env::var("SCM_REVISION")
+        .context("SCM_REVISION environment variable is not set")?
+        .trim()
+        .to_string();
+
+    if revision.len() != 40
+        || !revision
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
+    {
+        return Err(eyre!("Unexpected SCM_REVISION format: {revision}"));
+    }
+
+    Ok(revision)
+}
+
 /// Reads a `DEP_<CRATE>_PUBLIC_C_<KEY>` metadata variable exported by a
 /// dependency's build script.
 pub fn library_metadata(lib_name: &str, kind: &str) -> Result<String> {
@@ -48,7 +74,20 @@ pub fn library_metadata(lib_name: &str, kind: &str) -> Result<String> {
     ))
 }
 
+/// Writes a progress message to stderr, but only when trace output is enabled
+#[macro_export]
+macro_rules! trace {
+    ($($arg:tt)*) => {
+        if $crate::trace_enabled() {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
+pub use trace;
+
 /// Measures the execution time of a closure and prints it with the given label
+/// when trace output is enabled.
 pub fn measure_time<T, F>(label: impl AsRef<str>, f: F) -> T
 where
     F: FnOnce() -> T,
@@ -56,8 +95,23 @@ where
     let start_time = std::time::Instant::now();
     let result = f();
     let duration = start_time.elapsed();
-    eprintln!("{}: {:.2?}", label.as_ref(), duration);
+    trace!("{}: {:.2?}", label.as_ref(), duration);
     result
+}
+
+/// Reports whether the build was asked for trace output.
+///
+/// Cargo does not pass its own `--verbose` down to build scripts, so `xtask`
+/// sets `XBUILD_TRACE` alongside it.
+pub fn trace_enabled() -> bool {
+    static TRACE: OnceLock<bool> = OnceLock::new();
+
+    *TRACE.get_or_init(|| {
+        // Without this, toggling the variable would not re-run build scripts
+        // that Cargo considers up to date, and nothing would be logged.
+        cargo_out::rerun_if_env_changed("XBUILD_TRACE");
+        env::var_os("XBUILD_TRACE").is_some_and(|v| !v.is_empty() && v != "0")
+    })
 }
 
 /// Converts `path` to a path relative to `CARGO_MANIFEST_DIR` when possible.
@@ -184,6 +238,33 @@ pub fn cargo_target_dir() -> Result<PathBuf> {
     Ok(target_dir.to_path_buf())
 }
 
+/// Returns the `-fdiagnostics-color` flag to pass to `tool`, or None if the
+/// tool is not GCC- or Clang-like and would not understand it.
+///
+/// Compiler output is captured (see `emit_command_output`), so the compiler
+/// sees a pipe and disables color unless explicitly told otherwise.
+pub fn diagnostics_color_flag(tool: &cc::Tool) -> Option<&'static str> {
+    if !(tool.is_like_gnu() || tool.is_like_clang()) {
+        return None;
+    }
+
+    Some(if color_diagnostics_enabled() {
+        "-fdiagnostics-color=always"
+    } else {
+        "-fdiagnostics-color=never"
+    })
+}
+
+/// Decides whether compiler diagnostics should be colored.
+///
+/// The answer comes from `CARGO_TERM_COLOR`, resolved to `always`/`never` by
+/// `xtask` (see `forward_color_choice` there). A build script cannot detect
+/// the terminal itself - Cargo pipes its output - so under a bare
+/// `cargo build` the variable is unset and diagnostics stay plain.
+fn color_diagnostics_enabled() -> bool {
+    env::var_os("CARGO_TERM_COLOR").is_some_and(|v| v == "always")
+}
+
 /// Checks if the `IS_RUST_ANALYZER` environment variable is set,
 /// which indicates that Rust Analyzer is running.
 pub fn is_rust_analyzer() -> bool {
@@ -197,6 +278,6 @@ where
     P: AsRef<Path>,
 {
     for file in files {
-        println!("cargo:rerun-if-changed={}", file.as_ref().display());
+        cargo_out::rerun_if_changed(file);
     }
 }

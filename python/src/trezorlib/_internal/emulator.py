@@ -24,8 +24,9 @@ import signal
 import socket
 import subprocess
 import time
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, TextIO, Union, cast
+from typing import Any, Optional, TextIO, Union, cast
 
 from ..debuglink import DebugLinkNotFound, TrezorTestContext
 from ..transport import Transport
@@ -217,10 +218,10 @@ class Emulator:
             raise RuntimeError
         return self._client
 
-    def make_args(self) -> List[str]:
+    def make_args(self) -> list[str]:
         return []
 
-    def make_env(self) -> Dict[str, str]:
+    def make_env(self) -> dict[str, str]:
         return os.environ.copy()
 
     def _get_transport(self) -> UdpTransport:
@@ -373,6 +374,7 @@ class CoreEmulator(Emulator):
         sdcard: Optional[bytes] = None,
         disable_animation: bool = True,
         heap_size: str = "20M",
+        display_scale: Optional[float] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -390,8 +392,9 @@ class CoreEmulator(Emulator):
         self.disable_animation = disable_animation
         self.main_args = list(main_args)
         self.heap_size = heap_size
+        self.display_scale = display_scale
 
-    def make_env(self) -> Dict[str, str]:
+    def make_env(self) -> dict[str, str]:
         env = super().make_env()
         env.update(
             TREZOR_PROFILE_DIR=str(self.profile_dir),
@@ -403,11 +406,13 @@ class CoreEmulator(Emulator):
         if self.headless or self.disable_animation:
             env["TREZOR_DISABLE_FADE"] = "1"
             env["TREZOR_DISABLE_ANIMATION"] = "1"
+        if self.display_scale is not None:
+            env["TREZOR_EMULATOR_SCALE"] = str(self.display_scale)
         env["TROPIC_MODEL_PORT"] = str(self.tropic_port())
 
         return env
 
-    def make_args(self) -> List[str]:
+    def make_args(self) -> list[str]:
         pyopt = "-O0" if self.debug else "-O1"
         return (
             [pyopt, "-X", f"heapsize={self.heap_size}"]
@@ -459,7 +464,7 @@ class CoreEmulator(Emulator):
 class LegacyEmulator(Emulator):
     STORAGE_FILENAME = "emulator.img"
 
-    def make_env(self) -> Dict[str, str]:
+    def make_env(self) -> dict[str, str]:
         env = super().make_env()
         if self.headless:
             env["SDL_VIDEODRIVER"] = "dummy"

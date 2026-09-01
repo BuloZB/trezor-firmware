@@ -4,24 +4,25 @@ use std::{env, fs};
 use anyhow::{Context, Result, anyhow};
 use cargo_metadata::MetadataCommand;
 
-use crate::args::{BuildArgs, Model, Project};
+use crate::args::{Model, PrintVersionArgs, Project};
+use crate::options::ResolvedBuildArgs;
 
 /// Returns the path to the built ELF file for the given build arguments.
-pub fn elf_path(args: &BuildArgs) -> Result<PathBuf> {
+pub fn elf_path(args: &ResolvedBuildArgs) -> Result<PathBuf> {
     let elf_name = args.project.package_name(args.emulator);
     Ok(profile_dir(args)?.join(elf_name))
 }
 
 /// Returns the profile output directory (e.g.
 /// `build/thumbv7em-none-eabihf/release`).
-pub fn profile_dir(args: &BuildArgs) -> Result<PathBuf> {
+pub fn profile_dir(args: &ResolvedBuildArgs) -> Result<PathBuf> {
     let mut path = build_dir()?;
     if !args.emulator {
         let model_config = args.model.config()?;
         path = path.join(model_config.target_triple()?);
     }
 
-    let name = match args.profile_name() {
+    let name = match args.cargo_profile_name() {
         "dev" => "debug", // Cargo uses "debug" folder for dev profile
         name => name,
     };
@@ -185,6 +186,12 @@ pub fn get_version_file(project: Project) -> Result<PathBuf> {
         .join("projects")
         .join(project.binary_name())
         .join("version.h"))
+}
+
+pub fn print_version(args: PrintVersionArgs) -> Result<()> {
+    let version_str = parse_version_file(&get_version_file(args.project)?)?;
+    println!("{}", version_str);
+    Ok(())
 }
 
 #[cfg(test)]

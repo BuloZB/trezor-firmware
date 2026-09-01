@@ -93,10 +93,10 @@ trezor_message_impl! {
     DebugLinkGetPairingInfo => MessageType_DebugLinkGetPairingInfo,
     DebugLinkPairingInfo => MessageType_DebugLinkPairingInfo,
     DebugLinkSetLogFilter => MessageType_DebugLinkSetLogFilter,
-    DebugLinkN4W1Connected => MessageType_DebugLinkN4W1Connected,
-    DebugLinkN4W1Write => MessageType_DebugLinkN4W1Write,
-    DebugLinkN4W1Read => MessageType_DebugLinkN4W1Read,
-    DebugLinkN4W1Response => MessageType_DebugLinkN4W1Response,
+    DebugLinkN1W1Connected => MessageType_DebugLinkN1W1Connected,
+    DebugLinkN1W1Write => MessageType_DebugLinkN1W1Write,
+    DebugLinkN1W1Read => MessageType_DebugLinkN1W1Read,
+    DebugLinkN1W1Response => MessageType_DebugLinkN1W1Response,
     DebugLinkSetBatteryState => MessageType_DebugLinkSetBatteryState,
     ThpCreateNewSession => MessageType_ThpCreateNewSession,
     ThpCredentialRequest => MessageType_ThpCredentialRequest,
@@ -197,8 +197,6 @@ trezor_message_impl! {
     EthereumSignTypedHash => MessageType_EthereumSignTypedHash,
     EthereumDefinitionRequest => MessageType_EthereumDefinitionRequest,
     EthereumDefinitionAck => MessageType_EthereumDefinitionAck,
-    EthereumSignAuth7702 => MessageType_EthereumSignAuth7702,
-    EthereumAuth7702Signature => MessageType_EthereumAuth7702Signature,
 }
 
 #[cfg(feature = "evolu")]
@@ -343,6 +341,8 @@ trezor_message_impl! {
     TronUnfreezeBalanceV2Contract => MessageType_TronUnfreezeBalanceV2Contract,
     TronWithdrawUnfreeze => MessageType_TronWithdrawUnfreeze,
     TronVoteWitnessContract => MessageType_TronVoteWitnessContract,
+    TronDelegateResourceContract => MessageType_TronDelegateResourceContract,
+    TronUnDelegateResourceContract => MessageType_TronUnDelegateResourceContract,
     TronWithdrawBalance => MessageType_TronWithdrawBalance,
 }
 

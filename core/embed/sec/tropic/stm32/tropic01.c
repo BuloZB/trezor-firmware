@@ -39,15 +39,6 @@ static tropic_ui_progress_t ui_progress = NULL;
 
 void tropic_set_ui_progress(tropic_ui_progress_t f) { ui_progress = f; }
 
-void tropic01_reset(void) {
-  HAL_GPIO_WritePin(TROPIC01_SPI_NSS_PORT, TROPIC01_SPI_NSS_PIN,
-                    GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(TROPIC01_PWR_PORT, TROPIC01_PWR_PIN, GPIO_PIN_SET);
-  systick_delay_ms(10);
-  HAL_GPIO_WritePin(TROPIC01_PWR_PORT, TROPIC01_PWR_PIN, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(TROPIC01_SPI_NSS_PORT, TROPIC01_SPI_NSS_PIN, GPIO_PIN_SET);
-}
-
 lt_ret_t lt_port_init(lt_l2_state_t *s2) {
   tropic01_hal_driver_t *drv = &g_tropic01_hal_driver;
 
@@ -122,6 +113,23 @@ lt_ret_t lt_port_init(lt_l2_state_t *s2) {
   drv->spi.Init.CRCPolynomial = 0;
 
   HAL_SPI_Init(&drv->spi);
+
+// This is a fix for: https://github.com/tropicsquare/libtropic/issues/550
+// It can be removed once the Tropic application firmware is upgraded to
+// a version greater than 2.0.0.
+// The bug is that Tropic signals that it is in maintenance mode during
+// startup. This causes the chip to reboot in `lt_init()`, delaying the start
+// by 250 ms. It only manifests when `LT_L1_READ_RETRY_DELAY_MS` is too low.
+// A 124 ms delay was the shortest one found to skip the window in which
+// Tropic signals maintenance mode on a device with enabled memory
+// built-in self test (`MBIST_DIS = 0`) and RNG test (`RNGTEST_DIS = 0`).
+// 135 ms is used here in case it varies across devices.
+// We do not apply the fix in prodtest, because it would prolong the
+// duration of `prodtest_tropic_stress_init()`. The trade-off
+// is a slightly longer Tropic startup time in prodtest.
+#ifndef TREZOR_PRODTEST
+  systick_delay_ms(135);
+#endif
 
   drv->initialized = true;
 

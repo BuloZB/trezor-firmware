@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING
-from ubinascii import hexlify
 
 from trezor import TR
 
@@ -7,7 +6,7 @@ from . import networks
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes
-    from typing import Awaitable, Callable, Sequence
+    from collections.abc import Awaitable, Callable, Sequence
 
     from trezor.messages import EthereumFieldType, EthereumTokenInfo
     from trezor.ui.layouts import StrPropertyType
@@ -36,7 +35,7 @@ def address_from_bytes(
     else:
         prefix = ""
 
-    address_hex = hexlify(address_bytes)
+    address_hex = address_bytes.hex().encode()
     writer = keccak256(prefix.encode())
     writer.extend(address_hex)
     digest = writer.get_digest()
@@ -60,17 +59,15 @@ def address_from_bytes(
 
 
 def bytes_from_address(address: str) -> bytes:
-    from ubinascii import unhexlify
-
     from trezor import wire
 
     if len(address) == 40:
-        return unhexlify(address)
+        return bytes.fromhex(address)
 
     elif len(address) == 42:
         if address[0:2] not in ("0x", "0X"):
             raise wire.ProcessError("Ethereum: invalid beginning of an address")
-        return unhexlify(address[2:])
+        return bytes.fromhex(address[2:])
 
     elif len(address) == 0:
         return bytes()
@@ -121,7 +118,7 @@ def get_type_name(field: EthereumFieldType) -> str:
 def decode_typed_data(data: AnyBytes, type_name: str) -> str:
     """Used by sign_typed_data module to show data to user."""
     if type_name.startswith("bytes"):
-        return hexlify(data).decode()
+        return data.hex()
     elif type_name == "string":
         return bytes(data).decode()
     elif type_name == "address":
@@ -251,7 +248,7 @@ class DataChunkConfirmer:
                 value=chunk,
                 subtitle=TR.ethereum__data_size_template.format(self.total_len),
                 verb=TR.buttons__confirm,
-                verb_cancel=TR.send__cancel_sign,
+                verb_cancel=TR.buttons__cancel_sign,
                 verb_view_all=TR.ethereum__view_data_and_hash,
                 br_name="confirm_data",
                 br_code=ButtonRequestType.SignTx,

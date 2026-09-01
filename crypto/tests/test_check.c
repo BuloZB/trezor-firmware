@@ -24,6 +24,7 @@
 #include <assert.h>
 #include <check.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1968,6 +1969,193 @@ START_TEST(test_bip32_vector_4) {
   memcpy(&node3, &node, sizeof(HDNode));
   memzero(&node3.private_key, 32);
   ck_assert_mem_eq(&node2, &node3, sizeof(HDNode));
+}
+END_TEST
+
+// Base58Check-encodes a 78-byte extended key with the given key material.
+static void build_xkey(uint32_t version, const uint8_t *key33, char *str,
+                       size_t strsize) {
+  uint8_t node_data[78] = {0};
+  node_data[0] = version >> 24;
+  node_data[1] = version >> 16;
+  node_data[2] = version >> 8;
+  node_data[3] = version;
+  node_data[4] = 1;                   // depth
+  memset(node_data + 13, 0x42, 32);   // chain code
+  memcpy(node_data + 45, key33, 33);  // key material
+  base58_encode_check(node_data, sizeof(node_data), HASHER_SHA2D, str, strsize);
+}
+
+START_TEST(test_bip32_deserialize_invalid) {
+  char str[XPUB_MAXLEN] = {0};
+  uint8_t key[33] = {0};
+  HDNode node = {0};
+
+  const curve_info *secp = get_curve_by_name(SECP256K1_NAME);
+  const curve_info *ed = get_curve_by_name(ED25519_NAME);
+  ck_assert(secp != NULL);
+  ck_assert(ed != NULL);
+
+  // secp256k1 group order
+  uint8_t order[32] = {0};
+  memcpy(
+      order,
+      fromhex(
+          "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"),
+      32);
+  uint8_t order_minus_one[32] = {0};
+  memcpy(order_minus_one, order, 32);
+  order_minus_one[31] -= 1;
+
+  // hdnode_validate_private_key() accepts exactly [1, order-1]
+  uint8_t priv[32] = {0};
+  ck_assert(!hdnode_validate_private_key(secp, priv));
+  memcpy(priv, order, 32);
+  ck_assert(!hdnode_validate_private_key(secp, priv));
+  memcpy(priv, order_minus_one, 32);
+  ck_assert(hdnode_validate_private_key(secp, priv));
+  memset(priv, 0, sizeof(priv));
+  priv[31] = 1;
+  ck_assert(hdnode_validate_private_key(secp, priv));
+  // curves without ecdsa parameters take any 32-byte string
+  memset(priv, 0, sizeof(priv));
+  ck_assert(hdnode_validate_private_key(ed, priv));
+
+  // hdnode_validate_public_key() accepts genuine keys of both parities
+  bool seen_even = false, seen_odd = false;
+  for (uint8_t i = 0; i < 16; i++) {
+    uint8_t seed[16] = {0};
+    seed[0] = i;
+    hdnode_from_seed(seed, sizeof(seed), SECP256K1_NAME, &node);
+    ck_assert_int_eq(hdnode_fill_public_key(&node), 0);
+    ck_assert(hdnode_validate_public_key(secp, node.public_key));
+    if (node.public_key[0] == 0x02) seen_even = true;
+    if (node.public_key[0] == 0x03) seen_odd = true;
+  }
+  ck_assert(seen_even);
+  ck_assert(seen_odd);
+  memcpy(key, node.public_key, 33);
+
+  // the generator point is on the curve
+  uint8_t generator[33] = {0};
+  generator[0] = 0x02;
+  memcpy(
+      generator + 1,
+      fromhex(
+          "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"),
+      32);
+  ck_assert(hdnode_validate_public_key(secp, generator));
+
+  // flipping the parity byte of a valid key keeps it on the curve
+  uint8_t flipped[33] = {0};
+  memcpy(flipped, key, 33);
+  flipped[0] ^= 0x01;
+  ck_assert(hdnode_validate_public_key(secp, flipped));
+
+  // only 0x02 and 0x03 prefixes are accepted
+  uint8_t bad_prefix[33] = {0};
+  memcpy(bad_prefix, key, 33);
+  const uint8_t prefixes[] = {0x00, 0x01, 0x04, 0x05, 0x06, 0x07, 0xff};
+  for (size_t i = 0; i < sizeof(prefixes); i++) {
+    bad_prefix[0] = prefixes[i];
+    ck_assert(!hdnode_validate_public_key(secp, bad_prefix));
+  }
+
+  // x with no square root on the curve
+  uint8_t offcurve[33] = {0};
+  offcurve[0] = 0x02;
+  offcurve[32] = 0x05;  // x^3 + 7 is not a quadratic residue for x = 5
+  ck_assert(!hdnode_validate_public_key(secp, offcurve));
+  offcurve[32] = 0x00;  // nor for x = 0
+  ck_assert(!hdnode_validate_public_key(secp, offcurve));
+  offcurve[32] = 0x01;  // but x = 1 is a valid point
+  ck_assert(hdnode_validate_public_key(secp, offcurve));
+  offcurve[32] = 0x05;  // restore the off-curve x for the tests below
+
+  // x must be reduced modulo the field prime
+  uint8_t too_large[33] = {0};
+  memset(too_large, 0xff, sizeof(too_large));
+  too_large[0] = 0x02;
+  ck_assert(!hdnode_validate_public_key(secp, too_large));
+  memcpy(
+      too_large + 1,  // x == p exactly
+      fromhex(
+          "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),
+      32);
+  ck_assert(!hdnode_validate_public_key(secp, too_large));
+
+  // curves without ecdsa parameters check prefix is 0x00
+  uint8_t ed_key[33] = {0};
+  ck_assert(hdnode_validate_public_key(ed, ed_key));
+  // a valid secp256k1 key is not a valid ed25519 node key
+  ck_assert(!hdnode_validate_public_key(ed, generator));
+  ck_assert(!hdnode_validate_public_key(ed, offcurve));
+  // invalid prefix is rejected
+  ed_key[0] = 0x40;
+  ck_assert(!hdnode_validate_public_key(ed, ed_key));
+  // key material is not checked
+  ed_key[0] = 0x00;
+  memset(ed_key + 1, 0xff, 32);
+  ck_assert(hdnode_validate_public_key(ed, ed_key));
+
+  // the deserializer rejects a private key outside [1, order-1]
+  memset(key, 0, sizeof(key));
+  build_xkey(VERSION_PRIVATE, key, str, sizeof(str));
+  ck_assert_int_eq(hdnode_deserialize_private(str, VERSION_PRIVATE,
+                                              SECP256K1_NAME, &node, NULL),
+                   -5);
+
+  memset(key, 0, sizeof(key));
+  memcpy(key + 1, order, 32);
+  build_xkey(VERSION_PRIVATE, key, str, sizeof(str));
+  ck_assert_int_eq(hdnode_deserialize_private(str, VERSION_PRIVATE,
+                                              SECP256K1_NAME, &node, NULL),
+                   -5);
+
+  memset(key, 0, sizeof(key));
+  memcpy(key + 1, order_minus_one, 32);
+  build_xkey(VERSION_PRIVATE, key, str, sizeof(str));
+  ck_assert_int_eq(hdnode_deserialize_private(str, VERSION_PRIVATE,
+                                              SECP256K1_NAME, &node, NULL),
+                   0);
+  ck_assert_mem_eq(node.private_key, order_minus_one, 32);
+
+  // and a public key that is not a point on the curve
+  build_xkey(VERSION_PUBLIC, offcurve, str, sizeof(str));
+  ck_assert_int_eq(hdnode_deserialize_public(str, VERSION_PUBLIC,
+                                             SECP256K1_NAME, &node, NULL),
+                   -5);
+  ck_assert_int_eq(
+      hdnode_from_xpub(1, 0, node.chain_code, offcurve, SECP256K1_NAME, &node),
+      0);
+
+  // hdnode_public_ckd() rejects an off-curve point
+  HDNode unchecked = {0};
+  unchecked.curve = secp;
+  memcpy(unchecked.public_key, offcurve, 33);
+  unchecked.is_public_key_set = true;
+  ck_assert_int_eq(hdnode_public_ckd(&unchecked, 0), 0);
+
+  build_xkey(VERSION_PUBLIC, too_large, str, sizeof(str));
+  ck_assert_int_eq(hdnode_deserialize_public(str, VERSION_PUBLIC,
+                                             SECP256K1_NAME, &node, NULL),
+                   -5);
+
+  // a genuine public key still round-trips
+  HDNode seeded = {0};
+  hdnode_from_seed(fromhex("000102030405060708090a0b0c0d0e0f"), 16,
+                   SECP256K1_NAME, &seeded);
+  ck_assert_int_eq(hdnode_fill_public_key(&seeded), 0);
+  build_xkey(VERSION_PUBLIC, seeded.public_key, str, sizeof(str));
+  ck_assert_int_eq(hdnode_deserialize_public(str, VERSION_PUBLIC,
+                                             SECP256K1_NAME, &node, NULL),
+                   0);
+  ck_assert_mem_eq(node.public_key, seeded.public_key, 33);
+
+  // an unknown curve name must not be dereferenced
+  ck_assert_int_eq(
+      hdnode_deserialize_public(str, VERSION_PUBLIC, "foobar", &node, NULL),
+      -4);
 }
 END_TEST
 
@@ -4331,6 +4519,7 @@ START_TEST(test_aes) {
   aes_decrypt_ctx ctxd;
   uint8_t ibuf[16], obuf[16], iv[16], cbuf[16];
   const char **ivp, **plainp, **cipherp;
+  int res = 0;
 
   // ECB
   static const char *ecb_vector[] = {
@@ -4350,20 +4539,24 @@ START_TEST(test_aes) {
   cipherp = ecb_vector + 1;
   while (*plainp && *cipherp) {
     // encrypt
-    aes_encrypt_key256(
+    res = aes_encrypt_key256(
         fromhex(
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
         &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     memcpy(ibuf, fromhex(*plainp), 16);
-    aes_ecb_encrypt(ibuf, obuf, 16, &ctxe);
+    res = aes_ecb_encrypt(ibuf, obuf, 16, &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*cipherp), 16);
     // decrypt
-    aes_decrypt_key256(
+    res = aes_decrypt_key256(
         fromhex(
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
         &ctxd);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     memcpy(ibuf, fromhex(*cipherp), 16);
-    aes_ecb_decrypt(ibuf, obuf, 16, &ctxd);
+    res = aes_ecb_decrypt(ibuf, obuf, 16, &ctxd);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*plainp), 16);
     plainp += 2;
     cipherp += 2;
@@ -4393,22 +4586,26 @@ START_TEST(test_aes) {
   cipherp = cbc_vector + 2;
   while (*plainp && *cipherp) {
     // encrypt
-    aes_encrypt_key256(
+    res = aes_encrypt_key256(
         fromhex(
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
         &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     memcpy(iv, fromhex(*ivp), 16);
     memcpy(ibuf, fromhex(*plainp), 16);
-    aes_cbc_encrypt(ibuf, obuf, 16, iv, &ctxe);
+    res = aes_cbc_encrypt(ibuf, obuf, 16, iv, &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*cipherp), 16);
     // decrypt
-    aes_decrypt_key256(
+    res = aes_decrypt_key256(
         fromhex(
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
         &ctxd);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     memcpy(iv, fromhex(*ivp), 16);
     memcpy(ibuf, fromhex(*cipherp), 16);
-    aes_cbc_decrypt(ibuf, obuf, 16, iv, &ctxd);
+    res = aes_cbc_decrypt(ibuf, obuf, 16, iv, &ctxd);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*plainp), 16);
     ivp += 3;
     plainp += 3;
@@ -4438,22 +4635,26 @@ START_TEST(test_aes) {
   cipherp = cfb_vector + 2;
   while (*plainp && *cipherp) {
     // encrypt
-    aes_encrypt_key256(
+    res = aes_encrypt_key256(
         fromhex(
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
         &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     memcpy(iv, fromhex(*ivp), 16);
     memcpy(ibuf, fromhex(*plainp), 16);
-    aes_cfb_encrypt(ibuf, obuf, 16, iv, &ctxe);
+    res = aes_cfb_encrypt(ibuf, obuf, 16, iv, &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*cipherp), 16);
     // decrypt (uses encryption)
-    aes_encrypt_key256(
+    res = aes_encrypt_key256(
         fromhex(
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
         &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     memcpy(iv, fromhex(*ivp), 16);
     memcpy(ibuf, fromhex(*cipherp), 16);
-    aes_cfb_decrypt(ibuf, obuf, 16, iv, &ctxe);
+    res = aes_cfb_decrypt(ibuf, obuf, 16, iv, &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*plainp), 16);
     ivp += 3;
     plainp += 3;
@@ -4483,22 +4684,26 @@ START_TEST(test_aes) {
   cipherp = ofb_vector + 2;
   while (*plainp && *cipherp) {
     // encrypt
-    aes_encrypt_key256(
+    res = aes_encrypt_key256(
         fromhex(
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
         &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     memcpy(iv, fromhex(*ivp), 16);
     memcpy(ibuf, fromhex(*plainp), 16);
-    aes_ofb_encrypt(ibuf, obuf, 16, iv, &ctxe);
+    res = aes_ofb_encrypt(ibuf, obuf, 16, iv, &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*cipherp), 16);
     // decrypt (uses encryption)
-    aes_encrypt_key256(
+    res = aes_encrypt_key256(
         fromhex(
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
         &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     memcpy(iv, fromhex(*ivp), 16);
     memcpy(ibuf, fromhex(*cipherp), 16);
-    aes_ofb_decrypt(ibuf, obuf, 16, iv, &ctxe);
+    res = aes_ofb_decrypt(ibuf, obuf, 16, iv, &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*plainp), 16);
     ivp += 3;
     plainp += 3;
@@ -4523,13 +4728,15 @@ START_TEST(test_aes) {
   plainp = ctr_vector;
   cipherp = ctr_vector + 1;
   memcpy(cbuf, fromhex("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"), 16);
-  aes_encrypt_key256(
+  res = aes_encrypt_key256(
       fromhex(
           "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
       &ctxe);
+  ck_assert_int_eq(res, EXIT_SUCCESS);
   while (*plainp && *cipherp) {
     memcpy(ibuf, fromhex(*plainp), 16);
-    aes_ctr_encrypt(ibuf, obuf, 16, cbuf, aes_ctr_cbuf_inc, &ctxe);
+    res = aes_ctr_encrypt(ibuf, obuf, 16, cbuf, aes_ctr_cbuf_inc, &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*cipherp), 16);
     plainp += 2;
     cipherp += 2;
@@ -4538,16 +4745,57 @@ START_TEST(test_aes) {
   plainp = ctr_vector;
   cipherp = ctr_vector + 1;
   memcpy(cbuf, fromhex("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"), 16);
-  aes_encrypt_key256(
+  res = aes_encrypt_key256(
       fromhex(
           "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
       &ctxe);
+  ck_assert_int_eq(res, EXIT_SUCCESS);
   while (*plainp && *cipherp) {
     memcpy(ibuf, fromhex(*cipherp), 16);
-    aes_ctr_decrypt(ibuf, obuf, 16, cbuf, aes_ctr_cbuf_inc, &ctxe);
+    res = aes_ctr_decrypt(ibuf, obuf, 16, cbuf, aes_ctr_cbuf_inc, &ctxe);
+    ck_assert_int_eq(res, EXIT_SUCCESS);
     ck_assert_mem_eq(obuf, fromhex(*plainp), 16);
     plainp += 2;
     cipherp += 2;
+  }
+}
+END_TEST
+
+// the AES mode functions take a signed length parameter,
+// negative values have to be rejected
+START_TEST(test_aes_negative_length) {
+  aes_encrypt_ctx ctxe;
+  aes_decrypt_ctx ctxd;
+  uint8_t ibuf[16] = {0};
+  uint8_t obuf[16] = {0};
+  uint8_t iv[16] = {0};
+  uint8_t cbuf[16] = {0};
+
+  // -16 is a negative multiple of AES_BLOCK_SIZE
+  static const int lengths[] = {-1, -16, INT_MIN};
+
+  const uint8_t *key = fromhex(
+      "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4");
+  ck_assert_int_eq(aes_encrypt_key256(key, &ctxe), EXIT_SUCCESS);
+  ck_assert_int_eq(aes_decrypt_key256(key, &ctxd), EXIT_SUCCESS);
+
+  for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    int len = lengths[i];
+
+    ck_assert_int_eq(aes_ecb_encrypt(ibuf, obuf, len, &ctxe), EXIT_FAILURE);
+    ck_assert_int_eq(aes_ecb_decrypt(ibuf, obuf, len, &ctxd), EXIT_FAILURE);
+    ck_assert_int_eq(aes_cbc_encrypt(ibuf, obuf, len, iv, &ctxe), EXIT_FAILURE);
+    ck_assert_int_eq(aes_cbc_decrypt(ibuf, obuf, len, iv, &ctxd), EXIT_FAILURE);
+    ck_assert_int_eq(aes_cfb_encrypt(ibuf, obuf, len, iv, &ctxe), EXIT_FAILURE);
+    ck_assert_int_eq(aes_cfb_decrypt(ibuf, obuf, len, iv, &ctxe), EXIT_FAILURE);
+    ck_assert_int_eq(aes_ofb_encrypt(ibuf, obuf, len, iv, &ctxe), EXIT_FAILURE);
+    ck_assert_int_eq(aes_ofb_decrypt(ibuf, obuf, len, iv, &ctxe), EXIT_FAILURE);
+    ck_assert_int_eq(
+        aes_ctr_encrypt(ibuf, obuf, len, cbuf, aes_ctr_cbuf_inc, &ctxe),
+        EXIT_FAILURE);
+    ck_assert_int_eq(
+        aes_ctr_decrypt(ibuf, obuf, len, cbuf, aes_ctr_cbuf_inc, &ctxe),
+        EXIT_FAILURE);
   }
 }
 END_TEST
@@ -10413,7 +10661,7 @@ static void test_compress_coord(const char *k_raw) {
 
   bignum256 x = {0}, y = {0};
   bn_read_be(compress + 1, &x);
-  uncompress_coords(curve, compress[0], &x, &y);
+  ck_assert_int_eq(uncompress_coords(curve, compress[0], &x, &y), 1);
 
   ck_assert(bn_is_equal(&expected_coords.x, &x));
   ck_assert(bn_is_equal(&expected_coords.y, &y));
@@ -10435,6 +10683,57 @@ START_TEST(test_compress_coords) {
 
   for (int i = 0; i < (int)(sizeof(k_raw) / sizeof(*k_raw)); i++)
     test_compress_coord(k_raw[i]);
+}
+END_TEST
+
+static void test_uncompress_coord_invalid(const ecdsa_curve *curve,
+                                          const bignum256 *x) {
+  bignum256 y = {0};
+
+  for (uint8_t odd = 0x02; odd <= 0x03; odd++) {
+    bn_one(&y);
+    ck_assert_int_eq(uncompress_coords(curve, odd, x, &y), 0);
+    ck_assert(bn_is_zero(&y));
+  }
+}
+
+static void test_uncompress_coord_non_residue(const ecdsa_curve *curve,
+                                              uint32_t x_raw) {
+  bignum256 x = {0};
+  bn_read_uint32(x_raw, &x);
+  test_uncompress_coord_invalid(curve, &x);
+}
+
+static void test_uncompress_coord_out_of_range(const ecdsa_curve *curve) {
+  bignum256 x = {0};
+
+  // x == prime
+  bn_copy(&curve->prime, &x);
+  test_uncompress_coord_invalid(curve, &x);
+
+  // x == prime + 1
+  bn_addi(&x, 1);
+  test_uncompress_coord_invalid(curve, &x);
+
+  // x == 2^256 - 1
+  bn_read_be(
+      fromhex(
+          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+      &x);
+  test_uncompress_coord_invalid(curve, &x);
+}
+
+START_TEST(test_uncompress_coords_invalid) {
+  // x coordinates for which x^3 + a*x + b is not a quadratic residue,
+  // i.e. there is no curve point with the given x coordinate
+  test_uncompress_coord_non_residue(&secp256k1, 5);
+  test_uncompress_coord_non_residue(&secp256k1, 7);
+  test_uncompress_coord_non_residue(&nist256p1, 1);
+  test_uncompress_coord_non_residue(&nist256p1, 2);
+
+  // x coordinates which are not fully reduced modulo prime
+  test_uncompress_coord_out_of_range(&secp256k1);
+  test_uncompress_coord_out_of_range(&nist256p1);
 }
 END_TEST
 
@@ -11567,10 +11866,14 @@ START_TEST(test_elligator2) {
 }
 END_TEST
 
-START_TEST(test_noise_kk1) {
-  // Inject the seed to the random number generator to make the test
-  // deterministic
-  random_reseed(2748932008);
+// Runs the KK1 handshake and leaves both contexts in the transport phase. The
+// keys are derived from `seed`, so the exchanged messages are deterministic.
+static void test_noise_kk1_handshake(uint32_t seed,
+                                     noise_kk1_context_t *initiator_context,
+                                     noise_kk1_context_t *responder_context,
+                                     noise_kk1_request_t *request,
+                                     noise_kk1_response_t *response) {
+  random_reseed(seed);
 
   curve25519_key initiator_private_key = {0};
   curve25519_key responder_private_key = {0};
@@ -11581,6 +11884,24 @@ START_TEST(test_noise_kk1) {
   curve25519_scalarmult_basepoint(initiator_public_key, initiator_private_key);
   curve25519_scalarmult_basepoint(responder_public_key, responder_private_key);
 
+  // Initiator sends request
+  ck_assert_int_eq(
+      noise_kk1_create_handshake_request(initiator_context, request), true);
+
+  // Responder receives request and sends response
+  ck_assert_int_eq(noise_kk1_handle_handshake_request(
+                       responder_context, initiator_public_key,
+                       responder_private_key, request, response),
+                   true);
+
+  // Initiator receives response
+  ck_assert_int_eq(noise_kk1_handle_handshake_response(
+                       initiator_context, initiator_private_key,
+                       responder_public_key, response),
+                   true);
+}
+
+START_TEST(test_noise_kk1) {
   noise_kk1_context_t initiator_context = {0};
   noise_kk1_context_t responder_context = {0};
 
@@ -11622,23 +11943,10 @@ START_TEST(test_noise_kk1) {
 
   bool ret = false;
 
-  // Initiator sends request
-  ret = noise_kk1_create_handshake_request(&initiator_context, &request);
-  ck_assert_int_eq(ret, true);
+  test_noise_kk1_handshake(2748932008, &initiator_context, &responder_context,
+                           &request, &response);
   ck_assert_mem_eq(&request, fromhex(expected_request_hex), sizeof(request));
-
-  // Responder receives request and sends response
-  ret = noise_kk1_handle_handshake_request(
-      &responder_context, initiator_public_key, responder_private_key, &request,
-      &response);
-  ck_assert_int_eq(ret, true);
   ck_assert_mem_eq(&response, fromhex(expected_response_hex), sizeof(response));
-
-  // Initiator receives response
-  ret = noise_kk1_handle_handshake_response(&initiator_context,
-                                            initiator_private_key,
-                                            responder_public_key, &response);
-  ck_assert_int_eq(ret, true);
 
   // Initiator sends message1
   ret = noise_kk1_send_message(&initiator_context, associated_data1,
@@ -11702,10 +12010,122 @@ START_TEST(test_noise_kk1) {
 }
 END_TEST
 
-START_TEST(test_noise_xxpsk3) {
-  // Inject the seed to the random number generator to make the test
-  // deterministic
-  random_reseed(2748932008);
+START_TEST(test_noise_kk1_limits) {
+  noise_kk1_context_t initiator_context = {0};
+  noise_kk1_context_t responder_context = {0};
+  noise_kk1_request_t request = {0};
+  noise_kk1_response_t response = {0};
+  bool ret = false;
+
+  test_noise_kk1_handshake(2748932008, &initiator_context, &responder_context,
+                           &request, &response);
+
+  // --- Noise message size limit ---
+  // The buffers are large enough, it is the resulting Noise message that would
+  // exceed the 65535 byte limit
+  static uint8_t big_plaintext[NOISE_KK1_MAX_MESSAGE_SIZE + 1] = {0};
+  static uint8_t big_ciphertext[NOISE_KK1_MAX_MESSAGE_SIZE + 1] = {0};
+
+  ret =
+      noise_kk1_send_message(&initiator_context, NULL, 0, big_plaintext,
+                             NOISE_KK1_MAX_PLAINTEXT_SIZE + 1, big_ciphertext);
+  ck_assert_int_eq(ret, false);
+  // The sentinel shows that the message was rejected for its size before it was
+  // decrypted, a failed tag verification would have wiped the output buffer
+  big_plaintext[0] = 0xA5;
+  ret =
+      noise_kk1_receive_message(&initiator_context, NULL, 0, big_ciphertext,
+                                NOISE_KK1_MAX_MESSAGE_SIZE + 1, big_plaintext);
+  ck_assert_int_eq(ret, false);
+  ck_assert_uint_eq(big_plaintext[0], 0xA5);
+
+  // The largest allowed plaintext passes the size check and is encrypted
+  ret = noise_kk1_send_message(&initiator_context, NULL, 0, big_plaintext,
+                               NOISE_KK1_MAX_PLAINTEXT_SIZE, big_ciphertext);
+  ck_assert_int_eq(ret, true);
+
+  // The associated data counts towards the same limit, so one byte of it makes
+  // the largest plaintext too long
+  ret = noise_kk1_send_message(&initiator_context, big_plaintext, 1,
+                               big_plaintext, NOISE_KK1_MAX_PLAINTEXT_SIZE,
+                               big_ciphertext);
+  ck_assert_int_eq(ret, false);
+  big_plaintext[0] = 0xA5;
+  ret = noise_kk1_receive_message(&initiator_context, big_plaintext, 1,
+                                  big_ciphertext, NOISE_KK1_MAX_MESSAGE_SIZE,
+                                  big_plaintext);
+  ck_assert_int_eq(ret, false);
+  ck_assert_uint_eq(big_plaintext[0], 0xA5);
+
+  // Shortening the plaintext by that one byte is accepted again
+  ret = noise_kk1_send_message(&initiator_context, big_plaintext, 1,
+                               big_plaintext, NOISE_KK1_MAX_PLAINTEXT_SIZE - 1,
+                               big_ciphertext);
+  ck_assert_int_eq(ret, true);
+
+  // An associated data length beyond the limit is rejected on its own
+  ret = noise_kk1_send_message(&initiator_context, big_plaintext,
+                               NOISE_KK1_MAX_MESSAGE_SIZE + 1, big_plaintext, 0,
+                               big_ciphertext);
+  ck_assert_int_eq(ret, false);
+
+  // --- Message limit ---
+  // The counter occupies the low 6 bytes of the nonce, so it is exhausted after
+  // 2^48 messages. The message that exhausts it is not released: both the
+  // ciphertext and the context are wiped rather than reused with a wrapped
+  // counter.
+  uint8_t message5[] = "message5";
+  uint8_t ciphertext5[sizeof(message5) + NOISE_KK1_TAG_SIZE] = {0};
+  uint8_t plaintext5[sizeof(message5)] = {0};
+  const uint8_t zeros5[sizeof(ciphertext5)] = {0};
+
+  memset(responder_context.encryption_nonce, 0, NOISE_KK1_NONCE_SIZE);
+  memset(responder_context.encryption_nonce + 6, 0xFF, 6);
+  ret = noise_kk1_send_message(&responder_context, NULL, 0, message5,
+                               sizeof(message5), ciphertext5);
+  ck_assert_int_eq(ret, false);
+  ck_assert_int_eq(responder_context.initialized, false);
+  ck_assert_mem_eq(ciphertext5, zeros5, sizeof(ciphertext5));
+
+  // Sending again is refused because the context is gone
+  ret = noise_kk1_send_message(&responder_context, NULL, 0, message5,
+                               sizeof(message5), ciphertext5);
+  ck_assert_int_eq(ret, false);
+
+  // The peer rejects the message that exhausts its counter even though it
+  // authenticates. No such message is ever released, so it has to be encrypted
+  // directly with the peer's key.
+  uint8_t exhausted_nonce[NOISE_KK1_NONCE_SIZE] = {0};
+  memset(exhausted_nonce + 6, 0xFF, 6);
+  gcm_ctx gcm_context = {0};
+  ck_assert_int_eq(gcm_init_and_key(initiator_context.decryption_key,
+                                    NOISE_KK1_KEY_SIZE, &gcm_context),
+                   RETURN_GOOD);
+  memcpy(ciphertext5, message5, sizeof(message5));
+  ck_assert_int_eq(gcm_encrypt_message(exhausted_nonce, NOISE_KK1_NONCE_SIZE,
+                                       NULL, 0, ciphertext5, sizeof(message5),
+                                       ciphertext5 + sizeof(message5),
+                                       NOISE_KK1_TAG_SIZE, &gcm_context),
+                   RETURN_GOOD);
+  memzero(&gcm_context, sizeof(gcm_context));
+
+  memset(initiator_context.decryption_nonce, 0, NOISE_KK1_NONCE_SIZE);
+  memset(initiator_context.decryption_nonce + 6, 0xFF, 6);
+  ret = noise_kk1_receive_message(&initiator_context, NULL, 0, ciphertext5,
+                                  sizeof(ciphertext5), plaintext5);
+  ck_assert_int_eq(ret, false);
+  ck_assert_int_eq(initiator_context.initialized, false);
+  ck_assert_mem_eq(plaintext5, zeros5, sizeof(plaintext5));
+}
+END_TEST
+
+// Runs the XXpsk3 handshake with empty payloads and leaves both sides in the
+// transport phase, checking the message sizes and the exchanged static keys.
+// The keys are derived from `seed`.
+static void test_noise_xxpsk3_handshake(uint32_t seed,
+                                        noise_xxpsk3_initiator_t *initiator,
+                                        noise_xxpsk3_responder_t *responder) {
+  random_reseed(seed);
 
   uint8_t psk[32] = "this_is_a_32byte_preshared_key!!";
 
@@ -11714,61 +12134,69 @@ START_TEST(test_noise_xxpsk3) {
   random_buffer(initiator_private_key, sizeof(initiator_private_key));
   random_buffer(responder_private_key, sizeof(responder_private_key));
 
+  uint8_t initiator_public_key[32] = {0};
+  uint8_t responder_public_key[32] = {0};
+  curve25519_scalarmult_basepoint(initiator_public_key, initiator_private_key);
+  curve25519_scalarmult_basepoint(responder_public_key, responder_private_key);
+
+  ck_assert_int_eq(
+      noise_xxpsk3_initiator_init(initiator, psk, initiator_private_key,
+                                  initiator_public_key),
+      true);
+  ck_assert_int_eq(
+      noise_xxpsk3_responder_init(responder, psk, responder_private_key,
+                                  responder_public_key),
+      true);
+
+  uint8_t request1[256] = {0}, response1[256] = {0}, request2[256] = {0};
+  size_t request1_size = 0, response1_size = 0, request2_size = 0;
+  uint8_t received_responder_public_key[32] = {0};
+  uint8_t received_initiator_public_key[32] = {0};
+
+  // request1 = ephemeral_public_key[32] + encrypted_payload[0 + 16]
+  ck_assert_int_eq(
+      noise_xxpsk3_initiator_create_request1(initiator, NULL, 0, request1,
+                                             sizeof(request1), &request1_size),
+      true);
+  ck_assert_int_eq(request1_size, 32 + 16);
+  ck_assert_int_eq(noise_xxpsk3_responder_handle_request1(
+                       responder, request1, request1_size, NULL, 0, NULL),
+                   true);
+
+  // response1 = ephemeral_public_key[32] + encrypted_static_public_key[48] +
+  //             encrypted_payload[0 + 16]
+  ck_assert_int_eq(
+      noise_xxpsk3_responder_create_response1(
+          responder, NULL, 0, response1, sizeof(response1), &response1_size),
+      true);
+  ck_assert_int_eq(response1_size, 32 + 48 + 16);
+  ck_assert_int_eq(noise_xxpsk3_initiator_handle_response1(
+                       initiator, response1, response1_size,
+                       received_responder_public_key, NULL, 0, NULL),
+                   true);
+  ck_assert_mem_eq(received_responder_public_key, responder_public_key,
+                   sizeof(responder_public_key));
+
+  // request2 = encrypted_static_public_key[48] + encrypted_payload[0 + 16]
+  ck_assert_int_eq(
+      noise_xxpsk3_initiator_create_request2(initiator, NULL, 0, request2,
+                                             sizeof(request2), &request2_size),
+      true);
+  ck_assert_int_eq(request2_size, 48 + 16);
+  ck_assert_int_eq(noise_xxpsk3_responder_handle_request2(
+                       responder, request2, request2_size,
+                       received_initiator_public_key, NULL, 0, NULL),
+                   true);
+  ck_assert_mem_eq(received_initiator_public_key, initiator_public_key,
+                   sizeof(initiator_public_key));
+}
+
+START_TEST(test_noise_xxpsk3) {
   noise_xxpsk3_initiator_t initiator = {0};
   noise_xxpsk3_responder_t responder = {0};
-
   bool ret = false;
 
-  // Initialize initiator and responder
-  ret = noise_xxpsk3_initiator_init(&initiator, psk, initiator_private_key);
-  ck_assert_int_eq(ret, true);
-
-  ret = noise_xxpsk3_responder_init(&responder, psk, responder_private_key);
-  ck_assert_int_eq(ret, true);
-
-  // --- Handshake ---
-
-  // Initiator creates request1
-  uint8_t request1[256] = {0};
-  size_t request1_size = 0;
-  ret = noise_xxpsk3_initiator_create_request1(
-      &initiator, NULL, 0, request1, sizeof(request1), &request1_size);
-  ck_assert_int_eq(ret, true);
-  ck_assert_int_eq(request1_size,
-                   32 + 0 + 16);  // NOISE_XXPSK3_DHLEN + payload + tag
-
-  // Responder handles request1
-  ret = noise_xxpsk3_responder_handle_request1(&responder, request1,
-                                               request1_size, NULL, 0, NULL);
-  ck_assert_int_eq(ret, true);
-
-  // Responder creates response1
-  uint8_t response1[256] = {0};
-  size_t response1_size = 0;
-  ret = noise_xxpsk3_responder_create_response1(
-      &responder, NULL, 0, response1, sizeof(response1), &response1_size);
-  ck_assert_int_eq(ret, true);
-  // response1 = ephemeral_pub[32] + enc_static_pub[48] + enc_payload[0+16]
-  ck_assert_int_eq(response1_size, 32 + 48 + 16);
-
-  // Initiator handles response1
-  ret = noise_xxpsk3_initiator_handle_response1(&initiator, response1,
-                                                response1_size, NULL, 0, NULL);
-  ck_assert_int_eq(ret, true);
-
-  // Initiator creates request2
-  uint8_t request2[256] = {0};
-  size_t request2_size = 0;
-  ret = noise_xxpsk3_initiator_create_request2(
-      &initiator, NULL, 0, request2, sizeof(request2), &request2_size);
-  ck_assert_int_eq(ret, true);
-  // request2 = enc_static_pub[48] + enc_payload[0+16]
-  ck_assert_int_eq(request2_size, 48 + 16);
-
-  // Responder handles request2 — handshake complete
-  ret = noise_xxpsk3_responder_handle_request2(&responder, request2,
-                                               request2_size, NULL, 0, NULL);
-  ck_assert_int_eq(ret, true);
+  test_noise_xxpsk3_handshake(2748932008, &initiator, &responder);
 
   // --- Transport phase: both directions ---
 
@@ -11850,17 +12278,22 @@ START_TEST(test_noise_xxpsk3) {
                                      &pt_bad_size);
   ck_assert_int_eq(ret, false);
 
-  // --- Double-init should fail ---
-  ret = noise_xxpsk3_initiator_init(&initiator, psk, initiator_private_key);
-  ck_assert_int_eq(ret, false);
-
-  ret = noise_xxpsk3_responder_init(&responder, psk, responder_private_key);
-  ck_assert_int_eq(ret, false);
-
-  // Both sides must have the same handshake hash
+  // Both sides must have the same handshake hash.
   ck_assert_mem_eq(initiator.transport_state.handshake_hash,
                    responder.transport_state.handshake_hash,
                    NOISE_XXPSK3_HASHLEN);
+
+  // --- Double-init should fail ---
+  // The arguments are irrelevant, an already initialized structure is rejected
+  // before they are looked at
+  uint8_t unused_key[32] = {0};
+  ret = noise_xxpsk3_initiator_init(&initiator, unused_key, unused_key,
+                                    unused_key);
+  ck_assert_int_eq(ret, false);
+
+  ret = noise_xxpsk3_responder_init(&responder, unused_key, unused_key,
+                                    unused_key);
+  ck_assert_int_eq(ret, false);
 
   // Cleanup
   noise_xxpsk3_initiator_deinit(&initiator);
@@ -11871,6 +12304,101 @@ START_TEST(test_noise_xxpsk3) {
   noise_xxpsk3_responder_t zeroed_rspn = {0};
   ck_assert_int_eq(memcmp(&initiator, &zeroed_intr, sizeof(initiator)), 0);
   ck_assert_int_eq(memcmp(&responder, &zeroed_rspn, sizeof(responder)), 0);
+}
+END_TEST
+
+START_TEST(test_noise_xxpsk3_limits) {
+  // The buffers are large enough to hold an oversized Noise message, so only
+  // the message size limit itself can reject the calls below
+  static uint8_t payload_buf[NOISE_XXPSK3_MAX_MESSAGE_SIZE + 1] = {0};
+  static uint8_t message_buf[NOISE_XXPSK3_MAX_MESSAGE_SIZE + 1] = {0};
+  size_t message_size = 0;
+
+  noise_xxpsk3_initiator_t initiator = {0};
+  noise_xxpsk3_responder_t responder = {0};
+  bool ret = false;
+
+  // --- Handshake message size limit ---
+  // Any static key pair will do, the calls below are rejected on the length
+  // before any key is used
+  random_reseed(2748932008);
+  uint8_t psk[32] = "this_is_a_32byte_preshared_key!!";
+  uint8_t static_private_key[32] = {0};
+  uint8_t static_public_key[32] = {0};
+  random_buffer(static_private_key, sizeof(static_private_key));
+  curve25519_scalarmult_basepoint(static_public_key, static_private_key);
+
+  // request1 = ephemeral_public_key[32] + encrypted_payload[payload + 16]
+  ret = noise_xxpsk3_initiator_init(&initiator, psk, static_private_key,
+                                    static_public_key);
+  ck_assert_int_eq(ret, true);
+  ret = noise_xxpsk3_initiator_create_request1(
+      &initiator, payload_buf, NOISE_XXPSK3_MAX_MESSAGE_SIZE - (32 + 16) + 1,
+      message_buf, sizeof(message_buf), &message_size);
+  ck_assert_int_eq(ret, false);
+  // A rejected call deinitializes the initiator
+  ck_assert_int_eq(initiator.initialized, false);
+
+  ret = noise_xxpsk3_responder_init(&responder, psk, static_private_key,
+                                    static_public_key);
+  ck_assert_int_eq(ret, true);
+  // The sentinel shows that the message was rejected for its size before it was
+  // decrypted, a failed tag verification would have wiped the output buffer
+  payload_buf[0] = 0xA5;
+  ret = noise_xxpsk3_responder_handle_request1(
+      &responder, message_buf, NOISE_XXPSK3_MAX_MESSAGE_SIZE + 1, payload_buf,
+      sizeof(payload_buf), &message_size);
+  ck_assert_int_eq(ret, false);
+  ck_assert_int_eq(responder.initialized, false);
+  ck_assert_uint_eq(payload_buf[0], 0xA5);
+
+  // --- Transport message size limit ---
+  // The failed calls above wiped both structures, so a fresh handshake can run
+  test_noise_xxpsk3_handshake(2748932008, &initiator, &responder);
+
+  ret = noise_xxpsk3_send_message(&initiator.transport_state, payload_buf,
+                                  NOISE_XXPSK3_MAX_PLAINTEXT_SIZE + 1,
+                                  message_buf, sizeof(message_buf),
+                                  &message_size);
+  ck_assert_int_eq(ret, false);
+
+  payload_buf[0] = 0xA5;
+  ret = noise_xxpsk3_receive_message(&responder.transport_state, message_buf,
+                                     NOISE_XXPSK3_MAX_MESSAGE_SIZE + 1,
+                                     payload_buf, sizeof(payload_buf),
+                                     &message_size);
+  ck_assert_int_eq(ret, false);
+  ck_assert_uint_eq(payload_buf[0], 0xA5);
+
+  // The largest allowed plaintext passes the size check and is encrypted into a
+  // message of exactly the maximum size
+  ret = noise_xxpsk3_send_message(&initiator.transport_state, payload_buf,
+                                  NOISE_XXPSK3_MAX_PLAINTEXT_SIZE, message_buf,
+                                  sizeof(message_buf), &message_size);
+  ck_assert_int_eq(ret, true);
+  ck_assert_int_eq(message_size, NOISE_XXPSK3_MAX_MESSAGE_SIZE);
+
+  // --- Message limit ---
+  uint8_t msg[] = "hello";
+  uint8_t ciphertext[sizeof(msg) + 16] = {0};
+  size_t ciphertext_size = 0;
+
+  // The last message below the limit, with the nonce at 2^48 - 1, is still
+  // encrypted, which advances the nonce to the limit
+  responder.transport_state.send_cipher_state.nonce = (1ULL << 48) - 1;
+  ret = noise_xxpsk3_send_message(&responder.transport_state, msg, sizeof(msg),
+                                  ciphertext, sizeof(ciphertext),
+                                  &ciphertext_size);
+  ck_assert_int_eq(ret, true);
+
+  // With the nonce at 2^48 no further message is encrypted
+  ret = noise_xxpsk3_send_message(&responder.transport_state, msg, sizeof(msg),
+                                  ciphertext, sizeof(ciphertext),
+                                  &ciphertext_size);
+  ck_assert_int_eq(ret, false);
+
+  noise_xxpsk3_initiator_deinit(&initiator);
+  noise_xxpsk3_responder_deinit(&responder);
 }
 END_TEST
 
@@ -11993,6 +12521,13 @@ START_TEST(test_noise_xxpsk3_vectors) {
     random_buffer(initiator_private_key, sizeof(initiator_private_key));
     random_buffer(responder_private_key, sizeof(responder_private_key));
 
+    uint8_t initiator_public_key[32] = {0};
+    uint8_t responder_public_key[32] = {0};
+    curve25519_scalarmult_basepoint(initiator_public_key,
+                                    initiator_private_key);
+    curve25519_scalarmult_basepoint(responder_public_key,
+                                    responder_private_key);
+
     size_t req1_plen = strlen(vectors[v].req1_payload) / 2;
     size_t rsp1_plen = strlen(vectors[v].rsp1_payload) / 2;
     size_t req2_plen = strlen(vectors[v].req2_payload) / 2;
@@ -12012,9 +12547,11 @@ START_TEST(test_noise_xxpsk3_vectors) {
     noise_xxpsk3_responder_t responder = {0};
     bool ret;
 
-    ret = noise_xxpsk3_initiator_init(&initiator, psk, initiator_private_key);
+    ret = noise_xxpsk3_initiator_init(&initiator, psk, initiator_private_key,
+                                      initiator_public_key);
     ck_assert_int_eq(ret, true);
-    ret = noise_xxpsk3_responder_init(&responder, psk, responder_private_key);
+    ret = noise_xxpsk3_responder_init(&responder, psk, responder_private_key,
+                                      responder_public_key);
     ck_assert_int_eq(ret, true);
 
     uint8_t req1[512] = {0};
@@ -12042,10 +12579,13 @@ START_TEST(test_noise_xxpsk3_vectors) {
 
     uint8_t rsp1_dec[512] = {0};
     size_t rsp1_dec_size = 0;
-    ret = noise_xxpsk3_initiator_handle_response1(&initiator, rsp1, rsp1_size,
-                                                  rsp1_dec, sizeof(rsp1_dec),
-                                                  &rsp1_dec_size);
+    uint8_t received_responder_public_key[32] = {0};
+    ret = noise_xxpsk3_initiator_handle_response1(
+        &initiator, rsp1, rsp1_size, received_responder_public_key, rsp1_dec,
+        sizeof(rsp1_dec), &rsp1_dec_size);
     ck_assert_int_eq(ret, true);
+    ck_assert_mem_eq(received_responder_public_key, responder_public_key,
+                     sizeof(responder_public_key));
     ck_assert_int_eq(rsp1_dec_size, rsp1_plen);
     if (rsp1_plen) ck_assert_mem_eq(rsp1_dec, rsp1_payload, rsp1_plen);
 
@@ -12058,10 +12598,13 @@ START_TEST(test_noise_xxpsk3_vectors) {
 
     uint8_t req2_dec[512] = {0};
     size_t req2_dec_size = 0;
-    ret = noise_xxpsk3_responder_handle_request2(&responder, req2, req2_size,
-                                                 req2_dec, sizeof(req2_dec),
-                                                 &req2_dec_size);
+    uint8_t received_initiator_public_key[32] = {0};
+    ret = noise_xxpsk3_responder_handle_request2(
+        &responder, req2, req2_size, received_initiator_public_key, req2_dec,
+        sizeof(req2_dec), &req2_dec_size);
     ck_assert_int_eq(ret, true);
+    ck_assert_mem_eq(received_initiator_public_key, initiator_public_key,
+                     sizeof(initiator_public_key));
     ck_assert_int_eq(req2_dec_size, req2_plen);
     if (req2_plen) ck_assert_mem_eq(req2_dec, req2_payload, req2_plen);
 
@@ -12164,6 +12707,7 @@ Suite *test_suite(void) {
   tcase_add_test(tc, test_bip32_vector_2);
   tcase_add_test(tc, test_bip32_vector_3);
   tcase_add_test(tc, test_bip32_vector_4);
+  tcase_add_test(tc, test_bip32_deserialize_invalid);
   tcase_add_test(tc, test_bip32_compare);
   tcase_add_test(tc, test_bip32_cache_1);
   tcase_add_test(tc, test_bip32_cache_2);
@@ -12249,6 +12793,7 @@ Suite *test_suite(void) {
 
   tc = tcase_create("aes");
   tcase_add_test(tc, test_aes);
+  tcase_add_test(tc, test_aes_negative_length);
   suite_add_tcase(s, tc);
 
   tc = tcase_create("aes_ccm");
@@ -12429,6 +12974,7 @@ Suite *test_suite(void) {
 
   tc = tcase_create("compress_coords");
   tcase_add_test(tc, test_compress_coords);
+  tcase_add_test(tc, test_uncompress_coords_invalid);
   suite_add_tcase(s, tc);
 
   tc = tcase_create("zkp_bip340");
@@ -12455,7 +13001,9 @@ Suite *test_suite(void) {
 
   tc = tcase_create("noise");
   tcase_add_test(tc, test_noise_kk1);
+  tcase_add_test(tc, test_noise_kk1_limits);
   tcase_add_test(tc, test_noise_xxpsk3);
+  tcase_add_test(tc, test_noise_xxpsk3_limits);
   tcase_add_test(tc, test_noise_xxpsk3_vectors);
   suite_add_tcase(s, tc);
 

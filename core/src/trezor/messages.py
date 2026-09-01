@@ -3209,13 +3209,13 @@ if TYPE_CHECKING:
         def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkSetLogFilter"]:
             return isinstance(msg, cls)
 
-    class DebugLinkN4W1Connected(protobuf.MessageType):
+    class DebugLinkN1W1Connected(protobuf.MessageType):
 
         @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkN4W1Connected"]:
+        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkN1W1Connected"]:
             return isinstance(msg, cls)
 
-    class DebugLinkN4W1Write(protobuf.MessageType):
+    class DebugLinkN1W1Write(protobuf.MessageType):
         key: "str | None"
         value: "AnyBytes | None"
 
@@ -3228,10 +3228,10 @@ if TYPE_CHECKING:
             pass
 
         @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkN4W1Write"]:
+        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkN1W1Write"]:
             return isinstance(msg, cls)
 
-    class DebugLinkN4W1Read(protobuf.MessageType):
+    class DebugLinkN1W1Read(protobuf.MessageType):
         key: "str | None"
 
         def __init__(
@@ -3242,10 +3242,10 @@ if TYPE_CHECKING:
             pass
 
         @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkN4W1Read"]:
+        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkN1W1Read"]:
             return isinstance(msg, cls)
 
-    class DebugLinkN4W1Response(protobuf.MessageType):
+    class DebugLinkN1W1Response(protobuf.MessageType):
         value: "AnyBytes | None"
 
         def __init__(
@@ -3256,7 +3256,7 @@ if TYPE_CHECKING:
             pass
 
         @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkN4W1Response"]:
+        def is_type_of(cls, msg: Any) -> TypeGuard["DebugLinkN1W1Response"]:
             return isinstance(msg, cls)
 
     class DebugLinkGcInfoItem(protobuf.MessageType):
@@ -4123,6 +4123,7 @@ if TYPE_CHECKING:
         chunkify: "bool | None"
         payment_req: "PaymentRequest | None"
         supports_definition_request: "bool | None"
+        auth7702: "EthereumAuth7702 | None"
 
         def __init__(
             self,
@@ -4142,6 +4143,7 @@ if TYPE_CHECKING:
             chunkify: "bool | None" = None,
             payment_req: "PaymentRequest | None" = None,
             supports_definition_request: "bool | None" = None,
+            auth7702: "EthereumAuth7702 | None" = None,
         ) -> None:
             pass
 
@@ -4154,10 +4156,12 @@ if TYPE_CHECKING:
         signature_v: "int | None"
         signature_r: "AnyBytes | None"
         signature_s: "AnyBytes | None"
+        auth7702_list: "list[EthereumAuth7702Tuple]"
 
         def __init__(
             self,
             *,
+            auth7702_list: "list[EthereumAuth7702Tuple] | None" = None,
             data_length: "int | None" = None,
             signature_v: "int | None" = None,
             signature_r: "AnyBytes | None" = None,
@@ -4325,46 +4329,6 @@ if TYPE_CHECKING:
         def is_type_of(cls, msg: Any) -> TypeGuard["EthereumDefinitions"]:
             return isinstance(msg, cls)
 
-    class EthereumSignAuth7702(protobuf.MessageType):
-        address_n: "list[int]"
-        chain_id: "int"
-        delegate: "str"
-        nonce: "int"
-        definitions: "EthereumDefinitions | None"
-
-        def __init__(
-            self,
-            *,
-            chain_id: "int",
-            delegate: "str",
-            nonce: "int",
-            address_n: "list[int] | None" = None,
-            definitions: "EthereumDefinitions | None" = None,
-        ) -> None:
-            pass
-
-        @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["EthereumSignAuth7702"]:
-            return isinstance(msg, cls)
-
-    class EthereumAuth7702Signature(protobuf.MessageType):
-        signature_v: "int"
-        signature_r: "AnyBytes"
-        signature_s: "AnyBytes"
-
-        def __init__(
-            self,
-            *,
-            signature_v: "int",
-            signature_r: "AnyBytes",
-            signature_s: "AnyBytes",
-        ) -> None:
-            pass
-
-        @classmethod
-        def is_type_of(cls, msg: Any) -> TypeGuard["EthereumAuth7702Signature"]:
-            return isinstance(msg, cls)
-
     class EthereumAccessList(protobuf.MessageType):
         address: "str"
         storage_keys: "list[AnyBytes]"
@@ -4379,6 +4343,34 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["EthereumAccessList"]:
+            return isinstance(msg, cls)
+
+    class EthereumAuth7702(protobuf.MessageType):
+        delegate: "str"
+
+        def __init__(
+            self,
+            *,
+            delegate: "str",
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EthereumAuth7702"]:
+            return isinstance(msg, cls)
+
+    class EthereumAuth7702Tuple(protobuf.MessageType):
+        items: "list[AnyBytes]"
+
+        def __init__(
+            self,
+            *,
+            items: "list[AnyBytes] | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["EthereumAuth7702Tuple"]:
             return isinstance(msg, cls)
 
     class EthereumSignTypedData(protobuf.MessageType):
@@ -6677,6 +6669,7 @@ if TYPE_CHECKING:
         contract_address: "str"
         function_name: "str"
         args: "list[StellarSCVal]"
+        asset_hint: "StellarAsset | None"
 
         def __init__(
             self,
@@ -6684,6 +6677,7 @@ if TYPE_CHECKING:
             contract_address: "str",
             function_name: "str",
             args: "list[StellarSCVal] | None" = None,
+            asset_hint: "StellarAsset | None" = None,
         ) -> None:
             pass
 
@@ -7772,6 +7766,7 @@ if TYPE_CHECKING:
     class TronTriggerSmartContract(protobuf.MessageType):
         owner_address: "AnyBytes"
         contract_address: "AnyBytes"
+        call_value: "int | None"
         data: "AnyBytes"
 
         def __init__(
@@ -7780,6 +7775,7 @@ if TYPE_CHECKING:
             owner_address: "AnyBytes",
             contract_address: "AnyBytes",
             data: "AnyBytes",
+            call_value: "int | None" = None,
         ) -> None:
             pass
 
@@ -7849,6 +7845,50 @@ if TYPE_CHECKING:
 
         @classmethod
         def is_type_of(cls, msg: Any) -> TypeGuard["TronWithdrawBalance"]:
+            return isinstance(msg, cls)
+
+    class TronDelegateResourceContract(protobuf.MessageType):
+        owner_address: "AnyBytes"
+        resource: "TronResourceCode"
+        balance: "int"
+        receiver_address: "AnyBytes"
+        lock: "bool | None"
+        lock_period: "int | None"
+
+        def __init__(
+            self,
+            *,
+            owner_address: "AnyBytes",
+            balance: "int",
+            receiver_address: "AnyBytes",
+            resource: "TronResourceCode | None" = None,
+            lock: "bool | None" = None,
+            lock_period: "int | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronDelegateResourceContract"]:
+            return isinstance(msg, cls)
+
+    class TronUnDelegateResourceContract(protobuf.MessageType):
+        owner_address: "AnyBytes"
+        resource: "TronResourceCode"
+        balance: "int"
+        receiver_address: "AnyBytes"
+
+        def __init__(
+            self,
+            *,
+            owner_address: "AnyBytes",
+            balance: "int",
+            receiver_address: "AnyBytes",
+            resource: "TronResourceCode | None" = None,
+        ) -> None:
+            pass
+
+        @classmethod
+        def is_type_of(cls, msg: Any) -> TypeGuard["TronUnDelegateResourceContract"]:
             return isinstance(msg, cls)
 
     class TronSignature(protobuf.MessageType):

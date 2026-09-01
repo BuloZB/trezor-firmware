@@ -1,5 +1,5 @@
+import struct
 import uctypes
-import ustruct
 import utime
 from micropython import const
 from typing import TYPE_CHECKING
@@ -18,7 +18,8 @@ from .credential import Credential, Fido2Credential
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes
-    from typing import Any, Awaitable, Callable, Coroutine, Iterable, Iterator
+    from collections.abc import Awaitable, Callable, Coroutine, Iterable, Iterator
+    from typing import Any
 
     from .credential import U2fCredential
 
@@ -169,7 +170,9 @@ _FIDO_ATT_CERT = b"0\x82\x01\xcd0\x82\x01s\xa0\x03\x02\x01\x02\x02\x04\x03E`\xc4
 _BOGUS_RP_ID = ".dummy"
 _BOGUS_APPID_CHROME = b"A" * 32
 _BOGUS_APPID_FIREFOX = b"\0" * 32
-_BOGUS_APPIDS = (_BOGUS_APPID_CHROME, _BOGUS_APPID_FIREFOX)
+# SHA-256 of "make.me.blink", used by Firefox's authenticator-rs.
+_BOGUS_APPID_FIREFOX_BLINK = b"\xe8\x45\x41\xea\xf2\x07\xf7\xd7\x5a\xd0\x51\x43\x47\x70\xf6\xd1\xa9\xbf\x62\xf7\xea\x9b\xe5\x14\xfd\x4e\x0c\xa8\x27\x2b\x1d\xeb"
+_BOGUS_APPIDS = (_BOGUS_APPID_CHROME, _BOGUS_APPID_FIREFOX, _BOGUS_APPID_FIREFOX_BLINK)
 _AAGUID = b"\xd6\xd0\xbd\xc3b\xee\xc4\xdb\xde\x8dzenJD\x87"  # First 16 bytes of SHA-256("TREZOR 2")
 
 # authentication control byte
@@ -519,11 +522,9 @@ async def send_cmd(cmd: Cmd, iface: HID) -> None:
         seq += 1
 
 
-def send_cmd_sync(cmd: Cmd, iface: HID) -> None:
+def try_send_keepalive_sync(cid: int, status: int, iface: HID) -> None:
+    cmd = cmd_keepalive(cid, status)
     init_desc = frame_init()
-    cont_desc = frame_cont()
-    offset = 0
-    seq = 0
     datalen = len(cmd.data)
 
     buf, frm = make_struct(init_desc)
@@ -531,20 +532,14 @@ def send_cmd_sync(cmd: Cmd, iface: HID) -> None:
     frm.cmd = cmd.cmd
     frm.bcnt = datalen
 
-    offset += utils.memcpy(frm.data, 0, cmd.data, offset, datalen)
-    iface.write(buf)
-
-    if offset < datalen:
-        frm = overlay_struct(buf, cont_desc)
-
-    while offset < datalen:
-        frm.seq = seq
-        copied = utils.memcpy(frm.data, 0, cmd.data, offset, datalen)
-        offset += copied
-        if copied < _FRAME_CONT_SIZE:
-            frm.data[copied:] = bytearray(_FRAME_CONT_SIZE - copied)
-        iface.write_blocking(buf, 1000)
-        seq += 1
+    offset = utils.memcpy(frm.data, 0, cmd.data, 0, datalen)
+    assert offset == datalen  # 1-byte payload fits into one USB packet
+    try:
+        iface.write(buf)
+    except OSError as e:
+        # Don't fail the workflow, if the USB interface is blocked.
+        if __debug__:
+            log.warning(__name__, "Keepalive %s skipped: %s", status, e)
 
 
 async def handle_reports(iface: HID) -> None:
@@ -571,7 +566,7 @@ class KeepaliveCallback:
         self.iface = iface
 
     def __call__(self) -> None:
-        send_cmd_sync(cmd_keepalive(self.cid, _KEEPALIVE_STATUS_PROCESSING), self.iface)
+        try_send_keepalive_sync(self.cid, _KEEPALIVE_STATUS_PROCESSING, self.iface)
 
 
 async def verify_user(keepalive_callback: KeepaliveCallback) -> bool:
@@ -843,14 +838,14 @@ class Fido2ConfirmMakeCredential(Fido2State):
         cid = self.cid  # local_cache_attribute
 
         self._cred.generate_id()
-        send_cmd_sync(cmd_keepalive(cid, _KEEPALIVE_STATUS_PROCESSING), self.iface)
+        try_send_keepalive_sync(cid, _KEEPALIVE_STATUS_PROCESSING, self.iface)
         response_data = _cbor_make_credential_sign(
             self._client_data_hash, self._cred, self._user_verification
         )
 
         cmd = Cmd(cid, _CMD_CBOR, bytes([_ERR_NONE]) + response_data)
         if self._resident:
-            send_cmd_sync(cmd_keepalive(cid, _KEEPALIVE_STATUS_PROCESSING), self.iface)
+            try_send_keepalive_sync(cid, _KEEPALIVE_STATUS_PROCESSING, self.iface)
             if not store_resident_credential(self._cred):
                 cmd = cbor_error(cid, _ERR_KEY_STORE_FULL)
         await send_cmd(cmd, self.iface)
@@ -911,7 +906,7 @@ class Fido2ConfirmGetAssertion(Fido2State):
 
         assert self._selected_cred is not None
         try:
-            send_cmd_sync(cmd_keepalive(cid, _KEEPALIVE_STATUS_PROCESSING), self.iface)
+            try_send_keepalive_sync(cid, _KEEPALIVE_STATUS_PROCESSING, self.iface)
             response_data = cbor_get_assertion_sign(
                 self._client_data_hash,
                 self._selected_cred.rp_id_hash,
@@ -1421,7 +1416,7 @@ def _msg_authenticate_sign(
 
     # get next counter
     ctr = cred.next_signature_counter()
-    ctrbuf = ustruct.pack(">L", ctr)
+    ctrbuf = struct.pack(">L", ctr)
 
     # sign the input data together with counter
     sig = cred.sign((rp_id_hash, flags, ctrbuf, challenge))
@@ -1437,15 +1432,15 @@ def _msg_authenticate_sign(
 
 
 def msg_error(cid: int, code: int) -> Cmd:
-    return Cmd(cid, _CMD_MSG, ustruct.pack(">H", code))
+    return Cmd(cid, _CMD_MSG, struct.pack(">H", code))
 
 
 def cmd_error(cid: int, code: int) -> Cmd:
-    return Cmd(cid, _CMD_ERROR, ustruct.pack(">B", code))
+    return Cmd(cid, _CMD_ERROR, struct.pack(">B", code))
 
 
 def cbor_error(cid: int, code: int) -> Cmd:
-    return Cmd(cid, _CMD_CBOR, ustruct.pack(">B", code))
+    return Cmd(cid, _CMD_CBOR, struct.pack(">B", code))
 
 
 def credentials_from_descriptor_list(

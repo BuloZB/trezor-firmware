@@ -45,7 +45,7 @@ version = "1.0.13"
 criteria = "safe-to-deploy"
 
 [[exemptions.anyhow]]
-version = "1.0.102"
+version = "1.0.104"
 criteria = "safe-to-deploy"
 
 [[exemptions.backtrace]]
@@ -63,10 +63,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.camino]]
 version = "1.2.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.cargo-platform]]
-version = "0.3.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.cargo_metadata]]
@@ -137,10 +133,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.indenter]]
 version = "0.3.4"
-criteria = "safe-to-deploy"
-
-[[exemptions.indexmap]]
-version = "2.14.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.itertools]]
@@ -239,7 +231,7 @@ version = "0.6.8"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
-version = "0.9.8"
+version = "0.9.9"
 criteria = "safe-to-deploy"
 
 [[exemptions.static-alloc]]

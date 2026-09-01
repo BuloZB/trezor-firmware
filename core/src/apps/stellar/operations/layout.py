@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING
-from ubinascii import hexlify
 
 from trezor import TR
 from trezor.ui.layouts import (
@@ -11,10 +10,11 @@ from trezor.ui.layouts import (
 )
 from trezor.wire import DataError, ProcessError
 
-from ..layout import confirm_invocation, confirm_invoke_contract_args, format_amount
+from ..layout import confirm_invocation, confirm_invoke_contract
+from ..tokens import NATIVE_TOKEN, StellarToken
 
 if TYPE_CHECKING:
-    from buffer_types import StrOrBytes
+    from buffer_types import AnyBytes, StrOrBytes
 
     from trezor.messages import (
         StellarAccountMergeOp,
@@ -88,7 +88,7 @@ async def confirm_bump_sequence_op(op: StellarBumpSequenceOp) -> None:
 async def confirm_change_trust_op(op: StellarChangeTrustOp) -> None:
     await confirm_value(
         TR.stellar__delete_trust if op.limit == 0 else TR.stellar__add_trust,
-        format_amount(op.limit, op.asset),
+        StellarToken.from_asset(op.asset).format(op.limit),
         description=TR.stellar__limit,
         br_name="op_change_trust",
         is_data=False,
@@ -101,14 +101,12 @@ async def confirm_change_trust_op(op: StellarChangeTrustOp) -> None:
 async def confirm_create_account_op(
     op: StellarCreateAccountOp, output_index: int
 ) -> None:
-    from trezor.enums import StellarAssetType
-    from trezor.messages import StellarAsset
-
+    token = NATIVE_TOKEN
     await confirm_stellar_output(
         op.new_account,
-        format_amount(op.starting_balance),
+        token.format(op.starting_balance),
         output_index=output_index,
-        asset=StellarAsset(type=StellarAssetType.NATIVE),
+        token=token,
     )
 
 
@@ -151,10 +149,13 @@ async def _confirm_offer(
 ) -> None:
     from trezor.messages import StellarManageBuyOfferOp
 
-    from ..layout import format_asset
+    if op.price_d == 0:
+        raise DataError("Stellar: invalid price denominator")
 
     buying_asset = op.buying_asset  # local_cache_attribute
     selling_asset = op.selling_asset  # local_cache_attribute
+    buying_token = StellarToken.from_asset(buying_asset)
+    selling_token = StellarToken.from_asset(selling_asset)
 
     buying: PropertyType
     selling: PropertyType
@@ -163,16 +164,16 @@ async def _confirm_offer(
     if StellarManageBuyOfferOp.is_type_of(op):
         buying = (
             TR.stellar__buying,
-            format_amount(op.amount, buying_asset),
+            buying_token.format(op.amount),
             False,
         )
         selling = (
             TR.stellar__selling,
-            format_asset(selling_asset),
+            selling_token.symbol,
             False,
         )
         price = (
-            TR.stellar__price_per_template.format(format_asset(selling_asset)),
+            TR.stellar__price_per_template.format(selling_token.symbol),
             str(op.price_n / op.price_d),
             False,
         )
@@ -185,12 +186,12 @@ async def _confirm_offer(
     else:
         selling = (
             TR.stellar__selling,
-            format_amount(op.amount, selling_asset),
+            selling_token.format(op.amount),
             False,
         )
-        buying = (TR.stellar__buying, format_asset(buying_asset), False)
+        buying = (TR.stellar__buying, buying_token.symbol, False)
         price = (
-            TR.stellar__price_per_template.format(format_asset(buying_asset)),
+            TR.stellar__price_per_template.format(buying_token.symbol),
             str(op.price_n / op.price_d),
             False,
         )
@@ -231,11 +232,13 @@ async def confirm_path_payment_strict_receive_op(
     op: StellarPathPaymentStrictReceiveOp,
     output_index: int,
 ) -> None:
+    destination_token = StellarToken.from_asset(op.destination_asset)
+    send_token = StellarToken.from_asset(op.send_asset)
     await confirm_stellar_output(
         op.destination_account,
-        format_amount(op.destination_amount, op.destination_asset),
+        destination_token.format(op.destination_amount),
         output_index,
-        op.destination_asset,
+        destination_token,
         address_description=TR.stellar__path_pay,
         amount_description=TR.stellar__path_pay,
     )
@@ -243,8 +246,8 @@ async def confirm_path_payment_strict_receive_op(
     await confirm_stellar_output_amount(
         TR.stellar__debited_amount,
         f"{TR.words__recipient} #{output_index + 1}",
-        format_amount(op.send_max, op.send_asset),
-        op.send_asset,
+        send_token.format(op.send_max),
+        send_token,
         TR.stellar__pay_at_most,
     )
 
@@ -253,11 +256,13 @@ async def confirm_path_payment_strict_send_op(
     op: StellarPathPaymentStrictSendOp,
     output_index: int,
 ) -> None:
+    destination_token = StellarToken.from_asset(op.destination_asset)
+    send_token = StellarToken.from_asset(op.send_asset)
     await confirm_stellar_output(
         op.destination_account,
-        format_amount(op.destination_min, op.destination_asset),
+        destination_token.format(op.destination_min),
         output_index,
-        op.destination_asset,
+        destination_token,
         address_description=TR.stellar__path_pay_at_least,
         amount_description=TR.stellar__path_pay_at_least,
     )
@@ -265,18 +270,19 @@ async def confirm_path_payment_strict_send_op(
     await confirm_stellar_output_amount(
         TR.stellar__debited_amount,
         f"{TR.words__recipient} #{output_index + 1}",
-        format_amount(op.send_amount, op.send_asset),
-        op.send_asset,
+        send_token.format(op.send_amount),
+        send_token,
         TR.stellar__pay,
     )
 
 
 async def confirm_payment_op(op: StellarPaymentOp, output_index: int) -> None:
+    token = StellarToken.from_asset(op.asset)
     await confirm_stellar_output(
         op.destination_account,
-        format_amount(op.amount, op.asset),
+        token.format(op.amount),
         output_index,
-        op.asset,
+        token,
     )
 
 
@@ -381,7 +387,7 @@ async def confirm_set_options_op(op: StellarSetOptionsOp) -> None:
 async def confirm_claim_claimable_balance_op(
     op: StellarClaimClaimableBalanceOp,
 ) -> None:
-    balance_id = hexlify(op.balance_id).decode()
+    balance_id = op.balance_id.hex()
     await confirm_properties(
         "op_claim_claimable_balance",
         TR.stellar__claim_claimable_balance,
@@ -452,19 +458,26 @@ def _is_root_auth_entry(
     return False
 
 
-async def confirm_invoke_host_function_op(op: StellarInvokeHostFunctionOp) -> None:
+async def confirm_invoke_host_function_op(
+    op: StellarInvokeHostFunctionOp, tx_source_account: str, network_id: AnyBytes
+) -> None:
     from trezor.enums import StellarHostFunctionType, StellarSorobanCredentialsType
     from trezor.ui.layouts import should_show_more
 
     function = op.function
 
+    # the account whose signature authorizes the operation anyway: its
+    # explicit source account, or the transaction's otherwise
+    source_account = op.source_account or tx_source_account
+
     if function.type == StellarHostFunctionType.HOST_FUNCTION_TYPE_INVOKE_CONTRACT:
         if function.invoke_contract is None:
             raise DataError("Stellar: missing invoke_contract")
 
-        await confirm_invoke_contract_args(
+        await confirm_invoke_contract(
             function.invoke_contract,
-            br_name_prefix="op_invoke",
+            network_id,
+            source_account,
         )
     else:
         raise ProcessError("Stellar: unsupported host function type")
@@ -491,7 +504,11 @@ async def confirm_invoke_host_function_op(op: StellarInvokeHostFunctionOp) -> No
         ):
             shown += 1
             await _confirm_auth_entry(
-                auth_entry, shown, _is_root_auth_entry(auth_entry, function)
+                auth_entry,
+                shown,
+                network_id,
+                source_account,
+                is_root=_is_root_auth_entry(auth_entry, function),
             )
         else:
             non_src_entries.append(auth_entry)
@@ -505,28 +522,48 @@ async def confirm_invoke_host_function_op(op: StellarInvokeHostFunctionOp) -> No
         for auth_entry in non_src_entries:
             shown += 1
             await _confirm_auth_entry(
-                auth_entry, shown, _is_root_auth_entry(auth_entry, function)
+                auth_entry,
+                shown,
+                network_id,
+                source_account,
+                is_root=_is_root_auth_entry(auth_entry, function),
             )
 
 
 async def _confirm_auth_entry(
-    auth: StellarSorobanAuthorizationEntry, position: int, is_root: bool = False
+    auth: StellarSorobanAuthorizationEntry,
+    position: int,
+    network_id: AnyBytes,
+    source_account: str,
+    is_root: bool = False,
 ) -> None:
     from trezor.enums import StellarSorobanCredentialsType
 
     creds = auth.credentials
-
-    if creds.type == StellarSorobanCredentialsType.SOROBAN_CREDENTIALS_ADDRESS_V2:
+    # SOURCE_ACCOUNT credentials authorize the tree through the effective
+    # operation source; address credentials name their authorizing party.
+    if creds.type == StellarSorobanCredentialsType.SOROBAN_CREDENTIALS_SOURCE_ACCOUNT:
+        authorizing_address = source_account
+    elif creds.type == StellarSorobanCredentialsType.SOROBAN_CREDENTIALS_ADDRESS_V2:
         if creds.address_v2 is None:
             raise DataError("Stellar: missing address_v2 credentials")
 
+        authorizing_address = creds.address_v2.address
         await confirm_address(
             f"{TR.words__authorization} #{position}",
-            creds.address_v2.address,
+            authorizing_address,
             description=TR.words__address,
             br_name="op_auth_entry_address",
         )
+    else:
+        raise ProcessError("Stellar: unsupported credentials type")
 
     # Show the whole authorized invocation tree starting from its root (not just the
     # nested sub-invocations), so the user sees exactly what this signature authorizes.
-    await confirm_invocation(auth.root_invocation, f"#{position}", is_root=is_root)
+    await confirm_invocation(
+        auth.root_invocation,
+        f"#{position}",
+        network_id,
+        authorizing_address,
+        is_root=is_root,
+    )

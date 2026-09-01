@@ -25,6 +25,11 @@
 
 #define NOISE_XXPSK3_HASHLEN 32
 #define NOISE_XXPSK3_DHLEN 32
+#define NOISE_XXPSK3_TAG_SIZE 16
+
+#define NOISE_XXPSK3_MAX_MESSAGE_SIZE 65535
+#define NOISE_XXPSK3_MAX_PLAINTEXT_SIZE \
+  (NOISE_XXPSK3_MAX_MESSAGE_SIZE - NOISE_XXPSK3_TAG_SIZE)
 
 // Uncomment to enable initiator/responder functionality in the noise protocol
 // implementation.
@@ -61,19 +66,16 @@ typedef struct {
   bool has_remote_ephemeral_public;
   uint8_t remote_ephemeral_public[NOISE_XXPSK3_DHLEN];
 
-  bool has_remote_static_public;
-  uint8_t remote_static_public[NOISE_XXPSK3_DHLEN];
-
 } noise_xxpsk3_handshake_state_t;
 
 #ifdef USE_NOISE_XXPSK3_RESPONDER
 
 // Random values are used for greater resilience agains glitching attacks.
 typedef enum {
-  WAITING_FOR_REQUEST1 = 0x5091d95c,
-  READY_FOR_RESPONSE1 = 0x252d533a,
-  WAITING_FOR_REQUEST2 = 0xe3b601eb,
-  RSPN_HANDSHAKE_COMPLETE = 0x54acac08
+  NOISE_XXPSK3_RSPN_WAITING_FOR_REQUEST1 = 0x5091d95c,
+  NOISE_XXPSK3_RSPN_READY_FOR_RESPONSE1 = 0x252d533a,
+  NOISE_XXPSK3_RSPN_WAITING_FOR_REQUEST2 = 0xe3b601eb,
+  NOISE_XXPSK3_RSPN_HANDSHAKE_COMPLETE = 0x54acac08
 } noise_xxpsk3_responder_handshake_stage_t;
 
 typedef struct {
@@ -90,10 +92,10 @@ typedef struct {
 
 // Random values are used for greater resilience agains glitching attacks.
 typedef enum {
-  READY_FOR_REQUEST1 = 0x24a23a5e,
-  WAITING_FOR_RESPONSE1 = 0xa748a792,
-  READY_FOR_REQUEST2 = 0xba244240,
-  INTR_HANDSHAKE_COMPLETE = 0xf149f042
+  NOISE_XXPSK3_INTR_READY_FOR_REQUEST1 = 0x24a23a5e,
+  NOISE_XXPSK3_INTR_WAITING_FOR_RESPONSE1 = 0xa748a792,
+  NOISE_XXPSK3_INTR_READY_FOR_REQUEST2 = 0xba244240,
+  NOISE_XXPSK3_INTR_HANDSHAKE_COMPLETE = 0xf149f042
 } noise_xxpsk3_initiator_handshake_stage_t;
 
 typedef struct {
@@ -133,11 +135,14 @@ typedef struct {
  * @param intr Pointer to the initiator structure to initialize
  * @param psk Pre-shared key for the Noise protocol (32 bytes)
  * @param static_private_key Static private key for the initiator (32 bytes)
+ * @param static_public_key Static public key corresponding to
+ * `static_private_key` (32 bytes)
  * @return true if the initiator was initialized correctly, false otherwise
  */
 bool noise_xxpsk3_initiator_init(
     noise_xxpsk3_initiator_t *intr, const uint8_t psk[NOISE_XXPSK3_DHLEN],
-    const uint8_t static_private_key[NOISE_XXPSK3_DHLEN]);
+    const uint8_t static_private_key[NOISE_XXPSK3_DHLEN],
+    const uint8_t static_public_key[NOISE_XXPSK3_DHLEN]);
 
 /**
  * @brief Deinitialize the initiator structure and clear any sensitive data.
@@ -184,17 +189,17 @@ bool noise_xxpsk3_initiator_create_request1(
  * @param intr Pointer to the initiator structure
  * @param response Incoming response buffer
  * @param response_len Length of the incoming response buffer
+ * @param remote_static_public_key Output buffer for the responder's static
+ * public key (32 bytes)
  * @param payload Output buffer for the decrypted payload
  * @param max_payload_size Size of the output buffer
  * @param payload_size Set to the number of decrypted payload bytes
  * @return true if the response was handled correctly, false otherwise
  */
-bool noise_xxpsk3_initiator_handle_response1(noise_xxpsk3_initiator_t *intr,
-                                             const uint8_t *response,
-                                             size_t response_len,
-                                             uint8_t *payload,
-                                             size_t max_payload_size,
-                                             size_t *payload_size);
+bool noise_xxpsk3_initiator_handle_response1(
+    noise_xxpsk3_initiator_t *intr, const uint8_t *response,
+    size_t response_len, uint8_t remote_static_public_key[NOISE_XXPSK3_DHLEN],
+    uint8_t *payload, size_t max_payload_size, size_t *payload_size);
 
 /**
  * @brief Create request2, the third handshake message from the initiator.
@@ -252,11 +257,14 @@ bool noise_xxpsk3_initiator_create_request2(
  * @param rspn Pointer to the responder structure to initialize
  * @param psk Pre-shared key for the Noise protocol (32 bytes)
  * @param static_private_key Static private key for the responder (32 bytes)
+ * @param static_public_key Static public key corresponding to
+ * `static_private_key` (32 bytes)
  * @return true if the responder was initialized correctly, false otherwise
  */
 bool noise_xxpsk3_responder_init(
     noise_xxpsk3_responder_t *rspn, const uint8_t psk[NOISE_XXPSK3_DHLEN],
-    const uint8_t static_private_key[NOISE_XXPSK3_DHLEN]);
+    const uint8_t static_private_key[NOISE_XXPSK3_DHLEN],
+    const uint8_t static_public_key[NOISE_XXPSK3_DHLEN]);
 
 /**
  * @brief Deinitialize the responder structure and clear any sensitive data.
@@ -323,6 +331,8 @@ bool noise_xxpsk3_responder_create_response1(
  * @param rspn Pointer to the responder structure
  * @param request Incoming request buffer
  * @param request_len Length of the incoming request buffer
+ * @param remote_static_public_key Output buffer for the initiator's static
+ * public key (32 bytes)
  * @param payload Output buffer for the decrypted payload
  * @param max_payload_size Size of the output buffer
  * @param payload_size Set to the number of decrypted payload bytes
@@ -330,7 +340,8 @@ bool noise_xxpsk3_responder_create_response1(
  */
 bool noise_xxpsk3_responder_handle_request2(
     noise_xxpsk3_responder_t *rspn, const uint8_t *request, size_t request_len,
-    uint8_t *payload, size_t max_payload_size, size_t *payload_size);
+    uint8_t remote_static_public_key[NOISE_XXPSK3_DHLEN], uint8_t *payload,
+    size_t max_payload_size, size_t *payload_size);
 
 #endif /* USE_NOISE_XXPSK3_RESPONDER */
 
@@ -339,7 +350,8 @@ bool noise_xxpsk3_responder_handle_request2(
  *
  * @param ts Pointer to the established transport state
  * @param payload Plaintext to encrypt (may be empty)
- * @param payload_size Length of the plaintext in bytes
+ * @param payload_size Length of the plaintext in bytes; must not exceed
+ * NOISE_XXPSK3_MAX_PLAINTEXT_SIZE
  * @param ciphertext Output buffer for the encrypted message
  * @param max_ciphertext_size Size of the output buffer; must be at least
  * payload_size + 16
@@ -358,6 +370,7 @@ bool noise_xxpsk3_send_message(noise_xxpsk3_transport_state_t *ts,
  * @param ts Pointer to the established transport state
  * @param ciphertext Encrypted message to decrypt
  * @param ciphertext_size Length of the encrypted message; must be at least 16
+ * and must not exceed NOISE_XXPSK3_MAX_MESSAGE_SIZE
  * @param payload Output buffer for the decrypted plaintext
  * @param max_payload_size Size of the output buffer; must be at least
  * ciphertext_size - 16

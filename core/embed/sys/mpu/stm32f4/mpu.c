@@ -147,21 +147,6 @@ static void mpu_init_fixed_regions(void) {
   // SubRegion: 8KB at the beginning + 16KB at the end of 64KB CCMRAM
   SET_REGION( 4, CCMDATARAM_BASE,       SIZE_64KB,  0x3E, SRAM,       PRIV_RW );
   // clang-format on
-#elif defined(FIRMWARE)
-  // clang-format off
-  // Code in the Flash Bank #1 (Unprivileged, Read-Only, Executable)
-  // Subregion: 768KB = 1024KB except 2/8 at start
-  SET_REGION( 0, FLASH_BASE,            SIZE_1MB,   0x03, FLASH_CODE, PRIV_RO_URO );
-  // Code in the Flash Bank #2 (Unprivileged, Read-Only, Executable)
-  // Subregion: 896KB = 1024KB except 1/8 at start
-  SET_REGION( 1, FLASH_BASE + 0x100000, SIZE_1MB,   0x01, FLASH_CODE, PRIV_RO_URO );
-  // All CCMRAM (Unprivileged, Read-Write, Non-Executable)
-  SET_REGION( 2, CCMDATARAM_BASE,       SIZE_64KB,  0x00, SRAM,       FULL_ACCESS );
-  // All SRAM (Unprivileged, Read-Write, Non-Executable)
-  // Subregion:  192KB = 256KB except 2/8 at end
-  SET_REGION( 3, SRAM_BASE,             SIZE_256KB, 0xC0, SRAM,       FULL_ACCESS );
-  DIS_REGION( 4 );
-  // clang-format on
 #elif defined(TREZOR_PRODTEST)
   // clang-format off
   // Code in the Flash Bank #1 (Unprivileged, Read-Only, Executable)
@@ -247,6 +232,9 @@ bool mpu_inside_active_fb(const void* addr, size_t size) {
   irq_key_t lock = irq_lock();
 
   bool result =
+      // an inaccessible framebuffer contains nothing, see
+      // `mpu_set_active_fb()`
+      (drv->active_fb_addr != 0) && (drv->active_fb_size > 0) &&
       ((uintptr_t)addr + size >= (uintptr_t)addr) &&  // overflow check
       ((uintptr_t)addr >= drv->active_fb_addr) &&
       ((uintptr_t)addr + size <= drv->active_fb_addr + drv->active_fb_size);

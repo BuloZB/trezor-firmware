@@ -7,10 +7,11 @@ pub mod welcome;
 pub mod pairing_finalization;
 
 use heapless::String;
-use intro::Intro;
-use menu::Menu;
+use sys::time;
 use ufmt::uwrite;
 
+use self::intro::Intro;
+use self::menu::Menu;
 use super::bootloader::connect::Connect;
 use super::bootloader::welcome::Welcome;
 use super::component::bl_confirm::{Confirm, ConfirmTitle};
@@ -31,8 +32,6 @@ use super::{
 };
 use super::{fonts, UIBolt};
 use crate::bootloader::run;
-use crate::time::Duration;
-use crate::trezorhal::time;
 use crate::ui::component::Label;
 use crate::ui::display::toif::Toif;
 use crate::ui::display::{self, Color, Icon, LOADER_MAX};
@@ -132,7 +131,7 @@ impl UIBolt {
 impl BootloaderUI for UIBolt {
     fn screen_welcome() -> (u32, u32) {
         // let the previous screen on for some time
-        time::sleep(Duration::from_millis(1000));
+        time::sleep(time::Duration::from_millis(1000));
         let mut frame = Welcome::new();
         run(&mut frame, true, true)
     }
@@ -362,7 +361,7 @@ impl BootloaderUI for UIBolt {
         warning: bool,
         vendor_str: Option<&str>,
         version: [u8; 4],
-        vendor_img: &'static [u8],
+        vendor_img: &[u8],
         wait: i32,
     ) {
         let bg_color = if warning {
@@ -443,7 +442,7 @@ impl BootloaderUI for UIBolt {
     }
 
     #[cfg(feature = "ble")]
-    fn screen_pairing_mode(initial_setup: bool, _name: &'static str) -> (u32, u32) {
+    fn screen_pairing_mode(initial_setup: bool, _name: &str) -> (u32, u32) {
         let bg = if initial_setup { WELCOME_COLOR } else { BLD_BG };
 
         let btn = if initial_setup {

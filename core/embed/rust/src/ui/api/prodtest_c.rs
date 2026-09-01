@@ -2,6 +2,7 @@
 use cty::int16_t;
 #[cfg(feature = "touch")]
 use heapless::Vec;
+use rtl::CSlice;
 
 use crate::trezorhal::layout_buf::{c_layout_t, LayoutBuffer};
 use crate::trezorhal::sysevent::{parse_event, sysevents_t};
@@ -11,10 +12,12 @@ use crate::ui::ui_prodtest::{ProdtestLayoutType, ProdtestUI};
 use crate::ui::ModelUI;
 #[cfg(feature = "touch")]
 use crate::ui::{event::TouchEvent, layout::simplified::touch_unpack};
-use crate::util::from_c_array;
 
 #[no_mangle]
-extern "C" fn screen_prodtest_event(layout: *mut c_layout_t, signalled: &sysevents_t) -> u32 {
+unsafe extern "C" fn screen_prodtest_event(
+    layout: *mut c_layout_t,
+    signalled: &sysevents_t,
+) -> u32 {
     let e = parse_event(signalled);
     // SAFETY: calling code is supposed to give us exclusive access to an already
     // initialized layout
@@ -26,12 +29,15 @@ extern "C" fn screen_prodtest_event(layout: *mut c_layout_t, signalled: &syseven
 }
 
 #[no_mangle]
-extern "C" fn screen_prodtest_welcome(layout: *mut c_layout_t, id: *const cty::c_char, id_len: u8) {
-    let id = if id.is_null() {
-        None
-    } else {
-        unsafe { from_c_array(id, id_len as usize) }
-    };
+unsafe extern "C" fn screen_prodtest_welcome(
+    layout: *mut c_layout_t,
+    id: *const cty::c_char,
+    id_len: u8,
+) {
+    // SAFETY: caller must provide a pointer to `id` that has the same effective
+    // lifetime as `layout`. Then we use `into_unbounded_ascii_str` so that we
+    // can pass the resulting reference for storage in `layout`
+    let id = unsafe { CSlice::from_ptr_and_len(id, id_len as usize).into_unbounded_ascii_str() };
 
     let mut screen = <ModelUI as ProdtestUI>::CLayoutType::init_welcome(id);
     screen.show();
@@ -42,9 +48,9 @@ extern "C" fn screen_prodtest_welcome(layout: *mut c_layout_t, id: *const cty::c
 
 #[no_mangle]
 extern "C" fn screen_prodtest_show_text(text: *const cty::c_char, text_len: u8) {
-    let text = unwrap!(unsafe { from_c_array(text, text_len as usize) });
+    let text = unsafe { CSlice::from_ptr_and_len(text, text_len as usize) };
 
-    ModelUI::screen_prodtest_show_text(text);
+    ModelUI::screen_prodtest_show_text(text.as_ascii_str().unwrap_or_default());
 }
 
 #[no_mangle]
@@ -54,8 +60,8 @@ extern "C" fn screen_prodtest_border() {
 
 #[no_mangle]
 extern "C" fn screen_prodtest_bars(colors: *const cty::c_char, colors_len: u8) {
-    let colors: &str = unwrap!(unsafe { from_c_array(colors, colors_len as usize) });
-    ModelUI::screen_prodtest_bars(colors);
+    let colors = unsafe { CSlice::from_ptr_and_len(colors, colors_len as usize) };
+    ModelUI::screen_prodtest_bars(colors.as_ascii_str().unwrap_or_default());
 }
 
 #[no_mangle]
@@ -67,12 +73,13 @@ extern "C" fn screen_prodtest_touch(x0: int16_t, y0: int16_t, w: int16_t, h: int
 
 #[no_mangle]
 #[cfg(feature = "touch")]
-extern "C" fn screen_prodtest_draw(events: *const cty::uint32_t, events_len: u32) {
-    let events = unsafe { core::slice::from_raw_parts(events, events_len as usize) };
+unsafe extern "C" fn screen_prodtest_draw(events: *const cty::uint32_t, events_len: u32) {
+    // SAFETY: caller must provide a valid pointer
+    let events = unsafe { CSlice::from_ptr_and_len(events, events_len as usize) };
 
     let mut v: Vec<TouchEvent, 256> = Vec::new();
 
-    for e in events.iter() {
+    for e in events.as_slice().unwrap_or_default().iter() {
         if let Some(event) = touch_unpack(*e) {
             unwrap!(v.push(event));
         }

@@ -44,6 +44,18 @@
     goto access_violation;                                                     \
   }
 
+// The macros above multiply a stride by a height into a `size_t`. That cannot
+// overflow while both dimensions stay 16-bit, since an unsigned product needs
+// only as many bits as its operands have together. Widening any of the fields
+// would need a checked multiply here instead.
+_Static_assert(sizeof(((gfx_bitblt_t *)0)->dst_stride) +
+                           sizeof(((gfx_bitblt_t *)0)->height) <=
+                       sizeof(size_t) &&
+                   sizeof(((gfx_bitblt_t *)0)->src_stride) +
+                           sizeof(((gfx_bitblt_t *)0)->height) <=
+                       sizeof(size_t),
+               "bitblt dimensions may overflow the probe length");
+
 // ---------------------------------------------------------------------
 
 void sysevents_poll__verified(const sysevents_t *awaited,
@@ -129,6 +141,10 @@ bool syslog_start_record__verified(const log_source_t *source,
     goto access_violation;
   }
 
+  if (!probe_read_access(source->name, source->name_len)) {
+    goto access_violation;
+  }
+
   return syslog_start_record(source, level);
 access_violation:
   apptask_access_violation();
@@ -137,7 +153,9 @@ access_violation:
 
 ssize_t syslog_write_chunk__verified(const char *text, size_t text_len,
                                      bool end_record) {
-  if (!probe_read_access(text, text_len)) {
+  // NULL text is allowed for a zero-length write, `syslog_write_chunk()`
+  // still processes it and may end the record
+  if (!probe_read_access_opt(text, text_len)) {
     goto access_violation;
   }
 
@@ -199,7 +217,11 @@ void ipc_message_free__verified(ipc_message_t *msg) {
   // because the msg->data is treated as a "token" and validated
   // in the ipc_message_free() itself.
 
-  ipc_message_free(msg);
+  // Work on a copy so that the token cannot be changed after it has been
+  // validated by the implementation.
+  ipc_message_t msg_copy = *msg;
+
+  ipc_message_free(&msg_copy);
   return;
 
 access_violation:
@@ -208,7 +230,9 @@ access_violation:
 
 bool ipc_send__verified(systask_id_t remote, uint32_t fn, const void *data,
                         size_t data_size) {
-  if (!probe_read_access(data, data_size)) {
+  // NULL data is allowed for a zero-length message, `ipc_send()` accepts it and
+  // sends an empty message.
+  if (!probe_read_access_opt(data, data_size)) {
     goto access_violation;
   }
 
@@ -228,11 +252,15 @@ bool boot_image_check__verified(const boot_image_t *image) {
     goto access_violation;
   }
 
-  if (!probe_read_access(image->image_ptr, image->image_size)) {
+  // Work on a copy so that the verified fields cannot differ from
+  // the ones the implementation uses.
+  boot_image_t image_copy = *image;
+
+  if (!probe_read_access(image_copy.image_ptr, image_copy.image_size)) {
     goto access_violation;
   }
 
-  return boot_image_check(image);
+  return boot_image_check(&image_copy);
 
 access_violation:
   apptask_access_violation();
@@ -244,11 +272,15 @@ void boot_image_replace__verified(const boot_image_t *image) {
     goto access_violation;
   }
 
-  if (!probe_read_access(image->image_ptr, image->image_size)) {
+  // Work on a copy so that the verified fields cannot differ from
+  // the ones the implementation uses.
+  boot_image_t image_copy = *image;
+
+  if (!probe_read_access(image_copy.image_ptr, image_copy.image_size)) {
     goto access_violation;
   }
 
-  boot_image_replace(image);
+  boot_image_replace(&image_copy);
   return;
 
 access_violation:
@@ -270,34 +302,31 @@ void system_exit_error__verified(const char *title, size_t title_len,
   char message_copy[64] = {0};
   char footer_copy[64] = {0};
 
+  if (!probe_read_access_opt(title, title_len)) {
+    goto access_violation;
+  }
+
   if (title != NULL) {
-    if (!probe_read_access(title, title_len)) {
-      goto access_violation;
-    }
     title_len = MIN(title_len, sizeof(title_copy) - 1);
     title = strncpy(title_copy, title, title_len);
-  } else {
-    title_len = 0;
+  }
+
+  if (!probe_read_access_opt(message, message_len)) {
+    goto access_violation;
   }
 
   if (message != NULL) {
-    if (!probe_read_access(message, message_len)) {
-      goto access_violation;
-    }
     message_len = MIN(message_len, sizeof(message_copy) - 1);
     message = strncpy(message_copy, message, message_len);
-  } else {
-    message_len = 0;
+  }
+
+  if (!probe_read_access_opt(footer, footer_len)) {
+    goto access_violation;
   }
 
   if (footer != NULL) {
-    if (!probe_read_access(footer, footer_len)) {
-      goto access_violation;
-    }
     footer_len = MIN(footer_len, sizeof(footer_copy) - 1);
     footer = strncpy(footer_copy, footer, footer_len);
-  } else {
-    footer_len = 0;
   }
 
   systask_t *task = systask_active();
@@ -316,24 +345,22 @@ void system_exit_fatal__verified(const char *message, size_t message_len,
   char message_copy[64] = {0};
   char file_copy[64] = {0};
 
+  if (!probe_read_access_opt(message, message_len)) {
+    goto access_violation;
+  }
+
   if (message != NULL) {
-    if (!probe_read_access(message, message_len)) {
-      goto access_violation;
-    }
     message_len = MIN(message_len, sizeof(message_copy) - 1);
     message = strncpy(message_copy, message, message_len);
-  } else {
-    message_len = 0;
+  }
+
+  if (!probe_read_access_opt(file, file_len)) {
+    goto access_violation;
   }
 
   if (file != NULL) {
-    if (!probe_read_access(file, file_len)) {
-      goto access_violation;
-    }
     file_len = MIN(file_len, sizeof(file_copy) - 1);
     file = strncpy(file_copy, file, file_len);
-  } else {
-    file_len = 0;
   }
 
   systask_t *task = systask_active();
@@ -429,7 +456,8 @@ access_violation:
 }
 
 secbool usb_start__verified(const usb_start_params_t *params) {
-  if (!probe_read_access(params, sizeof(*params))) {
+  // NULL params is allowed and keeps the settings from usb_init()
+  if (!probe_read_access_opt_const_size(params, sizeof(*params))) {
     goto access_violation;
   }
 
@@ -658,7 +686,8 @@ access_violation:
 
 #ifdef USE_TELEMETRY
 bool telemetry_get__verified(telemetry_data_t *out) {
-  if (!probe_write_access(out, sizeof(*out))) {
+  // NULL out is allowed and only queries whether telemetry is available
+  if (!probe_write_access_opt_const_size(out, sizeof(*out))) {
     goto access_violation;
   }
 
@@ -685,7 +714,8 @@ static secbool storage_callback_wrapper(uint32_t wait, uint32_t progress,
 }
 
 void storage_setup__verified(PIN_UI_WAIT_CALLBACK callback) {
-  if (!probe_execute_access(callback)) {
+  // NULL callback is allowed and disables the UI progress callback
+  if (!probe_execute_access_opt(callback)) {
     goto access_violation;
   }
   storage_callback = callback;
@@ -700,11 +730,13 @@ access_violation:
 storage_unlock_result_t storage_unlock__verified(const uint8_t *pin,
                                                  size_t pin_len,
                                                  const uint8_t *ext_salt) {
-  if (!probe_read_access(pin, pin_len)) {
+  // `storage_unlock()` accepts a NULL pin and returns an error code
+  if (!probe_read_access_opt(pin, pin_len)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(ext_salt, EXTERNAL_SALT_SIZE)) {
+  // NULL ext_salt is allowed and means no external salt is used
+  if (!probe_read_access_opt_const_size(ext_salt, EXTERNAL_SALT_SIZE)) {
     goto access_violation;
   }
 
@@ -717,11 +749,13 @@ access_violation:
 
 storage_pin_change_result_t storage_change_pin__verified(
     const uint8_t *newpin, size_t newpin_len, const uint8_t *new_ext_salt) {
-  if (!probe_read_access(newpin, newpin_len)) {
+  // `storage_change_pin()` accepts a NULL newpin and returns an error code
+  if (!probe_read_access_opt(newpin, newpin_len)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(new_ext_salt, EXTERNAL_SALT_SIZE)) {
+  // NULL new_ext_salt is allowed and means no external salt is used
+  if (!probe_read_access_opt_const_size(new_ext_salt, EXTERNAL_SALT_SIZE)) {
     goto access_violation;
   }
 
@@ -749,15 +783,18 @@ secbool storage_change_wipe_code__verified(const uint8_t *pin, size_t pin_len,
                                            const uint8_t *ext_salt,
                                            const uint8_t *wipe_code,
                                            size_t wipe_code_len) {
-  if (!probe_read_access(pin, pin_len)) {
+  // `storage_change_wipe_code()` accepts a NULL pin and returns secfalse
+  if (!probe_read_access_opt(pin, pin_len)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(ext_salt, EXTERNAL_SALT_SIZE)) {
+  // NULL ext_salt is allowed and means no external salt is used
+  if (!probe_read_access_opt_const_size(ext_salt, EXTERNAL_SALT_SIZE)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(wipe_code, wipe_code_len)) {
+  // `storage_change_wipe_code()` accepts a NULL wipe_code and returns secfalse
+  if (!probe_read_access_opt(wipe_code, wipe_code_len)) {
     goto access_violation;
   }
 
@@ -771,7 +808,8 @@ access_violation:
 
 secbool storage_get__verified(const uint16_t key, void *val,
                               const uint16_t max_len, uint16_t *len) {
-  if (!probe_write_access(val, max_len)) {
+  // NULL val and max_len 0 is allowed and queries the value length only
+  if (!probe_write_access_opt(val, max_len)) {
     goto access_violation;
   }
 
@@ -788,7 +826,8 @@ access_violation:
 
 secbool storage_set__verified(const uint16_t key, const void *val,
                               const uint16_t len) {
-  if (!probe_read_access(val, len)) {
+  // NULL is allowed for a zero-length value.
+  if (!probe_read_access_opt(val, len)) {
     goto access_violation;
   }
 
@@ -825,16 +864,16 @@ access_violation:
   apptask_access_violation();
 }
 
-bool rng_fill_buffer_strong__verified(void *buffer, size_t buffer_size) {
+void rng_fill_buffer_strong__verified(void *buffer, size_t buffer_size) {
   if (!probe_write_access(buffer, buffer_size)) {
     goto access_violation;
   }
 
-  return rng_fill_buffer_strong(buffer, buffer_size);
+  rng_fill_buffer_strong(buffer, buffer_size);
+  return;
 
 access_violation:
   apptask_access_violation();
-  return false;
 }
 
 // ---------------------------------------------------------------------
@@ -868,7 +907,8 @@ access_violation:
 
 int firmware_hash_start__verified(const uint8_t *challenge,
                                   size_t challenge_len) {
-  if (!probe_read_access(challenge, challenge_len)) {
+  // challenge is optional, so we allow NULL with size 0
+  if (!probe_read_access_opt(challenge, challenge_len)) {
     goto access_violation;
   }
 
@@ -908,7 +948,9 @@ access_violation:
 #ifdef USE_BLE
 
 bool ble_enter_pairing_mode__verified(const uint8_t *name, size_t name_len) {
-  if (!probe_read_access(name, name_len)) {
+  // NULL name with name_len 0 is allowed and keeps the advertising name
+  // unchanged
+  if (!probe_read_access_opt(name, name_len)) {
     goto access_violation;
   }
 
@@ -995,7 +1037,8 @@ access_violation:
 }
 
 bool ble_unpair__verified(const bt_le_addr_t *addr) {
-  if (!probe_read_access(addr, sizeof(*addr))) {
+  // NULL addr is allowed and unpairs the currently connected device
+  if (!probe_read_access_opt_const_size(addr, sizeof(*addr))) {
     goto access_violation;
   }
 
@@ -1008,7 +1051,12 @@ access_violation:
 }
 
 uint8_t ble_get_bond_list__verified(bt_le_addr_t *bonds, size_t count) {
-  if (!probe_write_access(bonds, sizeof(bt_le_addr_t) * count)) {
+  // Reject counts for which the size below would overflow
+  if (count > SIZE_MAX / sizeof(*bonds)) {
+    goto access_violation;
+  }
+
+  if (!probe_write_access(bonds, sizeof(*bonds) * count)) {
     goto access_violation;
   }
 
@@ -1089,7 +1137,9 @@ access_violation:
 }
 
 pm_status_t pm_suspend__verified(wakeup_flags_t *wakeup_reason) {
-  if (!probe_write_access(wakeup_reason, sizeof(*wakeup_reason))) {
+  // NULL wakeup_reason is allowed and means the caller isn't interested
+  if (!probe_write_access_opt_const_size(wakeup_reason,
+                                         sizeof(*wakeup_reason))) {
     goto access_violation;
   }
 
@@ -1111,15 +1161,21 @@ jpegdec_state_t jpegdec_process__verified(jpegdec_input_t *input) {
     goto access_violation;
   }
 
-  if (input->offset > input->size) {
+  // Work on a copy so that the verified fields cannot differ from
+  // the ones the implementation uses.
+  jpegdec_input_t input_copy = *input;
+
+  // `jpegdec_process()` consumes `data[offset]` up to `data[size]`
+  if (!probe_read_access(input_copy.data, input_copy.size)) {
     goto access_violation;
   }
 
-  if (!probe_read_access(input->data, input->size - input->offset)) {
-    goto access_violation;
-  }
+  jpegdec_state_t state = jpegdec_process(&input_copy);
 
-  return jpegdec_process(input);
+  // `jpegdec_process()` advances `offset` by the number of consumed bytes
+  *input = input_copy;
+
+  return state;
 
 access_violation:
   apptask_access_violation();

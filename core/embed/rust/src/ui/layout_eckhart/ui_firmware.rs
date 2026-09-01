@@ -1,5 +1,7 @@
 use core::cmp::Ordering;
 
+use sys::time::Duration;
+
 use super::component::Button;
 use super::firmware::{
     ActionBar, Bip39Input, ConfirmHomescreen, DeviceMenuScreen, DurationInput, Header, HeaderMsg,
@@ -22,7 +24,6 @@ use crate::micropython::obj::Obj;
 use crate::micropython::util;
 use crate::storage;
 use crate::strutil::TString;
-use crate::time::Duration;
 use crate::translations::TR;
 use crate::ui::component::text::op::OpTextLayout;
 use crate::ui::component::text::paragraphs::{
@@ -384,7 +385,7 @@ impl FirmwareUI for UIEckhart {
 
     fn confirm_properties(
         title: TString<'static>,
-        _subtitle: Option<TString<'static>>,
+        subtitle: Option<TString<'static>>,
         items: Obj,
         hold: bool,
         verb: Option<TString<'static>>,
@@ -403,7 +404,7 @@ impl FirmwareUI for UIEckhart {
 
         let flow = flow::new_confirm_with_menu(
             title,
-            None,
+            subtitle,
             paragraphs,
             None,
             verb,

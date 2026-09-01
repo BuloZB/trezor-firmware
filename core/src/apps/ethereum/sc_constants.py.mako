@@ -3,12 +3,13 @@
 # do not edit manually!
 # fmt: off
 
-from typing import Iterator
-<%
-from binascii import unhexlify
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+<%
 def fmt_addr(addr_hex: str) -> str:
-    data = "".join(f'\\x{b:02x}' for b in unhexlify(addr_hex))
+    data = "".join(f'\\x{b:02x}' for b in bytes.fromhex(addr_hex))
     return f'b"{data}"'
 
 
@@ -147,16 +148,61 @@ def weth_deployments() -> Iterator[tuple[int, bytes]]:
 % endfor
 
 <%
-_EIP7702_ADDRESSES = [
-    # https://etherscan.io/address/0x5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d
-    ("5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d", "Ambire"),
-    # https://etherscan.io/address/0x63c0c19a282a1b52b07dd5a65b58948a07dae32b
-    ("63c0c19a282a1b52b07dd5a65b58948a07dae32b", "MetaMask"),
-]
+_EIP7702_ADDRESSES = {
+    1: [  # Ethereum
+        # https://etherscan.io/address/0x5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d
+        ("5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d", "Ambire"),
+        # https://etherscan.io/address/0x63c0c19a282a1b52b07dd5a65b58948a07dae32b
+        ("63c0c19a282a1b52b07dd5a65b58948a07dae32b", "MetaMask"),
+        # https://etherscan.io/address/0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9
+        ("4Cd241E8d1510e30b2076397afc7508Ae59C66c9", "Simple7702Account")
+    ],
+    10: [ # Optimism
+        # https://explorer.optimism.io/address/0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9
+        ("4Cd241E8d1510e30b2076397afc7508Ae59C66c9", "Simple7702Account")
+    ],
+    56: [ # BNB
+        # https://bscscan.com/address/0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9
+        ("4Cd241E8d1510e30b2076397afc7508Ae59C66c9", "Simple7702Account")
+    ],
+    137: [ # Polygon
+        # https://polygonscan.com/address/0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9
+        ("4Cd241E8d1510e30b2076397afc7508Ae59C66c9", "Simple7702Account")
+    ],
+    100: [  # Gnosis
+        # https://gnosisscan.io/address/0x5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d
+        ("5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d", "Ambire"),
+        # https://gnosisscan.io/address/0x63c0c19a282a1b52b07dd5a65b58948a07dae32b
+        ("63c0c19a282a1b52b07dd5a65b58948a07dae32b", "MetaMask"),
+    ],
+    8453: [  # Base
+        # https://basescan.org/address/0x5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d
+        ("5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d", "Ambire"),
+        # https://basescan.org/address/0x63c0c19a282a1b52b07dd5a65b58948a07dae32b
+        ("63c0c19a282a1b52b07dd5a65b58948a07dae32b", "MetaMask"),
+        # https://basescan.org/address/0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9
+        ("4Cd241E8d1510e30b2076397afc7508Ae59C66c9", "Simple7702Account")
+    ],
+    42161: [  # Arbitum
+        # https://arbiscan.io/address/0x5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d
+        ("5a7fc11397e9a8ad41bf10bf13f22b0a63f96f6d", "Ambire"),
+        # https://arbiscan.io/address/0x63c0c19a282a1b52b07dd5a65b58948a07dae32b
+        ("63c0c19a282a1b52b07dd5a65b58948a07dae32b", "MetaMask"),
+        # https://arbiscan.io/address/0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9
+        ("4Cd241E8d1510e30b2076397afc7508Ae59C66c9", "Simple7702Account")
+    ],
+}
+if 0 in _EIP7702_ADDRESSES:
+    raise RuntimeError('"All chains" delegation is explicitly not supported')
 %>
-def lookup_eip7702_address(address: bytes) -> str | None:
-% for addr, name in _EIP7702_ADDRESSES:
-    if address == ${fmt_addr(addr)}:
-        return "${name}"
+def lookup_eip7702_address(chain_id: int, address: bytes) -> str | None:
+% for chain_id, items in _EIP7702_ADDRESSES.items():
+    if chain_id == ${chain_id}:
+% for addr, name in items:
+        if address == ${fmt_addr(addr)}:
+            return "${name}"
+% endfor
+        return None
+
 % endfor
     return None

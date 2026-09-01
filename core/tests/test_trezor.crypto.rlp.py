@@ -128,7 +128,7 @@ class TestCryptoRlp(unittest.TestCase):
 
     def test_rlp_write(self):
         for i, o in self.vectors:
-            o = unhexlify(o)
+            o = bytes.fromhex(o)
             w = bytearray()
             rlp.write(w, i)
             self.assertEqual(w, o)
@@ -137,6 +137,22 @@ class TestCryptoRlp(unittest.TestCase):
         for i, o in self.vectors:
             length = rlp.length(i)
             self.assertEqual(length, len(o) // 2)
+
+    def test_rlp_same_encoding(self):
+        for i in range(0, 128):
+            o = bytes([i])
+
+            # some short bytestrings are their own encoding
+            w = bytearray()
+            rlp.write(w, o)
+            self.assertEqual(w, o)
+
+            # small positive integers are their own encoding
+            if i == 0:
+                continue  # already tested (see above)
+            w = bytearray()
+            rlp.write(w, i)
+            self.assertEqual(w, o)
 
 
 if __name__ == "__main__":

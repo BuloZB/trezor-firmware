@@ -181,7 +181,7 @@ if TYPE_CHECKING:
 
     class BackupMethod(IntEnum):
         Display = 0
-        N4W1 = 1
+        N1W1 = 1
 
     class SafetyCheckLevel(IntEnum):
         Strict = 0
@@ -239,7 +239,7 @@ if TYPE_CHECKING:
         BLE = 22
         NFC = 23
         Tron = 24
-        N4W1 = 25
+        N1W1 = 25
         TouchWakeup = 26
 
     class SdProtectOperationType(IntEnum):
@@ -470,6 +470,8 @@ if TYPE_CHECKING:
         FreezeBalanceV2Contract = 54
         UnfreezeBalanceV2Contract = 55
         WithdrawExpireUnfreezeContract = 56
+        DelegateResourceContract = 57
+        UnDelegateResourceContract = 58
 
     class MessageType(IntEnum):
         Initialize = 0
@@ -581,10 +583,10 @@ if TYPE_CHECKING:
         DebugLinkGetPairingInfo = 9011
         DebugLinkPairingInfo = 9012
         DebugLinkSetLogFilter = 9013
-        DebugLinkN4W1Connected = 9014
-        DebugLinkN4W1Write = 9015
-        DebugLinkN4W1Read = 9016
-        DebugLinkN4W1Response = 9017
+        DebugLinkN1W1Connected = 9014
+        DebugLinkN1W1Write = 9015
+        DebugLinkN1W1Read = 9016
+        DebugLinkN1W1Response = 9017
         DebugLinkSetBatteryState = 9018
         EthereumGetPublicKey = 450
         EthereumPublicKey = 451
@@ -606,8 +608,6 @@ if TYPE_CHECKING:
         EthereumSignTypedHash = 470
         EthereumDefinitionRequest = 471
         EthereumDefinitionAck = 472
-        EthereumSignAuth7702 = 473
-        EthereumAuth7702Signature = 474
         NEMGetAddress = 67
         NEMAddress = 68
         NEMSignTx = 69
@@ -763,6 +763,8 @@ if TYPE_CHECKING:
         TronUnfreezeBalanceV2Contract = 2208
         TronWithdrawUnfreeze = 2209
         TronVoteWitnessContract = 2210
+        TronDelegateResourceContract = 2211
+        TronUnDelegateResourceContract = 2212
         TronWithdrawBalance = 2213
         BenchmarkListNames = 9100
         BenchmarkNames = 9101

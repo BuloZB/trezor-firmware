@@ -63,7 +63,7 @@ def _language_version_matches() -> bool:
     if header is None:
         return True
 
-    return header.version[:3] == utils.VERSION[:3]
+    return translations.version_matches_firmware(header.version, utils.VERSION)
 
 
 def get_features() -> Features:
@@ -166,8 +166,8 @@ def get_features() -> Features:
     if utils.INTERNAL_MODEL == "T3W1":  # TODO utils.USE_NFC
         f.capabilities.append(Capability.NFC)
 
-    if utils.USE_N4W1:
-        f.capabilities.append(Capability.N4W1)
+    if utils.USE_N1W1:
+        f.capabilities.append(Capability.N1W1)
 
     # Only some models are capable of SD card
     if utils.USE_SD_CARD:

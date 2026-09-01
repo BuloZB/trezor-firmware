@@ -1,11 +1,12 @@
-from typing import TYPE_CHECKING, Sequence
+from micropython import const
+from typing import TYPE_CHECKING
 
 import storage
 import storage.device as storage_device
 from trezor import TR
 from trezor.crypto import hmac, slip39
 from trezor.enums import BackupType, MessageType
-from trezor.ui.layouts import confirm_action
+from trezor.ui.layouts import BR_CODE_OTHER, confirm_action, confirm_properties
 from trezor.wire import ProcessError
 
 from apps.common import backup_types
@@ -18,8 +19,10 @@ if __debug__:
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes
+    from collections.abc import Sequence
 
     from trezor.messages import ResetDevice, Success
+    from trezor.ui.layouts import PropertyType
 
 
 BAK_T_BIP39 = BackupType.Bip39  # global_import_cache
@@ -29,10 +32,11 @@ BAK_T_SLIP39_SINGLE_EXT = BackupType.Slip39_Single_Extendable  # global_import_c
 BAK_T_SLIP39_BASIC_EXT = BackupType.Slip39_Basic_Extendable  # global_import_cache
 BAK_T_SLIP39_ADVANCED_EXT = BackupType.Slip39_Advanced_Extendable  # global_import_cache
 _DEFAULT_BACKUP_TYPE = BAK_T_BIP39
+_ENTROPY_SIZE = const(32)
 
 
 async def reset_device(msg: ResetDevice) -> Success:
-    from trezor import config
+    from trezor import config, utils
     from trezor.crypto import bip39, random
     from trezor.messages import EntropyAck, EntropyRequest, Success
     from trezor.pin import render_empty_loader
@@ -85,7 +89,10 @@ async def reset_device(msg: ResetDevice) -> Success:
     prev_int_entropy = None
     while True:
         # generate internal entropy
-        int_entropy = random.bytes(32, True)
+        int_entropy = random.bytes(_ENTROPY_SIZE, True)
+        if len(int_entropy) != _ENTROPY_SIZE:
+            utils.halt("Invalid internal entropy")
+
         if __debug__:
             storage.debug.reset_internal_entropy[:] = int_entropy
 
@@ -101,6 +108,10 @@ async def reset_device(msg: ResetDevice) -> Success:
             EntropyAck,
         )
         ext_entropy = entropy_ack.entropy
+
+        if len(ext_entropy) * 8 < msg.strength:
+            raise ProcessError("Insufficient external entropy")
+
         # For SLIP-39 this is the Encrypted Master Secret
         secret = _compute_secret_from_entropy(int_entropy, ext_entropy, msg.strength)
 
@@ -283,17 +294,42 @@ async def backup_slip39_custom(
         mnemonics = _get_slip39_mnemonics(
             encrypted_master_secret, group_threshold, groups, extendable
         )
-        await confirm_action(
-            "warning_shamir_backup",
-            TR.reset__title_shamir_backup,
-            description=TR.reset__create_x_of_y_multi_share_backup_template.format(
-                groups[0][0], groups[0][1]
-            ),
-            verb=TR.buttons__continue,
-        )
         if len(groups) == 1:
+            await confirm_action(
+                "warning_shamir_backup",
+                TR.reset__title_shamir_backup,
+                description=TR.reset__create_x_of_y_multi_share_backup_template.format(
+                    groups[0][0], groups[0][1]
+                ),
+                verb=TR.buttons__continue,
+            )
             await layout.slip39_basic_show_and_confirm_shares(handler, mnemonics[0])
         else:
+            await confirm_action(
+                "warning_shamir_advanced_backup",
+                TR.reset__recovery_wallet_backup_title,
+                description=TR.backup__info_multi_group_backup.format(
+                    len(groups), group_threshold
+                ),
+                verb=TR.buttons__continue,
+            )
+
+            props: list[PropertyType] = []
+            for idx, (threshold, n_group) in enumerate(groups):
+                props.append(
+                    (
+                        TR.recovery__group_num_template.format(idx + 1),
+                        TR.backup__info_n_of_m_template.format(threshold, n_group),
+                        False,
+                    )
+                )
+            await confirm_properties(
+                "shamir_advanced_backup_groups",
+                TR.reset__recovery_wallet_backup_title,
+                props,
+                br_code=BR_CODE_OTHER,
+                verb=TR.buttons__continue,
+            )
             await layout.slip39_advanced_show_and_confirm_shares(handler, mnemonics)
 
 

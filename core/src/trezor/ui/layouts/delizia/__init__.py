@@ -15,9 +15,10 @@ from ..common import (
 
 if TYPE_CHECKING:
     from buffer_types import AnyBytes, StrOrBytes
-    from typing import Awaitable, Iterable, NoReturn, Sequence, TypeVar
+    from collections.abc import Awaitable, Iterable, Sequence
+    from typing import NoReturn, TypeVar
 
-    from trezor.messages import StellarAsset
+    from apps.stellar.tokens import StellarToken
 
     from ..common import ExceptionType, PropertyType, StrPropertyType
     from ..menu import Details
@@ -174,7 +175,7 @@ def confirm_path_warning(
         "path_warning",
         description,
         value=path,
-        verb_cancel=TR.words__cancel_and_exit,
+        verb_cancel=TR.buttons__cancel_and_exit,
         br_code=ButtonRequestType.UnknownDerivationPath,
     )
 
@@ -533,7 +534,7 @@ async def confirm_payment_request(
                 refund_account_items,
             )
         )
-    menu = Menu.root(menu_items, TR.send__cancel_sign)
+    menu = Menu.root(menu_items, TR.buttons__cancel_sign)
 
     with main_ctx as main_layout:
         await confirm_with_menu(main_layout, menu, "confirm_payment_request")
@@ -616,7 +617,7 @@ async def confirm_output(
             br_code,
             subtitle=title,
             chunkify=chunkify,
-            cancel_text=TR.send__cancel_sign,
+            cancel_text=TR.buttons__cancel_sign,
             info_items=info_items,
         ),
         lambda: confirm_value(
@@ -626,7 +627,7 @@ async def confirm_output(
             br_name="confirm_output",
             br_code=br_code,
             subtitle=title,
-            cancel_text=TR.send__cancel_sign,
+            cancel_text=TR.buttons__cancel_sign,
             info_items=info_items,
             can_go_back=True,
         ),
@@ -818,24 +819,6 @@ def confirm_text(
     )
 
 
-def confirm_amount(
-    title: str,
-    amount: str,
-    description: str | None = None,
-    br_name: str = "confirm_amount",
-    br_code: ButtonRequestType = BR_CODE_OTHER,
-) -> Awaitable[ui.UiResult]:
-    description = description or TR.words__amount  # def_arg
-    return confirm_value(
-        title,
-        amount,
-        description,
-        br_name,
-        br_code,
-        verb=TR.buttons__confirm,
-    )
-
-
 async def confirm_value(
     title: str,
     value: str,
@@ -1005,7 +988,7 @@ async def confirm_trade(
     menu_items = [create_details(TR.address__title_receive_address, account_items)]
     for k, v in extra_menu_items:
         menu_items.append(create_details(k, v))
-    menu = Menu.root(menu_items, TR.send__cancel_sign)
+    menu = Menu.root(menu_items, TR.buttons__cancel_sign)
 
     with trade_ctx as trade_layout:
         await confirm_with_menu(trade_layout, menu, "confirm_trade")
@@ -1084,7 +1067,7 @@ if not utils.BITCOIN_ONLY:
         return show_danger(
             "unknown_contract_warning",
             content=f"{TR.ethereum__unknown_contract_address} {TR.words__know_what_your_doing}",
-            verb_cancel=TR.send__cancel_sign,
+            verb_cancel=TR.buttons__cancel_sign,
         )
 
     async def confirm_ethereum_tx(
@@ -1387,7 +1370,7 @@ if not utils.BITCOIN_ONLY:
             ) as layout:
                 return await interact_with_menu(
                     layout,
-                    Menu.root(menu_items, TR.send__cancel_sign),
+                    Menu.root(menu_items, TR.buttons__cancel_sign),
                     f"{br_name}/intro",
                     ButtonRequestType.SignTx,
                 )
@@ -1402,7 +1385,7 @@ if not utils.BITCOIN_ONLY:
             ) as layout:
                 return await interact_with_menu(
                     layout,
-                    Menu.root(menu_items, TR.send__cancel_sign),
+                    Menu.root(menu_items, TR.buttons__cancel_sign),
                     f"{br_name}/vault_name",
                 )
 
@@ -1418,7 +1401,7 @@ if not utils.BITCOIN_ONLY:
             ) as layout:
                 return await interact_with_menu(
                     layout,
-                    Menu.root(menu_items, TR.send__cancel_sign),
+                    Menu.root(menu_items, TR.buttons__cancel_sign),
                     f"{br_name}/amount",
                     br_code,
                 )
@@ -1436,7 +1419,7 @@ if not utils.BITCOIN_ONLY:
                 ) as layout:
                     return await interact_with_menu(
                         layout,
-                        Menu.root(menu_items, TR.send__cancel_sign),
+                        Menu.root(menu_items, TR.buttons__cancel_sign),
                         f"{br_name}/extra_data",
                         br_code,
                     )
@@ -1456,7 +1439,7 @@ if not utils.BITCOIN_ONLY:
             ) as layout:
                 return await interact_with_menu(
                     layout,
-                    Menu.root(menu_items, TR.send__cancel_sign),
+                    Menu.root(menu_items, TR.buttons__cancel_sign),
                     f"{br_name}/summary",
                     br_code,
                 )
@@ -1500,7 +1483,7 @@ if not utils.BITCOIN_ONLY:
             ) as layout:
                 return await interact_with_menu(
                     layout,
-                    Menu.root(menu_items, TR.send__cancel_sign),
+                    Menu.root(menu_items, TR.buttons__cancel_sign),
                     f"{br_name}/intro",
                     br_code,
                 )
@@ -1516,7 +1499,7 @@ if not utils.BITCOIN_ONLY:
             ) as layout:
                 return await interact_with_menu(
                     layout,
-                    Menu.root(menu_items, TR.send__cancel_sign),
+                    Menu.root(menu_items, TR.buttons__cancel_sign),
                     f"{br_name}/tokens",
                     br_code,
                 )
@@ -1534,7 +1517,7 @@ if not utils.BITCOIN_ONLY:
             ) as layout:
                 return await interact_with_menu(
                     layout,
-                    Menu.root(menu_items, TR.send__cancel_sign),
+                    Menu.root(menu_items, TR.buttons__cancel_sign),
                     f"{br_name}/summary",
                     br_code,
                 )
@@ -1638,7 +1621,7 @@ if not utils.BITCOIN_ONLY:
         return show_danger(
             "unknown_token_warning",
             content=f"{TR.solana__unknown_token_address} {TR.words__know_what_your_doing}",
-            verb_cancel=TR.send__cancel_sign,
+            verb_cancel=TR.buttons__cancel_sign,
         )
 
     def confirm_solana_recipient(
@@ -1775,24 +1758,53 @@ if not utils.BITCOIN_ONLY:
             br_code=ButtonRequestType.SignTx,
         )
 
+    async def confirm_stellar_address(
+        title: str,
+        subtitle: str,
+        address: str,
+        description: str,
+        br_name: str,
+    ) -> None:
+        await confirm_address(
+            title,
+            address,
+            subtitle=subtitle or None,
+            description=description,
+            verb=TR.buttons__continue,
+            br_name=br_name,
+        )
+
+    async def confirm_stellar_valid_until(
+        title: str,
+        subtitle: str,
+        live_until_ledger: int,
+        br_name: str,
+    ) -> None:
+        await confirm_value(
+            title,
+            str(live_until_ledger),
+            TR.stellar__valid_until_ledger,
+            br_name,
+            subtitle=subtitle or None,
+            is_data=False,
+            verb=TR.buttons__continue,
+        )
+
     async def confirm_stellar_output_amount(
         title: str,
         subtitle: str,
         amount: str,
-        asset: StellarAsset,
+        token: StellarToken,
         description: str | None = None,
+        token_contract: str | None = None,
     ) -> None:
-        from trezor.enums import StellarAssetType
-
         info_items = []
-        if asset.type != StellarAssetType.NATIVE:
-            info_items = [
-                (
-                    TR.stellar__issuer_template.format(asset.code),
-                    asset.issuer or "",
-                    None,
-                )
-            ]
+        if token.issuer is not None:
+            info_items.append(
+                (TR.stellar__issuer_template.format(token.symbol), token.issuer, None)
+            )
+        if token_contract:
+            info_items.append((TR.stellar__token_contract, token_contract, None))
 
         await confirm_value(
             title,
@@ -1808,11 +1820,12 @@ if not utils.BITCOIN_ONLY:
 
     async def confirm_stellar_output(
         address: str,
-        amount: str | None,
+        amount: str,
         output_index: int,
-        asset: StellarAsset | None,
+        token: StellarToken,
         address_description: str | None = None,
         amount_description: str | None = None,
+        token_contract: str | None = None,
     ) -> None:
         subtitle = f"{TR.words__recipient} #{output_index + 1}"
         await confirm_address(
@@ -1825,14 +1838,14 @@ if not utils.BITCOIN_ONLY:
             verb=TR.buttons__continue,
         )
 
-        if amount is not None and asset is not None:
-            await confirm_stellar_output_amount(
-                title=TR.words__send,
-                subtitle=subtitle,
-                amount=amount,
-                asset=asset,
-                description=amount_description or TR.words__amount,
-            )
+        await confirm_stellar_output_amount(
+            title=TR.words__send,
+            subtitle=subtitle,
+            amount=amount,
+            token=token,
+            description=amount_description or TR.words__amount,
+            token_contract=token_contract,
+        )
 
     async def confirm_tron_claim(
         title: str,
@@ -1865,7 +1878,7 @@ if not utils.BITCOIN_ONLY:
         ) as layout:
             await interact_with_menu(
                 layout,
-                Menu.root(menu_items, TR.send__cancel_sign),
+                Menu.root(menu_items, TR.buttons__cancel_sign),
                 br_name,
                 br_code,
             )
@@ -1924,6 +1937,7 @@ if not utils.BITCOIN_ONLY:
         recipient_addr: str,
         amount_str: str,
         maximum_fee: str,
+        native_amount_str: str | None = None,
         chunkify: bool = False,
     ) -> None:
 
@@ -1960,12 +1974,13 @@ if not utils.BITCOIN_ONLY:
         )
 
         await _confirm_summary(
-            None,
-            None,
-            maximum_fee,
-            TR.words__fee_limit,
-            title,
-            None,
+            amount=native_amount_str,
+            amount_label=TR.words__amount if native_amount_str else None,
+            fee=maximum_fee,
+            fee_label=TR.words__fee_limit,
+            title=title,
+            br_name=br_name,
+            br_code=ButtonRequestType.SignTx,
         )
 
     # TODO: #6359 Reword the TR strings to be ETH agnostic.
@@ -1974,6 +1989,7 @@ if not utils.BITCOIN_ONLY:
         amount_str: str,
         is_revoke: bool,
         maximum_fee: str,
+        native_amount_str: str | None = None,
         chunkify: bool = False,
     ) -> None:
 
@@ -2025,8 +2041,8 @@ if not utils.BITCOIN_ONLY:
         )
 
         await _confirm_summary(
-            None,
-            None,
+            native_amount_str,
+            TR.words__amount if native_amount_str else None,
             maximum_fee,
             TR.words__fee_limit,
             title,

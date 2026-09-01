@@ -20,7 +20,7 @@ from apps.common.paths import address_n_to_str
 from .types import AddressType, is_address_reference
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from collections.abc import Sequence
 
     from trezor.messages import PaymentRequest, SolanaOffchainMessageV1, SolanaTokenInfo
     from trezor.ui.layouts import StrPropertyType
@@ -66,14 +66,13 @@ async def confirm_instruction(
     signer_public_key: bytes,
     definitions: Definitions,
 ) -> None:
-    instruction_title = (
-        f"{instruction_index}/{instructions_count}: {instruction.ui_name}"
-    )
+    instruction_title_index = f"{instruction_index}/{instructions_count}"
+    instruction_full_title = f"{instruction_title_index}: {instruction.ui_name}"
 
     if instruction.is_deprecated_warning is not None:
         await confirm_metadata(
             "confirm_deprecated_warning",
-            instruction_title,
+            instruction_full_title,
             instruction.is_deprecated_warning,
             br_code=ButtonRequestType.Other,
         )
@@ -116,16 +115,16 @@ async def confirm_instruction(
                     raise ValueError  # Invalid property template
 
             await confirm_properties(
-                "confirm_instruction",
-                f"{instruction_index}/{instructions_count}",
-                (
+                br_name="confirm_instruction",
+                title=instruction_title_index,
+                subtitle=instruction.ui_name,
+                props=(
                     (
                         ui_property.display_name,
                         property_template.format(value, *args),
                         True,
                     ),
                 ),
-                instruction.ui_name,
             )
         elif ui_property.account is not None:
             # optional account, skip if not present
@@ -160,9 +159,9 @@ async def confirm_instruction(
 
             await confirm_properties(
                 "confirm_instruction",
-                f"{instruction_index}/{instructions_count}",
-                account_data,
-                instruction.ui_name,
+                title=instruction_title_index,
+                props=account_data,
+                subtitle=instruction.ui_name,
             )
         else:
             raise ValueError  # Invalid ui property
@@ -188,10 +187,10 @@ async def confirm_instruction(
                 )
 
         await confirm_properties(
-            "confirm_instruction",
-            f"{instruction_index}/{instructions_count}",
-            signers,
-            instruction.ui_name,
+            br_name="confirm_instruction",
+            title=instruction_title_index,
+            subtitle=instruction.ui_name,
+            props=signers,
         )
 
 
@@ -436,7 +435,7 @@ async def confirm_stake_withdrawer(withdrawer_account: bytes, chunkify: bool) ->
     await show_danger(
         title=TR.words__important,
         content=TR.solana__stake_withdrawal_warning,
-        verb_cancel=TR.words__cancel_and_exit,
+        verb_cancel=TR.buttons__cancel_and_exit,
         br_name="confirm_stake_warning",
     )
     await confirm_address(

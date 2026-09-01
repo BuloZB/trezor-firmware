@@ -18,18 +18,19 @@ from __future__ import annotations
 
 import base64
 import sys
-from typing import TYPE_CHECKING
+import typing as t
 
 import click
 
 from .. import stellar, tools
 from . import with_session
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from ..client import Session
 
 try:
     from stellar_sdk import (
+        Asset,
         FeeBumpTransactionEnvelope,
         parse_transaction_envelope_from_xdr,
     )
@@ -38,6 +39,24 @@ except ImportError:
     pass
 
 PATH_HELP = "BIP32 path. Always use hardened paths and the m/44h/148h/ prefix"
+ASSET_HINT_HELP = (
+    "Asset whose Stellar Asset Contract is invoked, in the SEP-11 notation "
+    "CODE:ISSUER, or `native`. Lets the device show the invocation as a token "
+    "operation. Repeatable."
+)
+
+
+def _parse_asset(value: str) -> Asset:
+    """Parse an asset written the SEP-11 way: `native`, or CODE:ISSUER."""
+    try:
+        if value == "native":
+            return Asset.native()
+        code, _, issuer = value.partition(":")
+        if not issuer:
+            raise ValueError("expected CODE:ISSUER or `native`")
+        return Asset(code, issuer)
+    except Exception as e:
+        raise click.BadParameter(f"invalid asset {value!r}: {e}")
 
 
 @click.group(name="stellar")
@@ -57,7 +76,7 @@ def cli() -> None:
 @click.option("-C", "--chunkify", is_flag=True)
 @with_session
 def get_address(
-    session: "Session", address: str, show_display: bool, chunkify: bool
+    session: Session, address: str, show_display: bool, chunkify: bool
 ) -> str:
     """Get Stellar public address."""
     address_n = tools.parse_path(address)
@@ -73,16 +92,21 @@ def get_address(
     default=stellar.DEFAULT_BIP32_PATH,
 )
 @click.option(
-    "-n",
+    "-p",
     "--network-passphrase",
     default=stellar.DEFAULT_NETWORK_PASSPHRASE,
     required=False,
     help="Network passphrase (blank for public network).",
 )
+@click.option("-a", "--asset-hint", multiple=True, help=ASSET_HINT_HELP)
 @click.argument("b64envelope")
 @with_session
 def sign_transaction(
-    session: "Session", b64envelope: str, address: str, network_passphrase: str
+    session: Session,
+    b64envelope: str,
+    address: str,
+    network_passphrase: str,
+    asset_hint: tuple[str, ...],
 ) -> bytes:
     """Sign a base64-encoded transaction envelope.
 
@@ -111,7 +135,8 @@ def sign_transaction(
         sys.exit(1)
 
     address_n = tools.parse_path(address)
-    tx, operations, tx_ext = stellar.from_envelope(envelope)
+    asset_hints = [_parse_asset(a) for a in asset_hint]
+    tx, operations, tx_ext = stellar.from_envelope(envelope, asset_hints=asset_hints)
     resp = stellar.sign_tx(
         session, tx, operations, tx_ext, address_n, network_passphrase
     )
@@ -142,14 +167,16 @@ def sign_transaction(
     help="Override the entry's signature_expiration_ledger "
     "(the last ledger sequence at which the authorization is valid).",
 )
+@click.option("-a", "--asset-hint", multiple=True, help=ASSET_HINT_HELP)
 @click.argument("b64entry")
 @with_session
 def sign_soroban_authorization(
-    session: "Session",
+    session: Session,
     b64entry: str,
     address: str,
     network_passphrase: str,
     valid_until_ledger: int | None,
+    asset_hint: tuple[str, ...],
 ) -> bytes:
     """Sign a base64-encoded Soroban authorization entry.
 
@@ -191,7 +218,10 @@ def sign_soroban_authorization(
         sys.exit(1)
 
     address_n = tools.parse_path(address)
-    authorization = stellar.from_authorization_entry(entry_xdr)
+    asset_hints = [_parse_asset(a) for a in asset_hint]
+    authorization = stellar.from_authorization_entry(
+        entry_xdr, network_passphrase, asset_hints=asset_hints
+    )
     if valid_until_ledger is not None:
         authorization.signature_expiration_ledger = valid_until_ledger
     resp = stellar.sign_soroban_authorization(

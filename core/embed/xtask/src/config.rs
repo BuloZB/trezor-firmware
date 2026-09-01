@@ -5,6 +5,7 @@ use serde::Deserialize;
 
 use crate::args::Project;
 use crate::helpers::workspace_dir;
+use crate::options::OptionsMap;
 
 #[derive(Deserialize)]
 pub struct ModelConfig {
@@ -135,7 +136,7 @@ impl BoardConfig {
 }
 
 #[derive(Deserialize)]
-pub struct ProjectProfile {
+pub struct ProjectConfig {
     pub uses: Vec<String>,
     pub elf_sections: Vec<String>,
     /// Body sections used when the model has secmon and the binary needs a
@@ -150,9 +151,12 @@ pub struct ProjectProfile {
     pub split_pad_to: Option<String>,
     #[serde(default)]
     pub split_part2_sections: Option<Vec<String>>,
+    /// The project's complete mapping from build options to cargo features.
+    #[serde(rename = "build-options")]
+    pub options: OptionsMap,
 }
 
-impl ProjectProfile {
+impl ProjectConfig {
     pub fn load(project: Project) -> Result<Self> {
         let pkg = project.package_name(false);
         let path = workspace_dir()?
@@ -160,10 +164,30 @@ impl ProjectProfile {
             .join(pkg)
             .join("project.toml");
         let content = std::fs::read_to_string(&path)
-            .with_context(|| format!("Failed to read project profile: {}", path.display()))?;
+            .with_context(|| format!("Failed to read project config: {}", path.display()))?;
         toml::from_str(&content)
-            .with_context(|| format!("Failed to parse project profile: {}", path.display()))
+            .with_context(|| format!("Failed to parse project config: {}", path.display()))
     }
+}
+
+/// Returns the names declared in the `[features]` table of the given
+/// package's Cargo.toml. Used to validate that option-mapped features exist
+/// in the package actually being built.
+pub fn package_features(package: &str) -> Result<HashSet<String>> {
+    let path = workspace_dir()?
+        .join("projects")
+        .join(package)
+        .join("Cargo.toml");
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read package manifest: {}", path.display()))?;
+    let manifest: toml::Value = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse package manifest: {}", path.display()))?;
+
+    Ok(manifest
+        .get("features")
+        .and_then(|v| v.as_table())
+        .map(|table| table.keys().cloned().collect())
+        .unwrap_or_default())
 }
 
 #[derive(Deserialize, Default, Clone)]
@@ -172,19 +196,19 @@ pub struct ModelProjectOverride {
     pub exclude: Vec<String>,
 }
 
-pub struct BoardFeatures {
+pub struct BoardDefinition {
     pub features: Vec<String>,
     pub board_header: String,
 }
 
-pub fn resolve_board_features(
+pub fn resolve_board_definition(
     model_config: &ModelConfig,
     board_id: &str,
+    project_config: &ProjectConfig,
     project: Project,
     emulator: bool,
-) -> Result<BoardFeatures> {
+) -> Result<BoardDefinition> {
     let board_config = BoardConfig::load(&model_config.model_id, board_id)?;
-    let project_profile = ProjectProfile::load(project)?;
     let pkg = project.package_name(false);
     let model_override = model_config
         .project_overrides
@@ -192,19 +216,19 @@ pub fn resolve_board_features(
         .cloned()
         .unwrap_or_default();
 
-    let uses: HashSet<&str> = project_profile.uses.iter().map(|s| s.as_str()).collect();
+    let uses: HashSet<&str> = project_config.uses.iter().map(|s| s.as_str()).collect();
     let exclude: HashSet<&str> = model_override.exclude.iter().map(|s| s.as_str()).collect();
 
     let mut features = Vec::new();
 
-    // Model-intrinsic features filtered by project profile then model exceptions
+    // Model-intrinsic features filtered by project config then model exceptions
     for f in &model_config.features {
         if uses.contains(f.as_str()) && !exclude.contains(f.as_str()) {
             features.push(f.clone());
         }
     }
 
-    // Board peripheral features filtered by project profile then model exceptions
+    // Board peripheral features filtered by project config then model exceptions
     for periph in &board_config.peripherals {
         if uses.contains(periph.name.as_str()) && !exclude.contains(periph.name.as_str()) {
             features.push(periph.name.clone());
@@ -238,7 +262,7 @@ pub fn resolve_board_features(
         board_config.header
     };
 
-    Ok(BoardFeatures {
+    Ok(BoardDefinition {
         features,
         board_header,
     })

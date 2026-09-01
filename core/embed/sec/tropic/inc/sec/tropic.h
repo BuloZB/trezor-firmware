@@ -71,9 +71,14 @@
 
 lt_ret_t tropic_init(cli_t* cli);
 
-void tropic01_reset(void);
-
 void tropic_deinit(void);
+
+#ifdef USE_TROPIC_LOGGING
+// Routes libtropic's `LT_LOG_*()` output to `cli`. Pass NULL to stop.
+void tropic_set_log_sink(cli_t* cli);
+#endif  // USE_TROPIC_LOGGING
+
+lt_handle_t* tropic_get_handle(void);
 
 typedef struct {
   uint32_t distribution_version;
@@ -89,6 +94,9 @@ lt_ret_t tropic_custom_session_start(cli_t* cli,
                                      lt_pkey_index_t pairing_key_index);
 
 lt_ret_t tropic_session_invalidate(void);
+
+// Discards the session data without communicating with Tropic.
+void tropic_session_forget(void);
 
 bool tropic_get_pubkey(cli_t* cli, lt_handle_t* tropic_handle,
                        curve25519_key pubkey);
@@ -147,6 +155,11 @@ bool tropic_data_multi_read(uint16_t first_slot, uint16_t slot_count,
 bool tropic_random_buffer(void* buffer, size_t length);
 
 void tropic_random_buffer_time(uint32_t* time_ms);
+
+#ifdef TREZOR_EMULATOR
+void tropic_random_reseed(uint32_t seed);
+bool tropic_session_start(void);
+#endif
 
 #ifdef USE_STORAGE
 void tropic_session_start_time(uint32_t* time_ms);

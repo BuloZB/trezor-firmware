@@ -1,12 +1,14 @@
 import micropython
 import sys
-from typing import TYPE_CHECKING, Any, Callable, TypeAlias
+import vfs
+from io import open
+from os import getenv
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import coveragedata
-from uio import open
-from uos import getenv
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import FrameType
 
     TraceFunction: TypeAlias = Callable[[FrameType, str, Any], "TraceFunction"]
@@ -119,4 +121,7 @@ try:
     import main  # noqa: F401
 finally:
     print("\n------------------ script exited ------------------")
+    # enable filesystem access for frozen emulator
+    if len(vfs.mount()) == 0:
+        vfs.mount(vfs.VfsPosix(), "/")
     __prof__.write_data()

@@ -24,6 +24,7 @@
 #include <io/display.h>
 #include <io/rsod.h>
 #include <io/usb_config.h>
+#include <sec/monoctr.h>
 #include <sec/rsod_special.h>
 #include <sec/unit_properties.h>
 #include <sys/applet.h>
@@ -87,6 +88,8 @@ static void drivers_init(void) {
   flash_init();
   flash_otp_init();
 
+  monoctr_init();
+
   unit_properties_init();
 
   display_init(DISPLAY_RESET_CONTENT);
@@ -100,7 +103,9 @@ static void drivers_init(void) {
 #endif
 
 #ifdef USE_TROPIC
-  tropic_init(NULL);
+  ensure_true(tropic_init(NULL) == LT_OK,
+              "Failed to initialize Tropic driver. Make sure the "
+              "`model_server` is running.");
   ensure(tropic_ensure_configuration(), "Tropic configuration check failed");
 #endif
 

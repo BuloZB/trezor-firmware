@@ -140,6 +140,11 @@ def core_emulator(
     ) as emu:
         # Modifying emu.client to add screen recording (when --ui=test is used)
         _check_protocol(request, emu.client)
+        # core_emulator bypasses the client/session fixtures that normally sync
+        # TR's per-thread layout type, so TR.translate() would otherwise resolve
+        # per-model strings against the default (Bolt) instead of this emulator's
+        # actual layout.
+        translations.set_layout_type_and_lang(emu.client.debug.layout_type, "en")
         with ui_tests.screen_recording(emu.client, request, lambda: emu.client) as _:
             yield emu
 
@@ -715,7 +720,7 @@ BACKUP_METHODS = [
     pytest.param(arg, id=arg.name)
     for arg in [
         messages.BackupMethod.Display,
-        messages.BackupMethod.N4W1,
+        messages.BackupMethod.N1W1,
     ]
 ]
 
@@ -728,7 +733,7 @@ def backup_method(request, _raw_test_ctx: TrezorTestContext) -> messages.BackupM
     See https://docs.pytest.org/en/stable/how-to/fixtures.html#parametrizing-fixtures.
     """
     REQUIRED_CAPABILITY = {
-        messages.BackupMethod.N4W1: messages.Capability.N4W1,
+        messages.BackupMethod.N1W1: messages.Capability.N1W1,
     }
     method: messages.BackupMethod = request.param
     if (capability := REQUIRED_CAPABILITY.get(method)) is not None:

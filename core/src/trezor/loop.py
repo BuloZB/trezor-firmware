@@ -7,14 +7,15 @@ stepped through until completion, and can get asynchronously blocked by
 See `schedule`, `run`, and syscalls `sleep`, `wait`, `signal` and `race`.
 """
 
+import timeq
 import utime
-import utimeq
 from typing import TYPE_CHECKING
 
 from trezor import io, log
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Coroutine, Generator, Generic, TypeVar
+    from collections.abc import Awaitable, Callable, Coroutine, Generator
+    from typing import Any, Generic, TypeVar
 
     from .loop import wait
 
@@ -28,7 +29,7 @@ else:
     T = 0
 
 # tasks scheduled for execution in the future
-_queue = utimeq.utimeq(64)
+_queue = timeq.timeq(64)
 
 # tasks paused on I/O
 _paused: dict[int, set[Task]] = {}

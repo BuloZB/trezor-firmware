@@ -35,11 +35,24 @@
  * The function requires that Optiga and/or Tropic to be initialized
  * if they are enabled by USE_OPTIGA/USE_TROPIC.
  *
+ * If any entropy source fails, the function halts the device with a
+ * fatal error instead of returning. This is to ensure that a failure
+ * to generate strong randomness cannot be accidentally overlooked.
+ *
  * @param buffer Buffer to fill with random bytes.
  * @param buffer_size Size of the buffer in bytes.
- *
- * @return True on success, false on failure.
  */
-bool __wur rng_fill_buffer_strong(void* buffer, size_t buffer_size);
+void rng_fill_buffer_strong(void* buffer, size_t buffer_size);
 
+/**
+ * @brief Estimates the duration of a 32-byte `rng_fill_buffer_strong()`
+ * call and adds the result to `*time_ms`.
+ *
+ * Used to precompute the duration of operations that call
+ * `rng_fill_buffer_strong()`, e.g. to render progress bars. Accumulates the
+ * expected time of each enabled secure element's TRNG request. The MCU's
+ * TRNG duration is negligible and not counted.
+ *
+ * @param time_ms Running total in milliseconds to add the estimate to.
+ */
 void rng_fill_buffer_strong_time(uint32_t* time_ms);

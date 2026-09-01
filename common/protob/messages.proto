@@ -149,10 +149,10 @@ enum MessageType {
     MessageType_DebugLinkGetPairingInfo = 9011 [(bitcoin_only) = true, (wire_debug_in) = true];
     MessageType_DebugLinkPairingInfo = 9012 [(bitcoin_only) = true, (wire_debug_out) = true];
     MessageType_DebugLinkSetLogFilter = 9013 [(bitcoin_only) = true, (wire_debug_in) = true];
-    MessageType_DebugLinkN4W1Connected = 9014 [(bitcoin_only) = true, (wire_debug_in) = true];
-    MessageType_DebugLinkN4W1Write = 9015 [(bitcoin_only) = true, (wire_debug_out) = true];
-    MessageType_DebugLinkN4W1Read = 9016 [(bitcoin_only) = true, (wire_debug_out) = true];
-    MessageType_DebugLinkN4W1Response = 9017 [(bitcoin_only) = true, (wire_debug_in) = true];
+    MessageType_DebugLinkN1W1Connected = 9014 [(bitcoin_only) = true, (wire_debug_in) = true];
+    MessageType_DebugLinkN1W1Write = 9015 [(bitcoin_only) = true, (wire_debug_out) = true];
+    MessageType_DebugLinkN1W1Read = 9016 [(bitcoin_only) = true, (wire_debug_out) = true];
+    MessageType_DebugLinkN1W1Response = 9017 [(bitcoin_only) = true, (wire_debug_in) = true];
     MessageType_DebugLinkSetBatteryState = 9018 [(bitcoin_only) = true, (wire_debug_in) = true];
 
     // Ethereum
@@ -176,8 +176,7 @@ enum MessageType {
     MessageType_EthereumSignTypedHash = 470 [(wire_in) = true];
     MessageType_EthereumDefinitionRequest = 471 [(wire_out) = true];
     MessageType_EthereumDefinitionAck = 472 [(wire_in) = true];
-    MessageType_EthereumSignAuth7702 = 473 [(wire_in) = true];
-    MessageType_EthereumAuth7702Signature = 474 [(wire_out) = true];
+    reserved 473 to 474;
 
     // NEM
     MessageType_NEMGetAddress = 67 [(wire_in) = true];
@@ -395,7 +394,8 @@ enum MessageType {
     MessageType_TronUnfreezeBalanceV2Contract = 2208 [(wire_in) = true];
     MessageType_TronWithdrawUnfreeze = 2209 [(wire_in) = true];
     MessageType_TronVoteWitnessContract = 2210 [(wire_in) = true];
-    // 2 indexes reserved for (un)delegation. PR in review.
+    MessageType_TronDelegateResourceContract = 2211 [(wire_in) = true];
+    MessageType_TronUnDelegateResourceContract = 2212 [(wire_in) = true];
     MessageType_TronWithdrawBalance = 2213 [(wire_in) = true];
 
     // Benchmark
